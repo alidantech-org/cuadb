@@ -1,5 +1,5 @@
 ---
-{id: TSK-445BE17209D5,name: Harden and verify the single-container production image,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:09.092Z,updated_at: 2026-11-04T07:32:09.092Z,tags: [cuadb,release],depends_on: [TSK-4258A9C13469,TSK-4C7273B9E46A],order: 2048}
+{id: TSK-445BE17209D5,name: Harden and verify the single-container production image,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:09.092Z,updated_at: 2026-11-04T14:37:44.862Z,tags: [cuadb,release],depends_on: [TSK-4258A9C13469,TSK-4C7273B9E46A],order: 2048,extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T14:37:44.862Z}]}}
 ---
 
 # Harden and verify the single-container production image

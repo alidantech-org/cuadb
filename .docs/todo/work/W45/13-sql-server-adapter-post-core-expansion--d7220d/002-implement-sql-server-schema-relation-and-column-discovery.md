@@ -24,3 +24,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T14:44:56.690Z · PETER IRUNGU
+
+BLOCKED (not started): needs a disposable SQL Server and EULA approval; see docs/sql-server.md plan. Nothing in the README claims SQL Server support.
