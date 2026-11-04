@@ -1,5 +1,5 @@
 ---
-{id: TSK-E25A9F7241A3,name: "Evaluate SQL Server Rust driver, TLS and connection contract",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:09.649Z,updated_at: 2026-11-04T07:32:09.649Z,tags: [cuadb,mssql],depends_on: [TSK-54598487D0CE],order: 1024}
+{id: TSK-E25A9F7241A3,name: "Evaluate SQL Server Rust driver, TLS and connection contract",type: task,status: archived,priority: medium,created_at: 2026-11-04T07:32:09.649Z,updated_at: 2026-11-04T15:14:25.035Z,tags: [cuadb,mssql],depends_on: [TSK-54598487D0CE],order: 1024,extra: {status_history: [{from: planned,to: archived,at: 2026-11-04T15:14:25.035Z}]},archived_at: 2026-11-04T15:14:25.352Z}
 ---
 
 # Evaluate SQL Server Rust driver, TLS and connection contract

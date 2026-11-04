@@ -2,6 +2,10 @@
 {id: DOC-A146C291CE62,name: CuaDB architecture and adapter boundaries,type: documentation,tags: [cuadb,architecture]}
 ---
 
+---
+{id: DOC-A146C291CE62,name: CuaDB architecture and adapter boundaries,type: documentation,tags: [cuadb,architecture]}
+---
+
 # CuaDB architecture and adapter boundaries
 
 ## Product boundary
@@ -11,7 +15,7 @@ CuaDB is a lightweight, read-only database explorer. It is deliberately not a SQ
 The HTTP layer parses browser selection requests, validates basic input and returns full HTML pages or scoped HTMX fragments. Templates present typed view models; they never construct database queries. The application layer owns configured connection profiles, bounded pools, error conversion, request cancellation and redaction. The adapter interface describes schema discovery, relation metadata, paged data, statistics and capabilities without assuming a common catalog implementation. Each database adapter owns its driver, identifier rules, SQL generation, type decoding and metadata support.
 
 ## Engine support order
-PostgreSQL is first and the default URL scheme. It must work with PostgreSQL 18 and optionally PostGIS 3.6. MySQL/MariaDB and SQLite follow using the same browser-level contracts but independent metadata semantics. Microsoft SQL Server is a post-core expansion only after a driver compatibility decision. PostgreSQL connections target one database; another database is a separate trusted connection profile. MySQL database namespaces and SQLite file locations are represented honestly rather than renamed into fictitious PostgreSQL schemas.
+PostgreSQL is first and the default URL scheme. It must work with PostgreSQL 18 and optionally PostGIS 3.6. MySQL/MariaDB and SQLite follow using the same browser-level contracts but independent metadata semantics. The supported engines for this roadmap are PostgreSQL, MySQL, MariaDB and SQLite. No additional engine adapter is planned until the current product features are complete. PostgreSQL connections target one database; another database is a separate trusted connection profile. MySQL database namespaces and SQLite file locations are represented honestly rather than renamed into fictitious PostgreSQL schemas.
 
 ## Query flow
 A browser selects a configured connection, schema, relation, page and sort. The typed route resolves the trusted connection profile, consults the adapter and validates relation identifiers against catalog metadata. The adapter executes only bounded, read-only queries. It returns typed cells and availability-aware metadata. Rust maps this into an Askama view model; HTMX swaps a small HTML fragment. Sensitive rows are never stored in the browser as a durable client cache or exposed through a generic JSON SQL API.
