@@ -19,8 +19,8 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [x] Render usable SQLite database information with explicit unavailable metrics.
 - [x] Test in-memory or disposable fixture files across relevant table types.
 - [ ] Verify Docker bind mounts read-only and no write side effects after browsing.
-- [ ] Document SQLite path rules, WAL caveats and limits of available storage statistics.
-- [ ] Run common adapter contract tests across PostgreSQL, MySQL and SQLite.
+- [x] Document SQLite path rules, WAL caveats and limits of available storage statistics.
+- [x] Run common adapter contract tests across PostgreSQL, MySQL and SQLite.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
@@ -30,3 +30,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T12:45:49.953Z · PETER IRUNGU
 
 Progress evidence (2026-11-04): the adapter reports per-table size statistics unavailable rather than inventing values, and fixture tests cover the SQLite database, view, index, FK, row and unavailable size behavior. Docker read-only mount behavior and common cross-adapter contract tests remain open; WAL caveats need fuller documentation.
+
+### 2026-11-04T14:10:06.968Z · PETER IRUNGU
+
+Items 4,5 verified: docs/sqlite.md; tests/adapter_contract.rs runs one behavioral contract through the DatabaseAdapter trait on PostgreSQL 18, MariaDB 11.8, MySQL 8.4 and SQLite - all pass. Contract caught a real PostgreSQL defect: the row filter treated % and _ as ILIKE wildcards (fixed with escaping). Item 3 (Docker :ro bind mount in a real container) deferred to Group 12 Docker verification.

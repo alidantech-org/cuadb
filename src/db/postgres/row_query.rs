@@ -202,8 +202,9 @@ pub fn build(
         .iter()
         .map(|col| Ok(format!("t.{}::text", quote(&col.column.name)?)))
         .collect::<Result<Vec<_>, DbError>>()?;
+    // The filter is a literal substring: escape the LIKE wildcards and the escape character.
     let predicate = format!(
-        "({seek_predicate}) AND ($4::text IS NULL OR concat_ws(' ', {}) ILIKE ('%' || $4::text || '%'))",
+        r#"({seek_predicate}) AND ($4::text IS NULL OR concat_ws(' ', {}) ILIKE ('%' || replace(replace(replace($4::text, E'\\', E'\\\\'), '%', E'\\%'), '_', E'\\_') || '%'))"#,
         search_values.join(", ")
     );
     let offset = if seek.is_some() {

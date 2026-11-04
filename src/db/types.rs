@@ -55,6 +55,8 @@ pub enum RelationKind {
     MaterializedView,
     Partition,
     ForeignTable,
+    /// SQLite `CREATE VIRTUAL TABLE` (FTS, R-Tree, ...); backed by a module, not a plain table.
+    VirtualTable,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

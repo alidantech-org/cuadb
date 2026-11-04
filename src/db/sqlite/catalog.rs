@@ -1,7 +1,7 @@
 //! SQLite metadata and bounded read-only row adapter.
 use super::classify;
 use crate::db::{adapter::DatabaseAdapter, types::*};
-use sqlx::{Row, Sqlite, SqlitePool, TypeInfo, ValueRef, sqlite::SqliteRow};
+use sqlx::{Row, Sqlite, SqlitePool, sqlite::SqliteRow};
 use std::time::Duration;
 use tokio::time::timeout;
 const MAX_RELATIONS: i64 = 500;
@@ -10,6 +10,8 @@ const MAX_DETAILS: i64 = 300;
 const MAX_VISIBLE: usize = 24;
 const MAX_PAGE: u32 = 100;
 const MAX_OFFSET: u64 = 10_000;
+/// Bytes/characters fetched per text or blob cell (one over the 256 display limit).
+const PREVIEW: usize = 257;
 #[derive(Clone)]
 pub struct SqliteCatalog {
     pool: SqlitePool,
@@ -33,21 +35,32 @@ impl SqliteCatalog {
             .map_err(|_| DbError::new(DbErrorKind::TimedOut))?
             .map_err(classify)
     }
-    async fn visible(&self, id: &RelationId) -> Result<(), DbError> {
-        let n: i64 = self
+    /// Relation kind and whether it has a rowid; errors if it is not a visible user relation.
+    async fn meta(&self, id: &RelationId) -> Result<(RelationKind, bool), DbError> {
+        if id.namespace != "main" {
+            return Err(DbError::new(DbErrorKind::InvalidIdentifier));
+        }
+        let row = self
             .run(
-                sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM sqlite_schema WHERE name=? AND type IN ('table','view')",
+                sqlx::query(
+                    "SELECT type, wr FROM pragma_table_list WHERE schema='main' AND name=? \
+                     AND type IN ('table','view','virtual') AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' LIMIT 1",
                 )
                 .bind(&id.name)
-                .fetch_one(&self.pool),
+                .fetch_optional(&self.pool),
             )
-            .await?;
-        if n == 1 {
-            Ok(())
-        } else {
-            Err(DbError::new(DbErrorKind::InvalidIdentifier))
-        }
+            .await?
+            .ok_or_else(|| DbError::new(DbErrorKind::InvalidIdentifier))?;
+        let kind: String = get(&row, "type")?;
+        let without_rowid: i64 = get(&row, "wr")?;
+        Ok(match kind.as_str() {
+            "view" => (RelationKind::View, false),
+            "virtual" => (RelationKind::VirtualTable, false),
+            _ => (RelationKind::Table, without_rowid == 0),
+        })
+    }
+    async fn visible(&self, id: &RelationId) -> Result<(), DbError> {
+        self.meta(id).await.map(|_| ())
     }
     async fn details(&self, id: &RelationId) -> Result<CatalogList<ColumnDetail>, DbError> {
         self.visible(id).await?;
@@ -60,7 +73,8 @@ impl SqliteCatalog {
         let mut out = Vec::new();
         for r in &rows {
             let hidden: i64 = r.try_get("hidden").unwrap_or(0);
-            if hidden >= 2 {
+            // 1 = hidden column of a virtual table; 2/3 = VIRTUAL/STORED generated column.
+            if hidden == 1 {
                 continue;
             }
             let name: String = get(r, "name")?;
@@ -82,7 +96,11 @@ impl SqliteCatalog {
                 position: i16::try_from(cid + 1).unwrap_or(i16::MAX),
                 unique_key: pk > 0,
                 identity: None,
-                generated: None,
+                generated: match hidden {
+                    2 => Some("VIRTUAL".into()),
+                    3 => Some("STORED".into()),
+                    _ => None,
+                },
                 domain: None,
                 enum_values: Availability::Unavailable,
             })
@@ -181,6 +199,29 @@ fn capped<T>(mut v: Vec<T>, n: usize) -> CatalogList<T> {
         truncated,
     }
 }
+/// Declared type, plus the actual storage class when SQLite's dynamic typing
+/// stored something the declared affinity would not predict.
+fn storage_label(declared: &str, class: &str) -> String {
+    let upper = declared.to_ascii_uppercase();
+    let expected: &[&str] = if declared == "dynamic" {
+        &[]
+    } else if upper.contains("INT") {
+        &["integer"]
+    } else if upper.contains("CHAR") || upper.contains("CLOB") || upper.contains("TEXT") {
+        &["text"]
+    } else if upper.contains("BLOB") {
+        &["blob"]
+    } else if upper.contains("REAL") || upper.contains("FLOA") || upper.contains("DOUB") {
+        &["real", "integer"]
+    } else {
+        &["integer", "real"]
+    };
+    if class == "null" || expected.contains(&class) {
+        declared.to_string()
+    } else {
+        format!("{declared} · {class}")
+    }
+}
 fn cell(r: Option<String>, ty: &str) -> (Cell, RowPreview) {
     let Some(v) = r else {
         return (
@@ -254,21 +295,9 @@ impl DatabaseAdapter for SqliteCatalog {
             .collect())
     }
     async fn statistics(&self, id: &RelationId) -> Result<RelationStats, DbError> {
-        self.visible(id).await?;
-        let row = self
-            .run(
-                sqlx::query("SELECT type FROM sqlite_schema WHERE name=? LIMIT 1")
-                    .bind(&id.name)
-                    .fetch_one(&self.pool),
-            )
-            .await?;
-        let kind: String = get(&row, "type")?;
+        let (kind, _) = self.meta(id).await?;
         Ok(RelationStats {
-            relation_kind: Availability::Available(if kind == "view" {
-                RelationKind::View
-            } else {
-                RelationKind::Table
-            }),
+            relation_kind: Availability::Available(kind),
             estimated_rows: Availability::Unavailable,
             table_bytes: Availability::Unavailable,
             index_bytes: Availability::Unavailable,
@@ -323,7 +352,17 @@ impl DatabaseAdapter for SqliteCatalog {
         if ns != "main" {
             return Err(DbError::new(DbErrorKind::InvalidIdentifier));
         }
-        let rows=self.run(sqlx::query("SELECT name,type FROM sqlite_schema WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name LIMIT ?").bind(MAX_RELATIONS+1).fetch_all(&self.pool)).await?;
+        let rows = self
+            .run(
+                sqlx::query(
+                    "SELECT name, type FROM pragma_table_list WHERE schema='main' \
+                     AND type IN ('table','view','virtual') AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' \
+                     ORDER BY name LIMIT ?",
+                )
+                .bind(MAX_RELATIONS + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
         Ok(capped(
             rows.iter()
                 .map(|r| {
@@ -334,10 +373,10 @@ impl DatabaseAdapter for SqliteCatalog {
                             namespace: "main".into(),
                             name,
                         },
-                        kind: if ty == "view" {
-                            RelationKind::View
-                        } else {
-                            RelationKind::Table
+                        kind: match ty.as_str() {
+                            "view" => RelationKind::View,
+                            "virtual" => RelationKind::VirtualTable,
+                            _ => RelationKind::Table,
                         },
                     })
                 })
@@ -400,26 +439,59 @@ impl DatabaseAdapter for SqliteCatalog {
         if selected.len() > MAX_VISIBLE {
             return Err(DbError::new(DbErrorKind::InvalidIdentifier));
         }
+        let (_, has_rowid) = self.meta(id).await?;
         let mut projections = Vec::new();
         for (i, c) in selected.iter().enumerate() {
-            projections.push(format!("{} AS c{i}", quote(&c.column.name)?))
+            let q = quote(&c.column.name)?;
+            // Bound text/blob transfer in SQLite itself; the length column reveals truncation.
+            projections.push(format!(
+                "CASE WHEN typeof({q}) IN ('text','blob') THEN substr({q},1,{PREVIEW}) ELSE {q} END AS c{i}, \
+                 CASE WHEN typeof({q}) IN ('text','blob') THEN length({q}) END AS l{i}, typeof({q}) AS t{i}"
+            ));
         }
         if projections.is_empty() {
             projections.push("1 AS __cuadb_empty".into());
         }
+        // Deterministic ties: primary key columns, else rowid when the table has one.
+        let rowid_usable = has_rowid
+            && !columns.iter().any(|c| {
+                matches!(
+                    c.column.name.to_ascii_lowercase().as_str(),
+                    "rowid" | "_rowid_" | "oid"
+                )
+            });
+        let mut tie_break = columns
+            .iter()
+            .filter(|c| c.column.primary_key)
+            .map(|c| quote(&c.column.name))
+            .collect::<Result<Vec<_>, _>>()?;
+        if tie_break.is_empty() && rowid_usable {
+            tie_break.push("rowid".into());
+        }
+        let stable_order = !tie_break.is_empty();
         let order = if let Some(s) = &o.sort {
-            if !columns.iter().any(|c| c.column.name == s.column) {
-                return Err(DbError::new(DbErrorKind::InvalidIdentifier));
+            let column = columns
+                .iter()
+                .find(|c| c.column.name == s.column)
+                .ok_or_else(|| DbError::new(DbErrorKind::InvalidIdentifier))?;
+            if !self.sort_supported(&column.column.native_type) {
+                return Err(DbError::new(DbErrorKind::Unsupported));
             }
-            format!(
-                " ORDER BY {} {}",
-                quote(&s.column)?,
+            let q = quote(&s.column)?;
+            let mut order = format!(
+                " ORDER BY ({q} IS NULL), {q} {}",
                 if s.direction == SortDirection::Asc {
                     "ASC"
                 } else {
                     "DESC"
                 }
-            )
+            );
+            for key in tie_break.iter().filter(|key| **key != q) {
+                order.push_str(&format!(", {key}"));
+            }
+            order
+        } else if stable_order {
+            format!(" ORDER BY {}", tie_break.join(", "))
         } else {
             String::new()
         };
@@ -439,7 +511,12 @@ impl DatabaseAdapter for SqliteCatalog {
         sql.push_str(" LIMIT ? OFFSET ?");
         let mut q = sqlx::query(&sql);
         if let Some(f) = &o.filter {
-            q = q.bind(format!("%{}%", f.replace('%', "\\%").replace('_', "\\_")))
+            q = q.bind(format!(
+                "%{}%",
+                f.replace('\\', "\\\\")
+                    .replace('%', "\\%")
+                    .replace('_', "\\_")
+            ))
         }
         let rows = self
             .run(
@@ -455,78 +532,95 @@ impl DatabaseAdapter for SqliteCatalog {
             let mut cells = Vec::new();
             let mut ps = Vec::new();
             for (i, c) in selected.iter().enumerate() {
-                let value = r
-                    .try_get_raw(format!("c{i}").as_str())
+                let class: String = r
+                    .try_get(format!("t{i}").as_str())
                     .map_err(|_| DbError::new(DbErrorKind::Internal))?;
-                let (v, p) = if value.is_null() {
-                    cell(None, &c.column.native_type)
-                } else {
-                    let type_name = value.type_info().name().to_ascii_uppercase();
-                    match type_name.as_str() {
-                        "BLOB" => {
-                            let bytes: Vec<u8> = r
-                                .try_get(format!("c{i}").as_str())
-                                .map_err(|_| DbError::new(DbErrorKind::Internal))?;
-                            let preview = format!("{} bytes", bytes.len());
-                            (
-                                Cell::Bytes(bytes),
-                                RowPreview {
-                                    text: preview,
-                                    truncated: false,
-                                    type_name: c.column.native_type.clone(),
-                                    detail: None,
-                                },
-                            )
-                        }
-                        "INTEGER" | "BOOLEAN" => {
-                            let n: i64 = r
-                                .try_get(format!("c{i}").as_str())
-                                .map_err(|_| DbError::new(DbErrorKind::Internal))?;
-                            if type_name == "BOOLEAN" {
-                                (
-                                    Cell::Boolean(n != 0),
-                                    RowPreview {
-                                        text: n.to_string(),
-                                        truncated: false,
-                                        type_name: c.column.native_type.clone(),
-                                        detail: None,
-                                    },
-                                )
-                            } else {
-                                (
-                                    Cell::Integer(n),
-                                    RowPreview {
-                                        text: n.to_string(),
-                                        truncated: false,
-                                        type_name: c.column.native_type.clone(),
-                                        detail: None,
-                                    },
-                                )
+                let total: Option<i64> = r
+                    .try_get(format!("l{i}").as_str())
+                    .map_err(|_| DbError::new(DbErrorKind::Internal))?;
+                let type_name = storage_label(&c.column.native_type, &class);
+                let (v, mut p) = match class.as_str() {
+                    "null" => cell(None, &type_name),
+                    "blob" => {
+                        let bytes: Vec<u8> = r
+                            .try_get(format!("c{i}").as_str())
+                            .map_err(|_| DbError::new(DbErrorKind::Internal))?;
+                        let total = total.unwrap_or(bytes.len() as i64);
+                        let truncated = total as usize > bytes.len();
+                        let text = if truncated {
+                            format!("{total} bytes (first {} shown)", bytes.len())
+                        } else {
+                            format!("{total} bytes")
+                        };
+                        let cell = if truncated {
+                            Cell::Truncated {
+                                preview: format!(
+                                    "\\x{}",
+                                    bytes.iter().map(|b| format!("{b:02x}")).collect::<String>()
+                                ),
+                                type_name: type_name.clone(),
                             }
+                        } else {
+                            Cell::Bytes(bytes)
+                        };
+                        (
+                            cell,
+                            RowPreview {
+                                text,
+                                truncated,
+                                type_name: type_name.clone(),
+                                detail: None,
+                            },
+                        )
+                    }
+                    "integer" => {
+                        let n: i64 = r
+                            .try_get(format!("c{i}").as_str())
+                            .map_err(|_| DbError::new(DbErrorKind::Internal))?;
+                        let boolean = c.column.native_type.eq_ignore_ascii_case("boolean")
+                            || c.column.native_type.eq_ignore_ascii_case("bool");
+                        (
+                            if boolean && (n == 0 || n == 1) {
+                                Cell::Boolean(n == 1)
+                            } else {
+                                Cell::Integer(n)
+                            },
+                            RowPreview {
+                                text: n.to_string(),
+                                truncated: false,
+                                type_name: type_name.clone(),
+                                detail: None,
+                            },
+                        )
+                    }
+                    "real" => {
+                        let n: f64 = r
+                            .try_get(format!("c{i}").as_str())
+                            .map_err(|_| DbError::new(DbErrorKind::Internal))?;
+                        let text = n.to_string();
+                        (
+                            Cell::Decimal(text.clone()),
+                            RowPreview {
+                                text,
+                                truncated: false,
+                                type_name: type_name.clone(),
+                                detail: None,
+                            },
+                        )
+                    }
+                    _ => {
+                        let raw: String = r
+                            .try_get(format!("c{i}").as_str())
+                            .map_err(|_| DbError::new(DbErrorKind::Internal))?;
+                        let (mut cell_value, preview) = cell(Some(raw), &type_name);
+                        // `cell` guesses numbers from text; a text-class value stays text.
+                        if let Cell::Integer(_) | Cell::Decimal(_) | Cell::Boolean(_) = cell_value {
+                            cell_value = Cell::Text(preview.text.clone());
                         }
-                        "REAL" => {
-                            let n: f64 = r
-                                .try_get(format!("c{i}").as_str())
-                                .map_err(|_| DbError::new(DbErrorKind::Internal))?;
-                            let text = n.to_string();
-                            (
-                                Cell::Decimal(text.clone()),
-                                RowPreview {
-                                    text,
-                                    truncated: false,
-                                    type_name: c.column.native_type.clone(),
-                                    detail: None,
-                                },
-                            )
-                        }
-                        _ => {
-                            let raw: String = r
-                                .try_get(format!("c{i}").as_str())
-                                .map_err(|_| DbError::new(DbErrorKind::Internal))?;
-                            cell(Some(raw), &c.column.native_type)
-                        }
+                        (cell_value, preview)
                     }
                 };
+                p.type_name = type_name;
                 cells.push(v);
                 ps.push(p)
             }
@@ -542,7 +636,7 @@ impl DatabaseAdapter for SqliteCatalog {
             has_previous: o.page > 0,
             next_cursor: None,
             previous_cursor: None,
-            stable_order: false,
+            stable_order,
             keyset_enabled: false,
             page: o.page,
             offset,

@@ -1,5 +1,5 @@
 ---
-{id: TSK-F71C30D38C2C,name: Open mounted SQLite databases through restricted read-only paths,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.968Z,updated_at: 2026-11-04T12:33:38.494Z,tags: [cuadb,sqlite],depends_on: [TSK-A3CFF0B5E267,TSK-55D20E7D39E9],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T12:33:38.494Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-F71C30D38C2C/1793795618496-start,started_at: 2026-11-04T12:33:38.512Z}]}}}
+{id: TSK-F71C30D38C2C,name: Open mounted SQLite databases through restricted read-only paths,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:07.968Z,updated_at: 2026-11-04T14:10:07.135Z,tags: [cuadb,sqlite],depends_on: [TSK-A3CFF0B5E267,TSK-55D20E7D39E9],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T12:33:38.494Z},{from: in-progress,to: completed,at: 2026-11-04T14:10:07.135Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-F71C30D38C2C/1793795618496-start,started_at: 2026-11-04T12:33:38.512Z,end_ref: refs/tracking/TSK-F71C30D38C2C/1793801407137-end,ended_at: 2026-11-04T14:10:07.135Z,summary: {files: 39,insertions: 3741,deletions: 191}}]}}}
 ---
 
 # Open mounted SQLite databases through restricted read-only paths
@@ -18,8 +18,8 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 ## Acceptance checklist
 - [x] Validate configured SQLite URLs against an explicit allowed data root.
 - [x] Open the file without creating a new database or allowing modifications.
-- [ ] Test traversal attempts, missing files, symlinks and permission failures.
-- [ ] Document read-only Docker bind mounts and limitations with WAL databases.
+- [x] Test traversal attempts, missing files, symlinks and permission failures.
+- [x] Document read-only Docker bind mounts and limitations with WAL databases.
 - [x] Keep SQLite file paths and sensitive filesystem details out of the browser.
 
 ## Verification and handoff
@@ -38,3 +38,7 @@ Current checkpoint: Group10 SQLite slice passes cargo test --test sqlite_catalog
 ### 2026-11-04T12:45:49.483Z · PETER IRUNGU
 
 Progress evidence (2026-11-04): explicit canonical allow-root validation, read_only(true)/create_if_missing(false), and query_only=ON are implemented. cargo test --lib db::sqlite::tests passed 2 tests including denied INSERT and symlink escape; cargo test --test sqlite_catalog passed 2 fixture tests; bun run format:check and task validate passed. Still open: permission-failure coverage, read-only Docker bind-mount smoke, explicit WAL guidance, and full end-to-end behavior.
+
+### 2026-11-04T14:10:06.547Z · PETER IRUNGU
+
+VERIFIED: tests/sqlite_live.rs (always-on, temp files): traversal, missing file, directory, query/fragment options, symlink escape rejected / in-root symlink allowed, symlink loop, unreadable file (non-root run), error text without paths; browsing leaves bytes+mtime unchanged and creates no -journal/-wal/-shm; :ro-mount emulation (0555 dir, 0444 file) works for rollback-journal DB; clean WAL DB on :ro mount reports Ready. Documented in docs/sqlite.md. Limitation: WAL with a live writer on a strictly read-only mount is not tested (documented as may fail closed). A real 'docker run -v :ro' check is deferred to Group 12.
