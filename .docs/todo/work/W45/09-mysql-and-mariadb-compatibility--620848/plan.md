@@ -2,6 +2,9 @@
 {id: GRP-4E0980620848,name: 09 — MySQL and MariaDB compatibility,type: documentation,extra: {created_at: 2026-11-04T07:32:07.411Z}}
 ---
 
+## Deferred execution gate
+
+This group is intentionally deferred until the PostgreSQL + SQLite backend and the complete canonical frontend (groups 06–08) are accepted. Preserve completed connection groundwork. If a MySQL/MariaDB task is already in progress, stop at a safe boundary, record concise findings and mark it blocked through the Task CLI. Do not continue catalog/type/statistics/export verification or build a broad MariaDB/MySQL version matrix during the core milestone. Resume only for remaining product gaps after frontend acceptance.
 # 09 — MySQL and MariaDB compatibility — Plan
 
 ## Implementation approach

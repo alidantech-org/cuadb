@@ -2,14 +2,13 @@
 {id: GOAL-GRP-C11E16ED07C5,name: "12 — Security, integration, performance and Docker release goal",type: documentation,extra: {created_at: 2026-11-04T07:32:08.777Z,group: GRP-C11E16ED07C5}}
 ---
 
----
-{id: GOAL-GRP-C11E16ED07C5,name: "12 — Security, integration, performance and Docker release goal",type: documentation,extra: {created_at: 2026-11-04T07:32:08.777Z,group: GRP-C11E16ED07C5}}
----
+## Final release gate
 
+This group is the final acceptance phase. Do not start it as a substitute for completing the core backend, frontend, deferred engine work, trusted profiles, authentication or controlled SQL workspace. Release evidence must cover the current product scope and the dedicated security boundaries for any enabled SQL/CRUD capability. Keep engine verification focused on PostgreSQL and SQLite plus only the remaining MySQL/MariaDB gaps actually being completed.
 # 12 — Security, integration, performance and Docker release — Goal
 
 ## Outcome
-Prove CuaDB is safe and dependable as a local-first read-only database viewer for the supported engines. Ensure reproducible builds, meaningful automated tests, bounded query and memory behavior, documentation for real connections and a single production Docker container with one published UI port.
+Prove CuaDB is safe and dependable as a local-first read-only explorer with separately gated authenticated SQL/CRUD capabilities. Ensure reproducible builds, meaningful automated tests, bounded query and memory behavior, documentation for real connections and a single production Docker container with one published UI port.
 
 ## Definition of done
 Acceptance of **12 — Security, integration, performance and Docker release** requires evidence for these results:

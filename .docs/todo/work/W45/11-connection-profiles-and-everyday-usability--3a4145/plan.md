@@ -2,6 +2,9 @@
 {id: GRP-C1E9A83A4145,name: 11 — Connection profiles and everyday usability,type: documentation,extra: {created_at: 2026-11-04T07:32:08.365Z}}
 ---
 
+## Phase gate
+
+Complete this group after the PostgreSQL + SQLite backend, the canonical frontend and the remaining required MySQL/MariaDB compatibility work. Profiles are operator-configured and server-owned; never accept arbitrary browser-supplied connection URLs or expose credentials. Switching must reset all database-specific selection and cursor state.
 # 11 — Connection profiles and everyday usability — Plan
 
 ## Implementation approach

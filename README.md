@@ -1,8 +1,8 @@
 # CuaDB
 
-**CuaDB** is a fast, local-first, **read-only database explorer** for the browser. The goal is to connect to a database, browse schemas and tables, and inspect paginated records, column types, indexes and storage details—without a SQL runner or a bulky administration UI.
+**CuaDB** is a fast, local-first database explorer and workspace for the browser. The current explorer is read-only; later SQL execution and data editing are separate, authenticated capabilities with explicit resource permissions.
 
-> **Current status: safe PostgreSQL row paging (Group 04).** The Axum/Askama/HTMX server includes bounded row pages, optional catalog-validated column selection, sorting and indexed keyset navigation for eligible integer keys. **Whole-table exports and full canonical grid UI are not enabled yet.** Real row pages require the operator-configured PostgreSQL connection and a SELECT-only role. The catalog and row paths are compiled and verified against disposable PostgreSQL 18.6 and PostGIS fixtures.
+> **Current status: safe PostgreSQL row paging (Group 04).** The Axum/Askama/HTMX server includes bounded row pages, optional catalog-validated column selection, sorting and indexed keyset navigation for eligible integer keys. **Whole-table exports and full canonical grid UI are not enabled yet.** Real row pages require the operator-configured PostgreSQL connection and a SELECT-only role. PostgreSQL is the primary engine; SQLite is the second required engine in the core backend milestone. Existing MySQL/MariaDB connection groundwork is preserved, but remaining compatibility work is deferred until the canonical frontend is complete.
 
 ## Catalog inspection (Group 03)
 
@@ -46,7 +46,7 @@ for caps, limitations, fixture tests and export policy.
 - CSV neutralizes formula-leading text cells (`= + - @`, tab, CR) with a leading `'`. Responses are `attachment`, `no-store`, with an ASCII-safe filename.
 - The request timeout cancels a running export. Output is buffered within the byte cap, not streamed.
 - `format=zip&scope=related[&depth=0..2]` (default depth 1) returns a stored (uncompressed) ZIP: the relation plus relations it references through foreign keys (outgoing keys only, at most 8 relations), one bounded CSV each, and `manifest.json` (relations, row counts, relationships, truncation). Linked relations the role cannot read are listed as omitted; the root must be readable. The archive obeys a 16 MiB total cap and refuses sort/filter/column/page parameters. It is assembled in memory within that cap, not streamed.
-- Limits: incoming (child) relations are not followed; cells over the preview limit export their bounded preview; a SQLite/MySQL walk has not been verified for export (Postgres live only).
+- Limits: incoming (child) relations are not followed; cells over the preview limit export their bounded preview. SQLite export verification remains a focused follow-up; MySQL/MariaDB export work is deferred until after the frontend milestone.
 
 ## Stale responses, failures and retry (Group 05)
 
@@ -92,7 +92,7 @@ The HTML demo uses simulated connection names, data, statistics and client-side 
 - **Tailwind CSS 4 + small custom CSS**: compact explorer and read-only data grid.
 - **Vanilla JavaScript**: browser-only interactions such as sidebar toggling.
 - **Bun**: root task runner and frontend build tooling. Bun is **not** the production server.
-- **SQLx PostgreSQL, MySQL and MariaDB**: bounded lazy pools, read-only sessions and protected URL validation (no SQL editor).
+- **Database adapters**: PostgreSQL first and SQLite second for the core milestone; MySQL/MariaDB compatibility is deferred until the frontend is complete. Core browsing uses bounded read-only connections.
 - **Docker**: a single multi-stage image and **one** runtime container.
 
 ## Prerequisites
@@ -108,7 +108,7 @@ cargo fmt --version
 cargo clippy --version
 ```
 
-**Database credentials are optional**: without them the shell and tests work in disconnected mode. A configured PostgreSQL, MySQL, MariaDB or SQLite URL is validated at startup; the status indicator probes the database without delaying the health endpoint. SQLite files must be mounted under the configured allowed root.
+**Database credentials are optional**: without them the shell and tests work in disconnected mode. PostgreSQL and SQLite are the required engines for the initial backend milestone. The status indicator probes the configured database without delaying the health endpoint. SQLite files must be mounted under the configured allowed root. Do not run broad MySQL/MariaDB compatibility checks until after the frontend milestone.
 
 ## Quick start (from the repository root)
 
@@ -172,7 +172,7 @@ CuaDB validates typed settings before binding its HTTP listener. Errors identify
 | --- | --- | --- | --- |
 | `CUADB_HOST` | `127.0.0.1` | IPv4 or IPv6 literal | HTTP listener |
 | `CUADB_PORT` | `4848` | 1–65535 | HTTP listener |
-| `CUADB_DATABASE_URL` | Unset | PostgreSQL, MySQL, MariaDB, or SQLite URL; remote server URLs require credentials | Validated and used by a bounded read-only adapter |
+| `CUADB_DATABASE_URL` | Unset | PostgreSQL or SQLite URL for the core milestone; MySQL/MariaDB support is deferred until after frontend completion | Validated and used by a bounded read-only adapter |
 | `CUADB_SQLITE_ROOT` | `/data` | Absolute filesystem directory | Allowed root for SQLite database files |
 | `CUADB_CONNECTION_TIMEOUT_MS` | `5000` | 100–60000 | SQLx pool acquisition/connection deadline |
 | `CUADB_QUERY_TIMEOUT_MS` | `15000` | 100–120000 | Database query deadlines and status probe |
@@ -181,7 +181,7 @@ CuaDB validates typed settings before binding its HTTP listener. Errors identify
 | `CUADB_MAX_PAGE_SIZE` | `100` | 1–500 | Maximum data grid page size |
 | `CUADB_MAX_POOL_CONNECTIONS` | `4` | 1–32 | Maximum SQLx pooled connections |
 
-The default page size reduces automatically when only the maximum is lowered; an explicitly configured default above the maximum is rejected. PostgreSQL, MySQL and MariaDB URL parsers reject unsupported driver parameters and require passwords for non-loopback hosts. Loopback development may omit passwords and defaults to TLS disabled. Remote URLs use verified TLS by default. MySQL/MariaDB allow only the explicit `ssl-mode` option. SQLite URLs must use a file under `CUADB_SQLITE_ROOT`, default `/data` in Docker; details and fixture instructions are in [docs/sqlite.md](docs/sqlite.md), [docs/mysql-mariadb.md](docs/mysql-mariadb.md) and the [PostgreSQL connection and security guide](docs/postgresql-connections.md).
+The default page size reduces automatically when only the maximum is lowered; an explicitly configured default above the maximum is rejected. PostgreSQL URL parsing rejects unsupported driver parameters and requires passwords for non-loopback hosts. Loopback development may omit passwords and defaults to TLS disabled. Remote URLs use verified TLS by default. MySQL/MariaDB parser groundwork is retained, but remaining engine compatibility is not a core-milestone verification requirement. SQLite URLs must use a file under `CUADB_SQLITE_ROOT`, default `/data` in Docker; details and fixture instructions are in [docs/sqlite.md](docs/sqlite.md), [docs/mysql-mariadb.md](docs/mysql-mariadb.md) and the [PostgreSQL connection and security guide](docs/postgresql-connections.md).
 
 To change the local port:
 
@@ -279,12 +279,11 @@ cuadb/
 
 ## Product plan (after shell verification)
 
-1. **PostgreSQL MVP:** parse a PostgreSQL URL (default driver), connect read-only, discover schemas/tables/views, browse paginated and sortable rows, show columns, indexes and table sizes.
-2. **PostgreSQL value rendering:** JSON/JSONB, arrays, nullable values, and PostGIS geometry inspection.
-3. **Database adapters:** MySQL/MariaDB and SQLite with engine-specific metadata/capability handling. No additional database engine is planned until the existing product features are complete.
-4. **Usability:** multiple saved connection profiles (no password storage in browser), polished grids, safe large-cell inspection, and optimized keyset pagination where possible.
+1. **Backend first:** finish PostgreSQL and SQLite connections, catalogs, bounded rows, typed values, metadata and HTTP/HTML-fragment contracts.
+2. **Canonical UI second:** reproduce the standalone HTML demo with real server-backed data, compact grid, row inspector, settings and export interactions. Do not begin visual implementation before the backend gate passes.
+3. **Additional engines later:** finish remaining MySQL/MariaDB compatibility only after the frontend is accepted. Preserve completed connection groundwork and avoid broad compatibility matrices.
 
-CuaDB is intentionally **not** a SQL console, migration system, editor or full database administrator. Every database adapter should use constrained, read-only access and safe SQL identifier handling; metadata not supported by an engine must be indicated as unavailable.
+The current explorer is intentionally read-only. A separate SQL workspace and explicit CRUD/transaction capabilities are planned only after authentication and per-resource permissions are implemented. Those later operations must be opt-in, bounded and audited; they must not weaken the default browsing boundary.
 
 ## Security and project conventions
 
@@ -301,7 +300,7 @@ CuaDB is intentionally **not** a SQL console, migration system, editor or full d
 
 The project uses [Task / taskcode](https://github.com/alidantech-org/task) to manage implementation. **The active Task workspace is `.docs/`**, as configured in the root `task.yaml`; the generic Task-managed instructions below may refer to `tasks/`, but `task.yaml` is authoritative. The Task workspace has already been initialized; **do not run `task init` again**.
 
-A one-time, idempotent bootstrap in `scripts/roadmap/` prepares the original dependency-ordered implementation roadmap: **12 active groups, 52 detailed tasks, and 5 architecture/design/test documents**. The mistaken SQL Server expansion has been retired; the supported engine scope is PostgreSQL, MySQL, MariaDB and SQLite. The bootstrap is source input only; after creation, the generated Markdown under `.docs/` is the **single source of truth**. Never change task IDs, status history or status manually, and never maintain a parallel TODO list.
+The idempotent bootstrap in `scripts/roadmap/` now defines **14 groups and 62 detailed tasks**, including authentication/resource permissions and the controlled SQL workspace. The existing 12 groups and 52 tasks are preserved; run `bun run task:seed` once to add the two new groups and reconcile phase dependencies. The supported engine scope is PostgreSQL, SQLite, MySQL and MariaDB, in that delivery order. After creation, `.docs/` remains the single source of truth. Never hand-edit task IDs, status history or checkboxes.
 
 ### Preview and create the real Task records
 
@@ -353,7 +352,7 @@ task update <TSK-ID> --status completed
 task validate
 ```
 
-Group plans describe purpose, order, risks and completion criteria; blocking task links prevent starting dependent work without checking prerequisites. The seeded groups cover Rust foundations, secure database connections, PostgreSQL catalogs and paging, HTTP/HTMX, explorer navigation, data grid, inspector/PostGIS support, MySQL/MariaDB, SQLite, trusted connection profiles and release quality for the supported engines.
+Group plans describe purpose, risks and completion criteria; blocking task links enforce the delivery gates. The execution order is backend (PostgreSQL + SQLite and HTTP contracts), canonical frontend, remaining MySQL/MariaDB compatibility, trusted multi-connection profiles, authentication/resource permissions, controlled SQL/CRUD workspace and final release acceptance. Historical group numbers do not determine execution order.
 
 The root `bun run test` includes Task roadmap definition tests; `bun run format` and `bun run format:check` include the roadmap scripts. Task-managed Markdown is **not** automatically reformatted because its tool owns the frontmatter and status fields.
 

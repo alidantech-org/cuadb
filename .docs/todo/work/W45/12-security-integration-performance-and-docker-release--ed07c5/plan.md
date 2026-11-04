@@ -2,10 +2,13 @@
 {id: GRP-C11E16ED07C5,name: "12 — Security, integration, performance and Docker release",type: documentation,extra: {created_at: 2026-11-04T07:32:08.777Z}}
 ---
 
+## Final release gate
+
+This group is the final acceptance phase. Do not start it as a substitute for completing the core backend, frontend, deferred engine work, trusted profiles, authentication or controlled SQL workspace. Release evidence must cover the current product scope and the dedicated security boundaries for any enabled SQL/CRUD capability. Keep engine verification focused on PostgreSQL and SQLite plus only the remaining MySQL/MariaDB gaps actually being completed.
 # 12 — Security, integration, performance and Docker release — Plan
 
 ## Implementation approach
-Create disposable database fixtures and automated adapter contract tests, then exercise HTTP/HTML navigation through smoke and end-to-end checks. Review attacker-controlled inputs, secrets and read-only guarantees. Verify multi-stage Docker builds, runtime resource limits and static assets. Benchmark representative large datasets to find pagination and rendering bottlenecks; publish clear compatibility and operational documentation.
+Create disposable database fixtures and automated adapter contract tests, then exercise HTTP/HTML navigation through smoke and end-to-end checks. Review attacker-controlled inputs, secrets, read-only browsing guarantees, authentication and the explicit SQL/CRUD authorization boundary. Verify multi-stage Docker builds, runtime resource limits and static assets. Benchmark representative large datasets to find pagination and rendering bottlenecks; publish clear compatibility and operational documentation.
 
 ## Risks and safeguards
 A passing unit test does not prove the container can reach PostgreSQL or that database privileges prevent writes. Releasing with outdated lockfiles, missing build assets, expensive default SQL or unsafe Docker port binding would defeat the project goals. Use explicit acceptance gates and distinguish native-only checks from optional integration tests requiring disposable databases.

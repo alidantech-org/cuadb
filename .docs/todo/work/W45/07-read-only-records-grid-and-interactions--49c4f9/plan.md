@@ -2,6 +2,9 @@
 {id: GRP-033BDB49C4F9,name: 07 — Read-only records grid and interactions,type: documentation,extra: {created_at: 2026-11-04T07:32:06.325Z}}
 ---
 
+## Phase gate
+
+This is Phase 2 frontend work. Do not start or continue implementation until the PostgreSQL + SQLite backend groups (01–05 and 10) are accepted. The backend must provide real, stable data and HTML-fragment contracts first. Do not add MySQL/MariaDB checks to frontend tasks. Keep the committed `assets/cuadb-ui-demo.html` as the binding reference and perform focused visual acceptance at the group boundary, not repeated full screenshot matrices for every small change.
 # 07 — Read-only records grid and interactions — Plan
 
 ## Implementation approach

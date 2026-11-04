@@ -54,7 +54,7 @@ export const frontendGroups: GroupSpec[] = [
           'Verify that unsafe origins or methods cannot trigger unauthorized future state changes.',
           'Add response security regression tests and document local-only deployment assumptions.',
         ],
-        dependsOn: ['http-views'],
+        dependsOn: ['http-views', 'http-errors', 'sqlite-info'],
       },
       {
         key: 'http-errors',
@@ -110,7 +110,7 @@ export const frontendGroups: GroupSpec[] = [
           'Preserve selected relation and active tab across HTMX navigation.',
           'Test tree behavior with many relations and unusual names.',
         ],
-        dependsOn: ['explorer-layout', 'catalog-navigation', 'http-errors'],
+        dependsOn: ['explorer-layout', 'catalog-navigation', 'http-errors', 'sqlite-info'],
       },
       {
         key: 'explorer-search',
@@ -166,7 +166,7 @@ export const frontendGroups: GroupSpec[] = [
           'Bound initial rendered cell content and preserve a path for expanded inspection.',
           'Verify XSS escaping and layout behavior with fixture records.',
         ],
-        dependsOn: ['rows-cell-types', 'explorer-tree'],
+        dependsOn: ['rows-cell-types', 'explorer-tree', 'sqlite-rows'],
       },
       {
         key: 'grid-pagination',
@@ -252,7 +252,7 @@ export const frontendGroups: GroupSpec[] = [
           'Test Structure tab with a complex fixture containing composite keys and defaults.',
           'Keep the tab responsive through HTMX fragment updates without page reloads.',
         ],
-        dependsOn: ['catalog-relations', 'http-views'],
+        dependsOn: ['catalog-relations', 'http-views', 'sqlite-catalog'],
       },
       {
         key: 'inspect-info',
@@ -267,7 +267,7 @@ export const frontendGroups: GroupSpec[] = [
           'Test empty, partitioned, foreign and permission-restricted fixture scenarios.',
           'Use the same capability flags that other database adapters will expose.',
         ],
-        dependsOn: ['catalog-stats', 'http-views'],
+        dependsOn: ['catalog-stats', 'http-views', 'sqlite-info'],
       },
       {
         key: 'inspect-types',

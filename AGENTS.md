@@ -1,14 +1,34 @@
 # CuaDB implementation rules
 
-CuaDB is a local-first, read-only database explorer: one Rust/Axum server, Askama/HTMX frontend, Tailwind CSS, small vanilla JavaScript, and one Docker runtime container with one published UI port. PostgreSQL is the first engine; MySQL/MariaDB and SQLite follow through typed adapters. Do not add SQL editing, write operations, a second web runtime or unrequested administrative features.
+CuaDB is a local-first database explorer and database workspace built as one Rust/Axum server, Askama/HTMX frontend, Tailwind CSS, small vanilla JavaScript and one Docker runtime container with one published UI port. The currently delivered explorer is read-only. Any future data editing or SQL execution must be implemented only through the dedicated authenticated and permission-controlled roadmap groups; never weaken the current browsing safety boundary to shortcut those features.
 
-**Workspace path:** `task.yaml` configures Task at `.docs/`. Treat that file as authoritative even when the Task-generated guidance below uses the generic `tasks/` example. Read `.docs/README.md`, `.docs/rules/task-writing.md` and the selected group's goal/plan before work.
+**Workspace path:** `task.yaml` selects `.docs/`. Treat it as authoritative. Read `.docs/README.md`, `.docs/rules/task-writing.md`, the execution roadmap and the selected group's goal/plan before work.
 
-**Canonical UI constraint:** The committed `assets/cuadb-ui-demo.html` is the **required exact frontend layout and interaction baseline**, not inspiration. Before implementing any web UI, read it and `.docs/docs/frontend-interactions.md`. Preserve its sidebar, responsive shell, Simple/Advanced explorer, grid, Data/Structure/Indexes selector, inspector, settings and export surfaces. Use real, safe read-only backend data rather than the demo's fake rows or unbounded in-memory exports. Compare reference and implementation at matching browser viewports; material deviations require user approval.
+**Branch policy:** All work is committed directly to the existing `main` branch. Do not create branches, worktrees or pull requests. Do not force-push. Keep commits focused and preserve existing user work.
 
-**Execution order:** A one-time seed command (`bun run task:seed`) prepares the backlog through the Task CLI. Once created, `.docs/` is the single source of truth; never regenerate or hand-edit managed task IDs, status history or checkboxes. Before implementation, inspect the selected task and its blocking dependencies, move only that task to in-progress, implement the smallest complete vertical slice, and record tests and findings on that task. Run `task validate` for any Task workspace edits.
+**Database priority and verification budget:**
+- PostgreSQL is the primary engine. SQLite is the second required engine and is already implemented in the current core roadmap.
+- During core backend work, PostgreSQL and SQLite are the only engines that must be exercised. Use disposable fixtures and focused tests for the feature being implemented.
+- Do not spend time on broad MySQL/MariaDB catalog, data-type, statistics, export or compatibility matrices during the core milestone. Preserve already-completed MySQL/MariaDB groundwork; do not revert it. Pause remaining MySQL/MariaDB work until the complete frontend milestone has been accepted.
+- After the frontend milestone, finish only the MySQL/MariaDB gaps that are actually needed. Do not add any other database engines.
+- A focused PostgreSQL + SQLite success is sufficient to proceed. Do not repeat the same checks across several engines or run exhaustive database permutations for every task.
 
-**Quality and security:** Keep database-specific SQL and driver behavior in `src/db/` adapters, route/input validation in Rust web handlers and display-only behavior in templates/assets. Use least-privilege, bounded read-only database access, safe identifier quoting, escaped output, redacted logs and explicit feature capability flags. Run `bun run format:check`, `bun run check`, and `bun run test` after implementation. Live database integration tests require disposable fixtures; never mutate the user's existing PostgreSQL data.
+**Execution order — follow the phase gate, not the historical group numbers:**
+1. **Backend:** finish Rust foundation, engine-neutral contracts, PostgreSQL connections/catalog/rows, typed HTTP routes and HTML-fragment contracts, plus SQLite adapter and backend acceptance. No visual frontend implementation in this phase.
+2. **Frontend:** only after the PostgreSQL + SQLite backend gate passes, complete the canonical explorer, grid, inspector, structure and index interfaces.
+3. **Additional engines:** resume MySQL/MariaDB compatibility only after the frontend milestone.
+4. **Multi-connection:** complete trusted connection profiles and switching after the core engines and frontend are stable.
+5. **Authentication:** implement administrator bootstrap, users, sessions and resource permissions before exposing protected capabilities.
+6. **SQL workspace and editing:** implement only after authentication and permission controls. Keep it separate from the read-only explorer and disabled unless explicitly authorized.
+7. **Release:** complete security, integration, performance, Docker and release documentation last.
+
+Group numbers are stable identifiers, not execution order. The authoritative phase order and dependencies are in `.docs/docs/execution-roadmap.md`. If an older in-progress task conflicts with this phase policy, stop at a safe boundary, preserve its work and update its status/comments through the Task CLI before moving to the current phase.
+
+**Canonical UI constraint:** `assets/cuadb-ui-demo.html` is the required exact frontend layout and interaction baseline, not inspiration. Read it and `.docs/docs/frontend-interactions.md` before Phase 2. Preserve its sidebar, responsive shell, Simple/Advanced explorer, grid, Data/Structure/Indexes selector, inspector, settings and export surfaces. Use real backend data, not fake rows or unbounded in-memory exports. Perform focused visual comparison during the frontend milestone; do not spend backend time on visual polish.
+
+**Vertical-slice execution:** Use the Task workspace as the single source of truth. Inspect the selected task and its blockers, move only that task to in-progress, implement the smallest complete vertical slice, add targeted tests, record findings and tick checklists through the Task CLI. Prefer finishing one normal feature end to end over broad scaffolding. Run the root quality commands at meaningful group boundaries; do not repeatedly run every database or browser scenario after each small change. Run `task validate` after Task workspace changes.
+
+**Quality and security:** Keep database-specific SQL and driver behavior in `src/db/` adapters, route/input validation in Rust handlers and display-only behavior in templates/assets. The core explorer uses least-privilege read-only database access, bounded queries, safe identifier quoting, escaped output, redacted logs and explicit capability flags. Future write/SQL capabilities require authenticated users, explicit per-resource permissions, audit events and dedicated acceptance tests. Never mutate a user's existing database during tests.
 
 ---
 

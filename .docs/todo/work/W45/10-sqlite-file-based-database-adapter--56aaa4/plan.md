@@ -2,6 +2,9 @@
 {id: GRP-E86C8856AAA4,name: 10 — SQLite file-based database adapter,type: documentation,extra: {created_at: 2026-11-04T07:32:07.879Z}}
 ---
 
+## Backend priority
+
+This is required Phase 1 backend work and must complete before frontend groups 06–08. PostgreSQL and SQLite are the only required engines for the core milestone. Use focused disposable fixtures to prove the adapter's normal connection, catalog, bounded row, type and capability behavior. Do not make SQLite acceptance depend on MySQL/MariaDB or on frontend implementation.
 # 10 — SQLite file-based database adapter — Plan
 
 ## Implementation approach

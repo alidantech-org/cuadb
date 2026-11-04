@@ -22,7 +22,7 @@ import { groupGoal, LEGACY_GOAL_PARAGRAPH } from './goals';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-type TaskRecord = { id: string; name: string; path?: string };
+type TaskRecord = { id: string; name: string; path?: string; status?: string };
 type GroupRecord = { id: string; name: string; path?: string };
 type DocRecord = { id: string; name: string; path: string };
 
@@ -41,7 +41,7 @@ function groupPlan(group: GroupSpec): string {
     group.risks,
     '',
     '## Execution and verification',
-    'Work through the tasks in their listed order unless dependencies or test evidence justify another sequence. Before editing code, inspect the task using the CLI and check any blocking task links. Move exactly the selected task to in-progress, implement a coherent slice, add tests for errors and edge cases, and run Bun format/check/test plus focused live database checks where specified. Do not edit Task-managed IDs or status history manually. Use task comment for findings and task check for accepted items, and run task validate before recording completion. Any discovered work that falls outside the current task should be discussed and created as a separate detailed Task record rather than silently enlarging the scope.',
+    'Work through the dependency order and documented delivery phases. Before editing code, inspect the task and blockers, then move only the selected task to in-progress. Complete one vertical slice with focused tests. During core backend and frontend phases, verify only PostgreSQL and SQLite; do not run broad MySQL/MariaDB compatibility matrices. Resume MySQL/MariaDB only after the frontend gate. Run full root quality commands at group boundaries, not repeatedly for every small change. Never edit Task-managed IDs or status history manually; use task comment, task check and task validate.',
     '',
     '## Deliverables',
     'The group is accepted when its linked tasks are completed with evidence, its README or architecture documentation accurately reflects the implemented features, and the app remains usable with the existing shell and single Docker container constraints.',
@@ -62,13 +62,13 @@ function taskBody(group: GroupSpec, task: TaskSpec): string {
     `This task belongs to **${group.title}**. The group outcome is: ${group.goal}`,
     '',
     '## Implementation boundaries',
-    'CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.',
+    'CuaDB is a local-first database workspace served by one Rust/Axum process. The core explorer remains read-only. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and never expose credentials or arbitrary connection targets to browser state. Do not add data writes or SQL execution outside the later dedicated SQL workspace tasks, which require the authentication and resource-permission group first. Keep every query bounded by reasonable row, time and memory limits.',
     '',
     '## Acceptance checklist',
     checklist,
     '',
     '## Verification and handoff',
-    'Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.',
+    'Verify the expected result and realistic failure cases with the smallest relevant test set. Use disposable PostgreSQL and SQLite fixtures for the core milestone; do not add MySQL/MariaDB or other engines to routine verification. Run `bun run format:check`, `bun run check` and `bun run test` at meaningful group boundaries. Do not test against a personal or production database. Document unsupported capabilities honestly, record concise evidence in a Task comment, tick accepted items with `task check` and only then mark the task completed.',
   ].join('\n');
 }
 
@@ -240,6 +240,96 @@ function repairExistingGroupGoals(executable: string): number {
   return repaired;
 }
 
+function reconcilePhasePolicy(executable: string, taskIds: Map<string, string>): void {
+  const active = asArray<TaskRecord>(taskJson(executable, ['list']), 'list');
+  const archived = asArray<TaskRecord>(taskJson(executable, ['list', '--archived']), 'list --archived');
+  const records = [...active, ...archived];
+  const byId = new Map(records.map((task) => [task.id, task]));
+  const workspaceRoot = resolve(root, '.docs');
+
+  const pauseGroup = (groupKey: string, reason: string): void => {
+    const group = groups.find((item) => item.key === groupKey);
+    for (const task of group?.tasks ?? []) {
+      const id = taskIds.get(task.key);
+      const record = id ? byId.get(id) : undefined;
+      if (record?.status === 'in-progress') {
+        taskRun(executable, ['update', id!, '--status', 'blocked']);
+        taskRun(executable, ['comment', id!, '--text', reason]);
+        record.status = 'blocked';
+        console.log(`Paused phase-conflicting task: ${record.name} (${id})`);
+      }
+    }
+  };
+
+  const allCompleted = (keys: string[]): boolean =>
+    keys.every((key) =>
+      (groups.find((group) => group.key === key)?.tasks ?? []).every((task) => {
+        const id = taskIds.get(task.key);
+        return Boolean(id && byId.get(id)?.status === 'completed');
+      }),
+    );
+
+  const backendReady = allCompleted([
+    'foundation',
+    'contracts',
+    'postgres-catalog',
+    'postgres-rows',
+    'http',
+    'sqlite',
+  ]);
+  if (!backendReady) {
+    pauseGroup(
+      'explorer-ui',
+      'Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.',
+    );
+    pauseGroup(
+      'data-grid-ui',
+      'Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.',
+    );
+    pauseGroup(
+      'inspectors',
+      'Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.',
+    );
+  }
+
+  const frontendReady = allCompleted(['explorer-ui', 'data-grid-ui', 'inspectors']);
+  if (!frontendReady) {
+    pauseGroup(
+      'mysql',
+      'Paused by the CuaDB phase gate: preserve completed MySQL/MariaDB groundwork and resume remaining engine-specific work only after the PostgreSQL + SQLite backend and canonical frontend milestones are accepted. Do not spend core-milestone time on cross-engine verification.',
+    );
+  }
+
+  // Task CLI owns dependency metadata. Add missing links without editing
+  // managed frontmatter; skip completed and currently active tasks.
+  let linksAdded = 0;
+  for (const group of groups) {
+    for (const task of group.tasks) {
+      if (!task.dependsOn?.length) continue;
+      const taskId = taskIds.get(task.key);
+      const record = taskId ? byId.get(taskId) : undefined;
+      if (!taskId || !record || record.status === 'completed' || record.status === 'in-progress') continue;
+      if (!record.path) throw new Error(`Task ${taskId} has no path for dependency reconciliation`);
+      const relative = record.path.startsWith('.docs/') ? record.path.slice(6) : record.path;
+      const filepath = resolve(workspaceRoot, relative);
+      const current = readFileSync(filepath, 'utf8');
+      const match = current.match(/^depends_on:\\s*\\[([^\\]]*)\\]/m);
+      const existing = new Set(
+        [...(match?.[1] ?? '').matchAll(/TSK-[A-F0-9]+/g)].map((item) => item[0]),
+      );
+      for (const dependencyKey of task.dependsOn) {
+        const dependencyId = taskIds.get(dependencyKey);
+        if (!dependencyId) throw new Error(`Missing dependency task id for ${dependencyKey}`);
+        if (existing.has(dependencyId)) continue;
+        taskRun(executable, ['update', dependencyId, '--link', `blocks:${taskId}`]);
+        existing.add(dependencyId);
+        linksAdded++;
+      }
+    }
+  }
+  console.log(`Reconciled ${linksAdded} missing Task dependency links.`);
+}
+
 function seed(): void {
   validateWorkspace();
   const executable = taskCommand();
@@ -355,6 +445,7 @@ function seed(): void {
       }
     }
 
+    reconcilePhasePolicy(executable, taskIds);
     const repaired = repairExistingGroupGoals(executable);
     taskRun(executable, ['validate']);
     console.log(
