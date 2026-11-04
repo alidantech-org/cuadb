@@ -1,5 +1,5 @@
 ---
-{id: TSK-9890D0090922,name: "Design HTMX loading, cancellation, empty and error contracts",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:05.887Z,updated_at: 2026-11-04T07:32:05.887Z,tags: [cuadb,http],depends_on: [TSK-E09AA19D0352],order: 4096}
+{id: TSK-9890D0090922,name: "Design HTMX loading, cancellation, empty and error contracts",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.887Z,updated_at: 2026-11-04T11:29:07.621Z,tags: [cuadb,http],depends_on: [TSK-E09AA19D0352],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:07.621Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-9890D0090922/1793791747624-start,started_at: 2026-11-04T11:29:07.636Z}]}}}
 ---
 
 # Design HTMX loading, cancellation, empty and error contracts
@@ -16,8 +16,8 @@ This task belongs to **05 — HTTP read endpoints and HTML fragments**. The grou
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Define swap targets, request synchronization and stable loading indicators per fragment.
-- [ ] Provide safe fragments for timeout, validation, permission and disconnected states.
+- [x] Define swap targets, request synchronization and stable loading indicators per fragment.
+- [x] Provide safe fragments for timeout, validation, permission and disconnected states.
 - [ ] Ensure stale responses cannot replace a newer selected relation or sort.
 - [ ] Test full-page and HTMX failure behavior with simulated slow fake adapters.
 - [ ] Document retry and refresh actions without automatic unbounded polling.
@@ -33,3 +33,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T11:29:33.819Z · PETER IRUNGU
+
+Established stable sidebar/tree/main targets, HTMX loading indicator, disabled history caching, accessible status and safe error fragment behavior. Existing request timeout drops handler futures. Stale selection ordering, broader UI states and fake-adapter slow-route tests remain open.

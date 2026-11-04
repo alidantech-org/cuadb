@@ -1,5 +1,5 @@
 ---
-{id: TSK-61DA50E7C274,name: "Provide coherent disconnected, loading and error navigation states",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.252Z,updated_at: 2026-11-04T07:32:06.252Z,tags: [cuadb,explorer-ui],depends_on: [TSK-1C5E54BDB641,TSK-E68FB08CB73D],order: 4096}
+{id: TSK-61DA50E7C274,name: "Provide coherent disconnected, loading and error navigation states",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.252Z,updated_at: 2026-11-04T11:29:11.664Z,tags: [cuadb,explorer-ui],depends_on: [TSK-1C5E54BDB641,TSK-E68FB08CB73D],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.664Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-61DA50E7C274/1793791751666-start,started_at: 2026-11-04T11:29:11.681Z}]}}}
 ---
 
 # Provide coherent disconnected, loading and error navigation states
@@ -16,8 +16,8 @@ This task belongs to **06 — Database navigation and workspace UI**. The group 
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Render accurate connection indicators distinct from server health.
-- [ ] Expose useful recovery guidance for offline or misconfigured database connections.
+- [x] Render accurate connection indicators distinct from server health.
+- [x] Expose useful recovery guidance for offline or misconfigured database connections.
 - [ ] Show accessible skeleton/loading and empty-content states without fake data.
 - [ ] Prevent stale navigation fragments after fast table switching.
 - [ ] Test accessibility announcements and focus retention during HTMX swaps.
@@ -33,3 +33,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T11:29:35.092Z · PETER IRUNGU
+
+Shell separately reports app health, database connection state, catalog loading, empty catalog and safe database errors. Failure content remains inside the app shell. Full browser state/access-denied view parity requires further work.

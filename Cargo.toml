@@ -8,12 +8,15 @@ publish = false
 
 [dependencies]
 askama = "0.16.1"
+async-trait = "0.1"
 axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
 tower-http = { version = "0.6", features = ["fs"] }
 # Pin the engine driver while the adapter contract is being established.
 # No SQL migrations, macro compiler database access, or extra engines.
-sqlx = { version = "=0.8.6", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki"] }
+sqlx = { version = "=0.8.6", default-features = false, features = ["mysql", "postgres", "sqlite", "runtime-tokio", "tls-rustls-ring-webpki"] }
 url = "=2.5.8"
 getrandom = "0.3"
 

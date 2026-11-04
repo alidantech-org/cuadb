@@ -32,8 +32,25 @@ async fn rejects_browser_sql_and_invalid_navigation() {
         "/catalog/data?schema=public&relation=orders&relation=again",
         "/catalog/data?schema=public&relation=orders&sql=delete",
         "/catalog/data?schema=public&relation=orders&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id&column=id",
+        "/catalog/data?schema=public&relation=orders&size=25&size=50",
+        "/catalog/data?schema=public&relation=orders&column=",
+        "/catalog/data?schema=public&relation=orders&connection=other",
+        "/catalog/data?schema=public&relation=orders&spatial=raw-sql",
     ] {
         let (status, _) = response(path).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{path}");
     }
+}
+
+#[tokio::test]
+async fn row_search_is_bounded_and_unknown_options_remain_rejected() {
+    let oversized = "x".repeat(129);
+    let uri = format!("/catalog/data?schema=public&relation=orders&filter={oversized}");
+    assert_eq!(response(&uri).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response("/catalog/data?schema=public&relation=orders&filter=name&where=x")
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
 }

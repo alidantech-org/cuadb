@@ -1,0 +1,19 @@
+<section id="catalog-panel" class="data-panel" aria-label="Indexes and storage" aria-live="polite" hx-history="false">
+  <header class="bar"><h2>{{ title }}</h2><span class="spacer"></span><nav class="seg" aria-label="Table view">
+    <a href="{{ links.data }}" hx-get="{{ links.data }}" hx-target="#catalog-panel" hx-swap="outerHTML">Data</a>
+    <a href="{{ links.structure }}" hx-get="{{ links.structure }}" hx-target="#catalog-panel" hx-swap="outerHTML">Structure</a>
+    <a class="on" href="{{ links.indexes }}" hx-get="{{ links.indexes }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-current="page">Indexes</a>
+  </nav></header>
+  <div class="grid-scroll metadata-scroll">
+    <h3>Indexes</h3>
+    {% if indexes.is_empty() %}<p class="catalog-note">No visible indexes.</p>{% else %}
+    <table class="metadata-grid"><thead><tr><th>Name</th><th>Kind</th><th>Columns / expressions</th><th>Valid</th><th>Predicate</th><th>Definition</th></tr></thead><tbody>
+      {% for index in indexes %}<tr><th scope="row">{{ index.name }}</th><td>{{ index.kind }}</td><td>{{ index.columns }}</td><td>{% if index.valid %}Yes{% else %}No{% endif %}</td><td>{{ index.predicate }}</td><td>{{ index.definition }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+    {% if truncated %}<p class="catalog-note" role="status">The index list is capped and may be incomplete.</p>{% endif %}
+    <h3>Storage and statistics</h3><table class="metadata-grid"><thead><tr><th>Measurement</th><th>Value</th><th>Meaning</th></tr></thead><tbody>
+      {% for stat in statistics %}<tr><th scope="row">{{ stat.name }}</th><td>{{ stat.value }}</td><td>{{ stat.meaning }}</td></tr>{% endfor %}
+    </tbody></table>
+    <p class="catalog-note">Row counts and storage values are engine-reported estimates and may be stale, unavailable or permission-limited.</p>
+  </div>
+</section>

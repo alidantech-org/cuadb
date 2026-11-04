@@ -1,5 +1,5 @@
 ---
-{id: TSK-ABE2D51C83F3,name: Add safe expanded cell detail and copy actions,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.797Z,updated_at: 2026-11-04T07:32:06.797Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8DB2E738839F],order: 4096}
+{id: TSK-ABE2D51C83F3,name: Add safe expanded cell detail and copy actions,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.797Z,updated_at: 2026-11-04T11:29:41.886Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8DB2E738839F],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.886Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-ABE2D51C83F3/1793791781888-start,started_at: 2026-11-04T11:29:41.902Z}]}}}
 ---
 
 # Add safe expanded cell detail and copy actions

@@ -1,5 +1,5 @@
 ---
-{id: TSK-0AA246B508ED,name: Implement Table Info tab with honest statistics and storage,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.130Z,updated_at: 2026-11-04T07:32:07.130Z,tags: [cuadb,inspectors],depends_on: [TSK-CFEA5F712D4B,TSK-FFD6A5B94574],order: 2048}
+{id: TSK-0AA246B508ED,name: Implement Table Info tab with honest statistics and storage,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.130Z,updated_at: 2026-11-04T11:29:48.662Z,tags: [cuadb,inspectors],depends_on: [TSK-CFEA5F712D4B,TSK-FFD6A5B94574],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.662Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-0AA246B508ED/1793791788664-start,started_at: 2026-11-04T11:29:48.680Z}]}}}
 ---
 
 # Implement Table Info tab with honest statistics and storage

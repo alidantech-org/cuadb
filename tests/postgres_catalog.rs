@@ -189,8 +189,38 @@ async fn disposable_postgis_metadata_fixture() {
     );
     let indexes = catalog.list_indexes(&id("places")).await.unwrap();
     assert!(indexes.items.iter().any(|i| i.name == "places_gist"));
+    let spatial_rows = catalog
+        .fetch_rows(&id("places"), cuadb::db::types::RowOptions::default())
+        .await
+        .unwrap();
+    assert!(matches!(
+        &spatial_rows.rows[0][1],
+        cuadb::db::types::Cell::Text(value) if value.starts_with("POINT(")
+    ));
+    let statistics = catalog.relation_statistics(&id("places")).await.unwrap();
+    assert!(matches!(
+        statistics.relation_kind,
+        cuadb::db::types::Availability::Available(cuadb::db::types::RelationKind::Table)
+    ));
     let overview = catalog.advanced_overview().await.unwrap();
     assert!(overview.extensions.iter().any(|e| e == "postgis"));
+    assert!(catalog.postgis_schema().await.unwrap().is_some());
+    let geojson_rows = catalog
+        .fetch_rows(
+            &id("places"),
+            cuadb::db::types::RowOptions {
+                spatial_geojson: true,
+                ..cuadb::db::types::RowOptions::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        geojson_rows.previews[0][1]
+            .detail
+            .as_deref()
+            .is_some_and(|detail| detail.contains("\"coordinates\""))
+    );
     manager.close().await;
 }
 

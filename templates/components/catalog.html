@@ -1,28 +1,30 @@
-<section id="catalog-panel" aria-label="Database catalog" class="rounded-xl border border-slate-800 bg-slate-900 p-5" aria-live="polite">
-  <div class="mb-3 flex items-center justify-between gap-2">
-    <h2 class="text-sm font-semibold">{{ title }}</h2>
-    <a href="/catalog/schemas" hx-get="/catalog/schemas" hx-target="#catalog-panel" hx-swap="outerHTML"
-      class="text-xs text-indigo-300 hover:underline">Schemas</a>
-    <a href="/catalog/overview" hx-get="/catalog/overview" hx-target="#catalog-panel" hx-swap="outerHTML"
-      class="text-xs text-indigo-300 hover:underline">Overview</a>
-  </div>
-  <p class="mb-3 text-xs text-slate-400">{{ note }}</p>
+<section id="catalog-panel" aria-label="Database catalog" aria-live="polite" hx-history="false">
+  <header class="bar"><h2>{{ title }}</h2>
+    {% match relation %}{% when Some with (links) %}
+    <span class="spacer"></span><nav class="seg" aria-label="Table view">
+      <a class="{% if data_active %}on{% endif %}" href="{{ links.data }}" hx-get="{{ links.data }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-current="{% if data_active %}page{% else %}false{% endif %}">Data</a>
+      <a class="{% if structure_active %}on{% endif %}" href="{{ links.structure }}" hx-get="{{ links.structure }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-current="{% if structure_active %}page{% else %}false{% endif %}">Structure</a>
+      <a class="{% if indexes_active %}on{% endif %}" href="{{ links.indexes }}" hx-get="{{ links.indexes }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-current="{% if indexes_active %}page{% else %}false{% endif %}">Indexes</a>
+    </nav>
+    {% when None %}{% endmatch %}
+  </header>
+  <p class="catalog-note">{{ note }}</p>
   {% if truncated %}
-    <p class="mb-3 text-xs text-amber-300" role="status">Results are capped; this list is incomplete.</p>
+    <p class="catalog-note" role="status">Results are capped; this list is incomplete.</p>
   {% endif %}
   {% if rows.is_empty() %}
-    <p class="py-6 text-sm text-slate-400">No visible objects.</p>
+    <p class="catalog-note">No visible objects.</p>
   {% else %}
-    <ul class="divide-y divide-slate-800">
+    <ul class="catalog-list">
       {% for item in rows %}
-      <li class="py-2 text-sm">
+      <li>
         {% if item.href.is_empty() %}
         <span class="font-medium text-slate-200">{{ item.title }}</span>
         {% else %}
         <a href="{{ item.href }}" hx-get="{{ item.href }}" hx-target="#catalog-panel" hx-swap="outerHTML"
-          class="font-medium text-indigo-300 hover:underline">{{ item.title }}</a>
+          class="row-link">{{ item.title }}</a>
         {% endif %}
-        <p class="mt-1 whitespace-pre-wrap break-words text-xs text-slate-400">{{ item.description }}</p>
+        <p class="catalog-note">{{ item.description }}</p>
       </li>
       {% endfor %}
     </ul>

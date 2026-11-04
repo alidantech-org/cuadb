@@ -1,5 +1,5 @@
 ---
-{id: TSK-5EE171C4C580,name: Connect schema and table tree to real catalog data,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.091Z,updated_at: 2026-11-04T07:32:06.091Z,tags: [cuadb,explorer-ui],depends_on: [TSK-A513FD340BD5,TSK-5FC58B7B6E27,TSK-9890D0090922],order: 2048}
+{id: TSK-5EE171C4C580,name: Connect schema and table tree to real catalog data,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.091Z,updated_at: 2026-11-04T11:29:11.351Z,tags: [cuadb,explorer-ui],depends_on: [TSK-A513FD340BD5,TSK-5FC58B7B6E27,TSK-9890D0090922],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.351Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-5EE171C4C580/1793791751353-start,started_at: 2026-11-04T11:29:11.368Z}]}}}
 ---
 
 # Connect schema and table tree to real catalog data
@@ -16,7 +16,7 @@ This task belongs to **06 — Database navigation and workspace UI**. The group 
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Load available schema nodes and relation lists through real adapter-backed routes.
+- [x] Load available schema nodes and relation lists through real adapter-backed routes.
 - [ ] Support expand/collapse and distinguish tables, views and partition parents.
 - [ ] Implement empty schema and permission-denied states without broken tree nodes.
 - [ ] Preserve selected relation and active tab across HTMX navigation.
@@ -33,3 +33,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T11:29:34.362Z · PETER IRUNGU
+
+Schema fragment is loaded through HTMX from actual PostgreSQL adapter routes. Relation names carry safe navigation URLs and are filtered client-side without reading row data. Collapsible grouped schema tree and keyboard selection behavior remain incomplete.

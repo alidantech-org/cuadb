@@ -18,6 +18,8 @@ COPY --from=builder /app/target/release/cuadb ./cuadb
 COPY --from=assets /app/public/ ./public/
 ENV CUADB_PORT=4848
 ENV CUADB_HOST=0.0.0.0
+ENV CUADB_SQLITE_ROOT=/data
+VOLUME ["/data"]
 EXPOSE 4848
 USER 10001:10001
 CMD ["/app/cuadb"]

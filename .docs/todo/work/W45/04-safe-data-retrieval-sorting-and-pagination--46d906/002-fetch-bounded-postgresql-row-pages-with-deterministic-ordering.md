@@ -1,5 +1,5 @@
 ---
-{id: TSK-23B4836BB3AE,name: Fetch bounded PostgreSQL row pages with deterministic ordering,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.334Z,updated_at: 2026-11-04T11:13:52.263Z,tags: [cuadb,postgres-rows],depends_on: [TSK-EC8CC62AD5CD,TSK-5CCB4090CF43],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:13:52.263Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-23B4836BB3AE/1793790832265-start,started_at: 2026-11-04T11:13:52.282Z}]}}}
+{id: TSK-23B4836BB3AE,name: Fetch bounded PostgreSQL row pages with deterministic ordering,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.334Z,updated_at: 2026-11-04T11:37:20.563Z,tags: [cuadb,postgres-rows],depends_on: [TSK-EC8CC62AD5CD,TSK-5CCB4090CF43],order: 6144,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:13:52.263Z},{from: in-progress,to: completed,at: 2026-11-04T11:37:20.563Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-23B4836BB3AE/1793790832265-start,started_at: 2026-11-04T11:13:52.282Z,end_ref: refs/tracking/TSK-23B4836BB3AE/1793792240564-end,ended_at: 2026-11-04T11:37:20.564Z,summary: {files: 25,insertions: 930,deletions: 256}}]}}}
 ---
 
 # Fetch bounded PostgreSQL row pages with deterministic ordering

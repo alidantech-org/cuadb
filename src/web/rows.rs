@@ -6,7 +6,7 @@ use crate::{
 };
 use askama::Template;
 use axum::{
-    extract::{RawQuery, State},
+    extract::{Query, State},
     http::{HeaderValue, header},
     response::{Html, IntoResponse, Response},
 };
@@ -16,6 +16,10 @@ struct Header {
     native_type: String,
     asc: String,
     desc: String,
+    sort_direction: Option<&'static str>,
+    is_ascending: bool,
+    is_descending: bool,
+    sortable: bool,
 }
 #[derive(Clone)]
 struct Value {
@@ -23,6 +27,8 @@ struct Value {
     native_type: String,
     is_null: bool,
     truncated: bool,
+    detail: String,
+    class: &'static str,
 }
 #[derive(Clone)]
 struct DisplayRow {
@@ -33,10 +39,20 @@ struct DisplayRow {
 #[template(path = "components/data_page.html")]
 struct PageTemplate {
     title: String,
+    filter: String,
+    page_size: u32,
+    has_spatial: bool,
+    geojson_active: bool,
+    geojson_url: String,
+    sort: Option<String>,
+    direction: Option<&'static str>,
+    selected_columns: Vec<String>,
+    available_columns: Vec<ColumnView>,
+    compact: bool,
+    schema: String,
+    relation: String,
     headers: Vec<Header>,
     rows: Vec<DisplayRow>,
-    has_previous: bool,
-    has_more: bool,
     previous_url: String,
     next_url: String,
     page_number: u32,
@@ -44,11 +60,16 @@ struct PageTemplate {
     size_50: String,
     size_100: String,
     stable: bool,
-    keyset: bool,
     truncated_columns: bool,
-    limit: u32,
     shown_from: u64,
     shown_to: u64,
+    approximate_total: String,
+}
+#[derive(Clone)]
+struct ColumnView {
+    name: String,
+    native_type: String,
+    selected: bool,
 }
 fn invalid() -> AppError {
     AppError::new(ErrorKind::InvalidInput)
@@ -72,59 +93,131 @@ fn name(value: &str) -> Result<String, AppError> {
         Ok(value.to_string())
     }
 }
+fn value_class(native_type: &str) -> &'static str {
+    let native = native_type.to_ascii_lowercase();
+    if native.contains("json") {
+        "json-value"
+    } else if native.ends_with("[]") {
+        "array-value"
+    } else if native == "bytea" || native.contains("blob") || native.contains("binary") {
+        "binary-value"
+    } else if matches!(
+        native.as_str(),
+        "smallint" | "integer" | "bigint" | "real" | "double precision"
+    ) || native.starts_with("numeric")
+        || native.starts_with("decimal")
+    {
+        "numeric"
+    } else {
+        ""
+    }
+}
+fn detail_value(cell: &crate::db::types::Cell, native_type: &str) -> String {
+    use crate::db::types::Cell;
+    match cell {
+        Cell::Text(text) | Cell::Decimal(text) => {
+            if native_type.to_ascii_lowercase().contains("json") {
+                serde_json::from_str::<serde_json::Value>(text)
+                    .ok()
+                    .and_then(|value| serde_json::to_string_pretty(&value).ok())
+                    .filter(|pretty| pretty.len() <= 1024)
+                    .unwrap_or_else(|| text.clone())
+            } else {
+                text.clone()
+            }
+        }
+        Cell::Integer(number) => number.to_string(),
+        Cell::Boolean(value) => value.to_string(),
+        Cell::Bytes(bytes) => format!(
+            "\\x{}",
+            bytes
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+        ),
+        Cell::Truncated { preview, .. } => preview.clone(),
+        Cell::Unsupported { type_name } => format!("Unsupported {type_name}"),
+        Cell::Null => "NULL".into(),
+    }
+}
 #[derive(Clone)]
 struct Navigation {
     id: RelationId,
     options: RowOptions,
 }
-fn parse(raw: Option<String>) -> Result<Navigation, AppError> {
-    let raw = raw.ok_or_else(invalid)?;
-    if raw.len() > 2048 {
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DataQuery {
+    schema: String,
+    relation: String,
+    size: Option<u32>,
+    page: Option<u32>,
+    sort: Option<String>,
+    direction: Option<String>,
+    cursor: Option<String>,
+    filter: Option<String>,
+    spatial: Option<String>,
+    pick: Option<String>,
+    #[serde(default)]
+    column: Vec<String>,
+}
+
+fn parse(query: DataQuery) -> Result<Navigation, AppError> {
+    if query.column.len() > 24
+        || query
+            .filter
+            .as_ref()
+            .is_some_and(|filter| filter.len() > 128)
+    {
         return Err(invalid());
     }
-    let (mut schema, mut relation, mut sort, mut direction) = (None, None, None, None);
-    let (mut limit, mut page, mut cursor) = (None, None, None);
-    let mut columns = Vec::new();
-    for (key, value) in url::form_urlencoded::parse(raw.as_bytes()) {
-        let v = value.as_ref();
-        match key.as_ref() {
-            "schema" if schema.is_none() => schema = Some(name(v)?),
-            "relation" if relation.is_none() => relation = Some(name(v)?),
-            "sort" if sort.is_none() => sort = Some(name(v)?),
-            "direction" if direction.is_none() => {
-                direction = Some(match v {
-                    "asc" => SortDirection::Asc,
-                    "desc" => SortDirection::Desc,
-                    _ => return Err(invalid()),
-                });
-            }
-            "size" if limit.is_none() => {
-                limit = Some(v.parse::<u32>().map_err(|_| invalid())?);
-            }
-            "page" if page.is_none() => {
-                page = Some(v.parse::<u32>().map_err(|_| invalid())?);
-            }
-            "cursor" if cursor.is_none() => {
-                if v.len() != 64 || !v.bytes().all(|b| b.is_ascii_hexdigit()) {
-                    return Err(invalid());
-                }
-                cursor = Some(v.to_string());
-            }
-            "column" if columns.len() < 24 => columns.push(name(v)?),
-            _ => return Err(invalid()),
-        }
-    }
-    if sort.is_some() != direction.is_some() {
+    let spatial_geojson = match query.spatial.as_deref() {
+        None => false,
+        Some("geojson") => true,
+        Some(_) => return Err(invalid()),
+    };
+    let column_selection_explicit = match query.pick.as_deref() {
+        None => false,
+        Some("1") => true,
+        Some(_) => return Err(invalid()),
+    };
+    if query.sort.is_some() != query.direction.is_some() {
         return Err(invalid());
     }
+    let sort = query.sort.map(|column| name(&column)).transpose()?;
+    let direction = query
+        .direction
+        .map(|direction| match direction.as_str() {
+            "asc" => Ok(SortDirection::Asc),
+            "desc" => Ok(SortDirection::Desc),
+            _ => Err(invalid()),
+        })
+        .transpose()?;
+    let cursor = query
+        .cursor
+        .map(|cursor| {
+            if cursor.len() == 64 && cursor.bytes().all(|b| b.is_ascii_hexdigit()) {
+                Ok(cursor)
+            } else {
+                Err(invalid())
+            }
+        })
+        .transpose()?;
     let options = RowOptions {
-        limit: limit.unwrap_or(25),
-        page: page.unwrap_or(0),
-        selected_columns: columns,
+        limit: query.size.unwrap_or(25),
+        page: query.page.unwrap_or(0),
+        selected_columns: query
+            .column
+            .iter()
+            .map(|c| name(c))
+            .collect::<Result<_, _>>()?,
+        column_selection_explicit,
         sort: sort
             .zip(direction)
             .map(|(column, direction)| SortSpec { column, direction }),
         cursor,
+        filter: query.filter.filter(|filter| !filter.is_empty()),
+        spatial_geojson,
     };
     if options.limit == 0
         || options.limit > 100
@@ -135,8 +228,8 @@ fn parse(raw: Option<String>) -> Result<Navigation, AppError> {
     }
     Ok(Navigation {
         id: RelationId {
-            namespace: schema.ok_or_else(invalid)?,
-            name: relation.ok_or_else(invalid)?,
+            namespace: name(&query.schema)?,
+            name: name(&query.relation)?,
         },
         options,
     })
@@ -159,6 +252,15 @@ fn link(nav: &Navigation, page: u32, cursor: Option<&str>, sort: Option<SortSpec
     for col in &nav.options.selected_columns {
         q.append_pair("column", col);
     }
+    if nav.options.column_selection_explicit {
+        q.append_pair("pick", "1");
+    }
+    if let Some(filter) = nav.options.filter.as_deref() {
+        q.append_pair("filter", filter);
+    }
+    if nav.options.spatial_geojson {
+        q.append_pair("spatial", "geojson");
+    }
     if let Some(token) = cursor {
         q.append_pair("cursor", token);
     } else if page > 0 {
@@ -168,9 +270,9 @@ fn link(nav: &Navigation, page: u32, cursor: Option<&str>, sort: Option<SortSpec
 }
 pub async fn data(
     State(state): State<AppState>,
-    RawQuery(raw): RawQuery,
+    Query(query): Query<DataQuery>,
 ) -> Result<Response, AppError> {
-    let nav = parse(raw)?;
+    let nav = parse(query)?;
     let catalog = state
         .catalog()
         .ok_or(AppError::new(ErrorKind::DatabaseUnavailable))?;
@@ -178,32 +280,67 @@ pub async fn data(
         .fetch_rows(&nav.id, nav.options.clone())
         .await
         .map_err(classified)?;
-    let headers = page
-        .columns
-        .iter()
-        .map(|c| Header {
-            name: c.name.clone(),
-            native_type: c.native_type.clone(),
-            asc: link(
-                &nav,
-                0,
-                None,
-                Some(SortSpec {
-                    column: c.name.clone(),
-                    direction: SortDirection::Asc,
+    let headers =
+        page.columns
+            .iter()
+            .map(|c| Header {
+                name: c.name.clone(),
+                native_type: c.native_type.clone(),
+                sortable: catalog.sort_supported(&c.native_type),
+                asc: {
+                    let clear = nav.options.sort.as_ref().is_some_and(|sort| {
+                        sort.column == c.name && sort.direction == SortDirection::Asc
+                    });
+                    if clear {
+                        link(&nav, 0, None, None)
+                    } else {
+                        link(
+                            &nav,
+                            0,
+                            None,
+                            Some(SortSpec {
+                                column: c.name.clone(),
+                                direction: SortDirection::Asc,
+                            }),
+                        )
+                    }
+                },
+                desc: {
+                    let clear = nav.options.sort.as_ref().is_some_and(|sort| {
+                        sort.column == c.name && sort.direction == SortDirection::Desc
+                    });
+                    if clear {
+                        link(&nav, 0, None, None)
+                    } else {
+                        link(
+                            &nav,
+                            0,
+                            None,
+                            Some(SortSpec {
+                                column: c.name.clone(),
+                                direction: SortDirection::Desc,
+                            }),
+                        )
+                    }
+                },
+                sort_direction: nav.options.sort.as_ref().and_then(|sort| {
+                    (sort.column == c.name).then_some(match sort.direction {
+                        SortDirection::Asc => "ascending",
+                        SortDirection::Desc => "descending",
+                    })
                 }),
-            ),
-            desc: link(
-                &nav,
-                0,
-                None,
-                Some(SortSpec {
-                    column: c.name.clone(),
-                    direction: SortDirection::Desc,
+                is_ascending: nav.options.sort.as_ref().is_some_and(|sort| {
+                    sort.column == c.name && sort.direction == SortDirection::Asc
                 }),
-            ),
-        })
-        .collect::<Vec<_>>();
+                is_descending: nav.options.sort.as_ref().is_some_and(|sort| {
+                    sort.column == c.name && sort.direction == SortDirection::Desc
+                }),
+            })
+            .collect::<Vec<_>>();
+    let has_spatial = page.columns.iter().any(|column| {
+        let native = column.native_type.to_ascii_lowercase();
+        native.starts_with("geometry") || native.starts_with("geography")
+    });
     let shown_from = if page.rows.is_empty() {
         0
     } else {
@@ -213,6 +350,12 @@ pub async fn data(
         0
     } else {
         shown_from + page.rows.len() as u64 - 1
+    };
+    let approximate_total = match (&page.approximate_total, nav.options.filter.as_ref()) {
+        (_, Some(_)) | (crate::db::types::Availability::Unavailable, None) => {
+            "unavailable".to_string()
+        }
+        (crate::db::types::Availability::Available(total), None) => total.to_string(),
     };
     let previous_url = if page.has_previous {
         link(
@@ -239,11 +382,20 @@ pub async fn data(
         let values = cells
             .iter()
             .zip(previews)
-            .map(|(cell, preview)| Value {
-                text: preview.text,
-                native_type: preview.type_name,
-                truncated: preview.truncated,
-                is_null: matches!(cell, crate::db::types::Cell::Null),
+            .map(|(cell, preview)| {
+                let mut detail = detail_value(cell, &preview.type_name);
+                if let Some(spatial) = preview.detail.as_deref() {
+                    detail.push_str("\n\nGeoJSON detail:\n");
+                    detail.push_str(spatial);
+                }
+                Value {
+                    text: preview.text,
+                    class: value_class(&preview.type_name),
+                    native_type: preview.type_name,
+                    truncated: preview.truncated,
+                    is_null: matches!(cell, crate::db::types::Cell::Null),
+                    detail,
+                }
             })
             .collect();
         rendered.push(DisplayRow {
@@ -258,12 +410,41 @@ pub async fn data(
     let size_50 = link(&sizes, 0, None, sizes.options.sort.clone());
     sizes.options.limit = 100;
     let size_100 = link(&sizes, 0, None, sizes.options.sort.clone());
+    let mut geojson_nav = nav.clone();
+    geojson_nav.options.spatial_geojson = !nav.options.spatial_geojson;
+    let geojson_url = link(&geojson_nav, 0, None, geojson_nav.options.sort.clone());
     let view = PageTemplate {
         title: format!("Data · {}.{}", nav.id.namespace, nav.id.name),
+        filter: nav.options.filter.clone().unwrap_or_default(),
+        page_size: nav.options.limit,
+        has_spatial,
+        geojson_active: nav.options.spatial_geojson,
+        geojson_url,
+        sort: nav.options.sort.as_ref().map(|sort| sort.column.clone()),
+        direction: nav.options.sort.as_ref().map(|sort| match sort.direction {
+            SortDirection::Asc => "asc",
+            SortDirection::Desc => "desc",
+        }),
+        selected_columns: nav.options.selected_columns.clone(),
+        available_columns: page
+            .available_columns
+            .iter()
+            .map(|column| ColumnView {
+                name: column.name.clone(),
+                native_type: column.native_type.clone(),
+                selected: if nav.options.column_selection_explicit {
+                    nav.options.selected_columns.contains(&column.name)
+                } else {
+                    nav.options.selected_columns.is_empty()
+                        || nav.options.selected_columns.contains(&column.name)
+                },
+            })
+            .collect(),
+        compact: false,
+        schema: url::form_urlencoded::byte_serialize(nav.id.namespace.as_bytes()).collect(),
+        relation: url::form_urlencoded::byte_serialize(nav.id.name.as_bytes()).collect(),
         headers,
         rows: rendered,
-        has_previous: page.has_previous,
-        has_more: page.has_more,
         previous_url,
         next_url,
         page_number: page.page.saturating_add(1),
@@ -271,11 +452,10 @@ pub async fn data(
         size_50,
         size_100,
         stable: page.stable_order,
-        keyset: page.keyset_enabled,
         truncated_columns: page.truncated_columns,
-        limit: nav.options.limit,
         shown_from,
         shown_to,
+        approximate_total,
     };
     let body = view.render().map_err(|_| AppError::template())?;
     let mut response = Html(body).into_response();
@@ -283,4 +463,25 @@ pub async fn data(
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{detail_value, value_class};
+    use crate::db::types::Cell;
+
+    #[test]
+    fn rich_value_details_are_bounded_and_preserve_meaning() {
+        assert_eq!(value_class("jsonb"), "json-value");
+        assert_eq!(value_class("integer"), "numeric");
+        assert_eq!(
+            detail_value(&Cell::Text(r#"{"a":1}"#.into()), "jsonb"),
+            "{\n  \"a\": 1\n}"
+        );
+        assert_eq!(
+            detail_value(&Cell::Bytes(vec![0, 255]), "bytea"),
+            r#"\x00ff"#
+        );
+        assert_eq!(detail_value(&Cell::Null, "text"), "NULL");
+    }
 }

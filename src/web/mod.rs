@@ -54,7 +54,7 @@ pub async fn health() -> &'static str {
 #[template(path = "components/connection_status.html")]
 struct ConnectionStatusTemplate {
     label: &'static str,
-    detail: &'static str,
+    detail: String,
     ready: bool,
 }
 
@@ -62,9 +62,10 @@ struct ConnectionStatusTemplate {
 /// Failed probes are cached briefly, so repeated HTMX requests are inexpensive.
 pub async fn connection_status(State(state): State<AppState>) -> Result<Response, AppError> {
     let snapshot = state.connection_snapshot().await;
+    let detected_engine = state.detected_engine().await;
     let view = ConnectionStatusTemplate {
         label: snapshot.label(),
-        detail: snapshot.detail(),
+        detail: snapshot.detail(detected_engine),
         ready: snapshot.is_ready(),
     };
     let mut response = html(view)?.into_response();

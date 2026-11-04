@@ -81,6 +81,9 @@ impl PgCatalog {
             options.page = anchor.page;
         }
         let details = self.describe_columns(id).await?;
+        if details.truncated && options.filter.is_some() {
+            return Err(DbError::new(DbErrorKind::Unsupported));
+        }
         if details.truncated && options.selected_columns.is_empty() {
             return Err(DbError::new(DbErrorKind::Unsupported));
         }
@@ -89,6 +92,18 @@ impl PgCatalog {
             value: a.value,
             direction: a.direction,
         });
+        let has_spatial = details.items.iter().any(|column| {
+            let native = column.column.native_type.to_ascii_lowercase();
+            native.starts_with("geometry") || native.starts_with("geography")
+        });
+        let postgis_schema = if has_spatial {
+            self.postgis_schema().await?
+        } else {
+            None
+        };
+        if options.spatial_geojson && (!has_spatial || postgis_schema.is_none()) {
+            return Err(DbError::new(DbErrorKind::Unsupported));
+        }
         let plan = row_query::build(
             &id.namespace,
             &id.name,
@@ -97,6 +112,7 @@ impl PgCatalog {
             &options,
             self.max_page_size,
             seek,
+            postgis_schema.as_deref(),
         )?;
         let began = std::time::Instant::now();
         let records = timeout(
@@ -105,6 +121,7 @@ impl PgCatalog {
                 .bind(plan.seek_value)
                 .bind(i64::from(options.limit) + 1)
                 .bind(plan.offset)
+                .bind(plan.filter_value.as_deref())
                 .fetch_all(&self.pool),
         )
         .await
@@ -128,7 +145,30 @@ impl PgCatalog {
                 let raw: Option<String> = record
                     .try_get(format!("c{i}").as_str())
                     .map_err(|_| DbError::new(DbErrorKind::Internal))?;
-                let (cell, preview) = normalize(raw.as_deref(), &col.column.native_type);
+                let (cell, mut preview) = normalize(raw.as_deref(), &col.column.native_type);
+                if plan.spatial_geojson
+                    && (col
+                        .column
+                        .native_type
+                        .to_ascii_lowercase()
+                        .starts_with("geometry")
+                        || col
+                            .column
+                            .native_type
+                            .to_ascii_lowercase()
+                            .starts_with("geography"))
+                    && let Some(raw_json) = record
+                        .try_get::<Option<String>, _>(format!("g{i}").as_str())
+                        .map_err(|_| DbError::new(DbErrorKind::Internal))?
+                {
+                    preview.detail = Some(if raw_json.len() > 1024 {
+                        "GeoJSON detail exceeds the 1024 character display limit.".into()
+                    } else if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw_json) {
+                        serde_json::to_string_pretty(&value).unwrap_or(raw_json)
+                    } else {
+                        "GeoJSON detail is unavailable for this value.".into()
+                    });
+                }
                 cells.push(cell);
                 previews.push(preview);
             }
@@ -186,7 +226,9 @@ impl PgCatalog {
             rows.push(cells);
             previews.push(view);
         }
+        let available_columns = details.items.iter().map(|c| c.column.clone()).collect();
         Ok(RowPage {
+            available_columns,
             columns: plan.selected.into_iter().map(|c| c.column).collect(),
             rows,
             previews,
@@ -235,6 +277,7 @@ pub fn normalize(raw: Option<&str>, native: &str) -> (Cell, RowPreview) {
                 text: "NULL".into(),
                 truncated: false,
                 type_name: native.into(),
+                detail: None,
             },
         );
     };
@@ -251,6 +294,7 @@ pub fn normalize(raw: Option<&str>, native: &str) -> (Cell, RowPreview) {
         text: bounded.into(),
         truncated,
         type_name: native.into(),
+        detail: None,
     };
     if truncated {
         return (

@@ -22,7 +22,7 @@ async fn disconnected_catalog_is_helpful_without_database() {
     let (status, html) = response("/catalog/schemas").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Not configured."));
-    assert!(html.contains("No visible objects."));
+    assert!(html.contains("Database schemas"));
     assert!(!html.contains("postgresql://"));
 
     let (status, _) = response("/catalog/overview").await;
@@ -38,6 +38,8 @@ async fn rejects_duplicate_unknown_and_unbounded_identifier_params() {
         "/catalog/structure?schema=public",
         "/catalog/structure?schema=public&relation=x&relation=y",
         "/catalog/structure?schema=%00&relation=x",
+        "/catalog/indexes?schema=public&relation=x&sort=bad",
+        "/catalog/stats?schema=public&relation=x&connection=other",
     ] {
         let (status, html) = response(path).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{path}");

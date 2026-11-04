@@ -31,10 +31,22 @@ async fn home_renders_an_html_shell() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    assert_eq!(response.headers()["x-content-type-options"], "nosniff");
+    assert_eq!(response.headers()["x-frame-options"], "DENY");
+    assert!(
+        response.headers()["content-security-policy"]
+            .to_str()
+            .unwrap()
+            .contains("default-src 'self'")
+    );
     let body = to_bytes(response.into_body(), 256_000).await.unwrap();
     let html = String::from_utf8(body.to_vec()).unwrap();
     assert!(html.contains("CuaDB"));
-    assert!(html.contains("Data preview"));
+    assert!(html.contains("Search tables"));
+    assert!(html.contains("id=\"side\""));
+    assert!(html.contains("id=\"mainbody\""));
+    assert!(!html.contains("placeholder · no database queries"));
 }
 
 #[tokio::test]

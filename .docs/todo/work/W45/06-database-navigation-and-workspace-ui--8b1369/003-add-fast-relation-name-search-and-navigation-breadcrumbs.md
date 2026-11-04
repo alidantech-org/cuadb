@@ -1,5 +1,5 @@
 ---
-{id: TSK-1C5E54BDB641,name: Add fast relation-name search and navigation breadcrumbs,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.170Z,updated_at: 2026-11-04T07:32:06.170Z,tags: [cuadb,explorer-ui],depends_on: [TSK-5EE171C4C580],order: 3072}
+{id: TSK-1C5E54BDB641,name: Add fast relation-name search and navigation breadcrumbs,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.170Z,updated_at: 2026-11-04T11:29:11.515Z,tags: [cuadb,explorer-ui],depends_on: [TSK-5EE171C4C580],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.515Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-1C5E54BDB641/1793791751518-start,started_at: 2026-11-04T11:29:11.532Z}]}}}
 ---
 
 # Add fast relation-name search and navigation breadcrumbs
@@ -16,7 +16,7 @@ This task belongs to **06 — Database navigation and workspace UI**. The group 
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Search schema and relation names without reading underlying data rows.
+- [x] Search schema and relation names without reading underlying data rows.
 - [ ] Preserve navigation context and selection when clearing or changing the search.
 - [ ] Provide keyboard navigation and clear empty-results messaging.
 - [ ] Test special characters, case sensitivity and large table lists.
@@ -33,3 +33,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T11:29:34.666Z · PETER IRUNGU
+
+Added immediate case-insensitive relation-name filtering on server-rendered catalog entries; filtering inspects names only and does not query cell data. Breadcrumbs and large-catalog server fallback remain open.

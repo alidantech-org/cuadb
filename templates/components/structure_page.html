@@ -1,0 +1,22 @@
+<section id="catalog-panel" class="data-panel" aria-label="Table structure" aria-live="polite" hx-history="false">
+  <header class="bar"><h2>{{ title }}</h2><span class="spacer"></span><nav class="seg" aria-label="Table view">
+    <a href="{{ links.data }}" hx-get="{{ links.data }}" hx-target="#catalog-panel" hx-swap="outerHTML">Data</a>
+    <a class="on" href="{{ links.structure }}" hx-get="{{ links.structure }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-current="page">Structure</a>
+    <a href="{{ links.indexes }}" hx-get="{{ links.indexes }}" hx-target="#catalog-panel" hx-swap="outerHTML">Indexes</a>
+  </nav></header>
+  <div class="grid-scroll metadata-scroll">
+    <h3>Columns</h3>
+    {% if columns.is_empty() %}<p class="catalog-note">No visible column metadata.</p>{% else %}
+    <table class="metadata-grid"><thead><tr><th>Position</th><th>Column</th><th>Type</th><th>Nullable</th><th>Key</th><th>Default / generation</th></tr></thead><tbody>
+      {% for column in columns %}<tr><td>{{ column.position }}</td><th scope="row">{{ column.name }}</th><td>{{ column.native_type }}</td><td>{% if column.nullable %}Yes{% else %}No{% endif %}</td><td>{{ column.key }}</td><td>{{ column.generation }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+    <h3>Constraints</h3>
+    {% if constraints.is_empty() %}<p class="catalog-note">No visible constraints, or this relation does not expose constraint metadata.</p>{% else %}
+    <table class="metadata-grid"><thead><tr><th>Name</th><th>Kind</th><th>Columns</th><th>References</th><th>Definition</th></tr></thead><tbody>
+      {% for constraint in constraints %}<tr><th scope="row">{{ constraint.name }}</th><td>{{ constraint.kind }}</td><td>{{ constraint.columns }}</td><td>{{ constraint.references }}</td><td>{{ constraint.definition }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+    {% if partitions.is_empty() %}{% else %}<h3>Partitions</h3><table class="metadata-grid"><thead><tr><th>Parent</th><th>Child</th><th>Bound</th></tr></thead><tbody>{% for partition in partitions %}<tr><td>{{ partition.parent }}</td><td>{{ partition.child }}</td><td>{{ partition.bound }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+    {% if truncated %}<p class="catalog-note" role="status">Some catalog metadata was capped; lists may be incomplete.</p>{% endif %}
+    <p class="catalog-note">Definitions are metadata only. Permissions can hide related objects; views may not expose table constraints.</p>
+  </div>
+</section>

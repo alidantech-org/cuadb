@@ -1,0 +1,12 @@
+<div class="schema-tree" aria-label="Database schemas" role="tree">
+  {% if schemas.is_empty() %}
+    <p class="catalog-note" role="status">{{ note }}</p>
+  {% else %}
+    {% for schema in schemas %}
+    <details class="schema-node" role="treeitem" data-schema-name="{{ schema.name }}" hx-get="{{ schema.href }}" hx-trigger="toggle once" hx-target="find .schema-children" hx-swap="innerHTML">
+      <summary class="schema-head"><span class="schema-chevron" aria-hidden="true">›</span><span class="schema-name">{{ schema.name }}</span></summary>
+      <div class="schema-children" role="group"><span class="catalog-note">Expand to load visible relations…</span></div>
+    </details>
+    {% endfor %}
+  {% endif %}
+</div>

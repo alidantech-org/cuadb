@@ -107,7 +107,44 @@ fn apply_policy(router: Router, policy: RequestPolicy) -> Router {
         .layer(middleware::from_fn_with_state(policy, bound_request))
         // Outermost: every completed request, including rejected ones, gets a
         // generated request ID. Never log a URI, query string, headers or body.
+        .layer(middleware::from_fn(security_headers))
         .layer(middleware::from_fn(trace_request))
+}
+
+async fn security_headers(request: Request, next: Next) -> Response {
+    let is_static = request.uri().path().starts_with("/static/");
+    let is_html_route =
+        !request.uri().path().starts_with("/static/") && request.uri().path() != "/health";
+    let mut response = next.run(request).await;
+    let no_store = is_html_route || request_is_html(&response);
+    let headers = response.headers_mut();
+    if !is_static {
+        headers.insert("x-content-type-options", "nosniff".parse().unwrap());
+        headers.insert("x-frame-options", "DENY".parse().unwrap());
+        headers.insert("referrer-policy", "no-referrer".parse().unwrap());
+        headers.insert(
+            "content-security-policy",
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+                .parse()
+                .unwrap(),
+        );
+        headers.insert(
+            "cross-origin-resource-policy",
+            "same-origin".parse().unwrap(),
+        );
+    }
+    if no_store {
+        headers.insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
+    }
+    response
+}
+
+fn request_is_html(response: &Response) -> bool {
+    response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("text/html"))
 }
 
 /// Immediately reject overload rather than allocating an unbounded wait queue.
@@ -194,7 +231,7 @@ async fn trace_request(request: Request, next: Next) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use super::{RequestPolicy, apply_policy, router};
+    use super::{RequestPolicy, apply_policy, header, router};
     use axum::{
         Router,
         body::{Body, to_bytes},
@@ -235,6 +272,23 @@ mod tests {
         assert!(response.headers().contains_key("x-request-id"));
         let body = to_bytes(response.into_body(), 1024).await.unwrap();
         assert_eq!(body.as_ref(), b"ok");
+    }
+
+    #[tokio::test]
+    async fn html_responses_are_no_store_and_have_browser_security_headers() {
+        let response = router()
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+        assert_eq!(response.headers()["x-content-type-options"], "nosniff");
+        assert_eq!(response.headers()["x-frame-options"], "DENY");
+        assert!(
+            response.headers()["content-security-policy"]
+                .to_str()
+                .unwrap()
+                .contains("frame-ancestors 'none'")
+        );
     }
 
     #[tokio::test]

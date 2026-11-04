@@ -1,0 +1,13 @@
+<ul class="relation-tree" aria-label="Relations in {{ schema }}">
+  {% if relations.is_empty() %}
+    <li class="catalog-note" role="status">{{ note }}</li>
+  {% else %}
+    {% for relation in relations %}
+    <li class="relation-node" data-relation-name="{{ relation.name }}">
+      <a href="{{ relation.href }}" hx-get="{{ relation.href }}" hx-target="#mainbody" hx-swap="innerHTML" hx-sync="#mainbody:replace" class="row-link" aria-label="Open {{ relation.kind }} {{ relation.name }}">
+        <span class="relation-kind" aria-hidden="true">{{ relation.kind }}</span><span>{{ relation.name }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  {% endif %}
+</ul>

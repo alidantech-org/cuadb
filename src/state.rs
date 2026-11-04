@@ -5,60 +5,139 @@ use std::sync::Arc;
 use crate::{
     config::Config,
     db::{
-        postgres::{PgManager, url::UrlError},
+        adapter::DatabaseAdapter,
+        mysql::{MySqlManager, url::UrlError as MySqlUrlError},
+        postgres::{PgManager, url::UrlError as PgUrlError},
+        sqlite::{SqliteManager, SqliteUrlError},
         types::{ConnectionSnapshot, ConnectionStatus},
     },
 };
 
+#[derive(Debug)]
+pub enum StateError {
+    PostgreSql(PgUrlError),
+    MySql(MySqlUrlError),
+    Sqlite(SqliteUrlError),
+    UnsupportedDatabase,
+}
+
+impl std::fmt::Display for StateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::PostgreSql(error) => error.fmt(f),
+            Self::MySql(error) => error.fmt(f),
+            Self::Sqlite(error) => error.fmt(f),
+            Self::UnsupportedDatabase => f.write_str("Unsupported database URL scheme"),
+        }
+    }
+}
+
+impl std::error::Error for StateError {}
+
+#[derive(Clone)]
+enum Runtime {
+    PostgreSql(Arc<PgManager>),
+    MySql(Arc<MySqlManager>),
+    Sqlite(Arc<SqliteManager>),
+}
+
 #[derive(Clone)]
 pub struct AppState {
-    postgres: Option<Arc<PgManager>>,
+    runtime: Option<Runtime>,
+    catalog: Option<Arc<dyn DatabaseAdapter>>,
 }
 
 impl AppState {
-    pub fn from_config(config: &Config) -> Result<Self, UrlError> {
-        let postgres = config
-            .database_url()
-            .map(|secret| PgManager::new(secret.expose(), &config.limits))
-            .transpose()?
-            .map(Arc::new);
-        Ok(Self { postgres })
+    pub fn from_config(config: &Config) -> Result<Self, StateError> {
+        let runtime = if let Some(secret) = config.database_url() {
+            let url = secret.expose();
+            if url.starts_with("sqlite:///") {
+                let root = &config.sqlite_root;
+                Some(Runtime::Sqlite(Arc::new(
+                    SqliteManager::new(url, root.as_path(), &config.limits)
+                        .map_err(StateError::Sqlite)?,
+                )))
+            } else if url.starts_with("sqlite:") {
+                return Err(StateError::UnsupportedDatabase);
+            } else if url.starts_with("mysql://") || url.starts_with("mariadb://") {
+                Some(Runtime::MySql(Arc::new(
+                    MySqlManager::new(url, &config.limits).map_err(StateError::MySql)?,
+                )))
+            } else {
+                Some(Runtime::PostgreSql(Arc::new(
+                    PgManager::new(url, &config.limits).map_err(StateError::PostgreSql)?,
+                )))
+            }
+        } else {
+            None
+        };
+        let catalog = runtime.as_ref().map(|manager| match manager {
+            Runtime::PostgreSql(manager) => Arc::new(manager.catalog()) as Arc<dyn DatabaseAdapter>,
+            Runtime::MySql(manager) => Arc::new(manager.catalog()) as Arc<dyn DatabaseAdapter>,
+            Runtime::Sqlite(manager) => Arc::new(manager.catalog()) as Arc<dyn DatabaseAdapter>,
+        });
+        Ok(Self { runtime, catalog })
     }
 
     pub fn disconnected() -> Self {
-        Self { postgres: None }
+        Self {
+            runtime: None,
+            catalog: None,
+        }
     }
 
     pub async fn connection_snapshot(&self) -> ConnectionSnapshot {
-        match &self.postgres {
-            Some(manager) => manager.snapshot().await,
+        match &self.runtime {
+            Some(Runtime::PostgreSql(manager)) => manager.snapshot().await,
+            Some(Runtime::MySql(manager)) => manager.snapshot().await,
+            Some(Runtime::Sqlite(manager)) => manager.snapshot().await,
             None => ConnectionSnapshot::disconnected(),
         }
     }
 
+    pub async fn detected_engine(&self) -> Option<crate::db::types::Engine> {
+        match &self.catalog {
+            Some(catalog) => Some(catalog.detected_engine().await),
+            None => None,
+        }
+    }
+
     /// The only catalog query target is the operator-configured shared pool.
-    pub fn catalog(&self) -> Option<crate::db::postgres::PgCatalog> {
-        self.postgres.as_ref().map(|manager| manager.catalog())
+    pub fn catalog(&self) -> Option<Arc<dyn DatabaseAdapter>> {
+        self.catalog.clone()
     }
 
     /// Optional startup probe: errors change status, never crash the UI.
     pub fn start_probe(&self) {
-        if let Some(manager) = &self.postgres {
-            let manager = Arc::clone(manager);
+        if let Some(manager) = &self.runtime {
+            let manager = manager.clone();
             let _task = tokio::spawn(async move {
-                let _ = manager.snapshot().await;
+                match manager {
+                    Runtime::PostgreSql(manager) => {
+                        let _ = manager.snapshot().await;
+                    }
+                    Runtime::MySql(manager) => {
+                        let _ = manager.snapshot().await;
+                    }
+                    Runtime::Sqlite(manager) => {
+                        let _ = manager.snapshot().await;
+                    }
+                }
             });
         }
     }
 
     pub async fn close(&self) {
-        if let Some(manager) = &self.postgres {
-            manager.close().await;
+        match &self.runtime {
+            Some(Runtime::PostgreSql(manager)) => manager.close().await,
+            Some(Runtime::MySql(manager)) => manager.close().await,
+            Some(Runtime::Sqlite(manager)) => manager.close().await,
+            None => {}
         }
     }
 
     pub fn is_configured(&self) -> bool {
-        self.postgres.is_some()
+        self.runtime.is_some()
     }
 }
 
@@ -75,14 +154,28 @@ impl ConnectionSnapshot {
         }
     }
 
-    pub fn detail(self) -> &'static str {
+    pub fn detail(self, detected_engine: Option<crate::db::types::Engine>) -> String {
+        let engine = detected_engine.unwrap_or(self.engine);
+        let engine = match engine {
+            crate::db::types::Engine::PostgreSql => "PostgreSQL",
+            crate::db::types::Engine::MySql => "MySQL",
+            crate::db::types::Engine::MariaDb => "MariaDB",
+            crate::db::types::Engine::Sqlite => "SQLite",
+            crate::db::types::Engine::SqlServer => "SQL Server",
+        };
         match self.status {
-            ConnectionStatus::Disconnected => "Set CUADB_DATABASE_URL on the server.",
-            ConnectionStatus::Connecting => "Checking the configured PostgreSQL connection.",
-            ConnectionStatus::Ready => "PostgreSQL connection and read-only session verified.",
-            ConnectionStatus::Unavailable => "Cannot reach the configured PostgreSQL database.",
-            ConnectionStatus::AuthenticationFailed => "Check the configured viewer credentials.",
-            ConnectionStatus::PermissionDenied => "The viewer role lacks required access.",
+            ConnectionStatus::Disconnected => "Set CUADB_DATABASE_URL on the server.".into(),
+            ConnectionStatus::Connecting => format!("Checking the configured {engine} connection."),
+            ConnectionStatus::Ready => {
+                format!("{engine} connection and read-only session verified.")
+            }
+            ConnectionStatus::Unavailable => {
+                format!("Cannot reach the configured {engine} database.")
+            }
+            ConnectionStatus::AuthenticationFailed => {
+                "Check the configured viewer credentials.".into()
+            }
+            ConnectionStatus::PermissionDenied => "The viewer role lacks required access.".into(),
         }
     }
 

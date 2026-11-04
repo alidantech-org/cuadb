@@ -1,5 +1,5 @@
 ---
-{id: TSK-58382C325F5F,name: Add optional PostGIS geometry and geography inspection,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.352Z,updated_at: 2026-11-04T07:32:07.352Z,tags: [cuadb,inspectors],depends_on: [TSK-11615BE5E97B,TSK-725618F4E684],order: 4096}
+{id: TSK-58382C325F5F,name: Add optional PostGIS geometry and geography inspection,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.352Z,updated_at: 2026-11-04T11:29:48.994Z,tags: [cuadb,inspectors],depends_on: [TSK-11615BE5E97B,TSK-725618F4E684],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.994Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-58382C325F5F/1793791788996-start,started_at: 2026-11-04T11:29:49.010Z}]}}}
 ---
 
 # Add optional PostGIS geometry and geography inspection

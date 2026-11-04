@@ -1,5 +1,5 @@
 ---
-{id: TSK-8EC2E48964BC,name: Implement table Structure tab from real metadata,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.044Z,updated_at: 2026-11-04T07:32:07.044Z,tags: [cuadb,inspectors],depends_on: [TSK-047C7016EEAA,TSK-FFD6A5B94574],order: 1024}
+{id: TSK-8EC2E48964BC,name: Implement table Structure tab from real metadata,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.044Z,updated_at: 2026-11-04T11:29:48.511Z,tags: [cuadb,inspectors],depends_on: [TSK-047C7016EEAA,TSK-FFD6A5B94574],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.511Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-8EC2E48964BC/1793791788513-start,started_at: 2026-11-04T11:29:48.525Z}]}}}
 ---
 
 # Implement table Structure tab from real metadata
@@ -33,3 +33,9 @@ The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T12:22:43.140Z · PETER IRUNGU
+
+Implemented initial structure and indexes/statistics table fragments backed by shared adapter metadata. A live MariaDB fixture verified columns, keys, generated values and rough row statistics. Canonical UI comparison and engine-specific feature details remain to validate.

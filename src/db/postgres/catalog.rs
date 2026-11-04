@@ -13,7 +13,7 @@ use crate::db::{
         Availability, Capability, CatalogList, CatalogObject, CatalogObjectKind, Column,
         ColumnDetail, Constraint, ConstraintKind, DbError, DbErrorKind, Engine, Index, Namespace,
         Overview, PageRequest, PartitionLink, Relation, RelationId, RelationKind, RelationStats,
-        RowPage, SchemaSize,
+        RowOptions, RowPage, SchemaSize,
     },
 };
 
@@ -418,7 +418,8 @@ impl PgCatalog {
         let row = self
             .bounded(
                 sqlx::query(
-                    r#"SELECT CASE WHEN c.relkind IN ('r','m') AND c.reltuples>=0
+                    r#"SELECT c.relkind::text AS relation_kind,
+                      CASE WHEN c.relkind IN ('r','m') AND c.reltuples>=0
                          THEN c.reltuples::bigint ELSE NULL END AS rows_estimate,
                       CASE WHEN c.relkind IN ('r','m')
                          THEN pg_catalog.pg_table_size(c.oid) ELSE NULL END AS table_bytes,
@@ -434,12 +435,36 @@ impl PgCatalog {
             )
             .await?;
         let estimate: Option<i64> = get(&row, "rows_estimate")?;
+        let kind: String = get(&row, "relation_kind")?;
         Ok(RelationStats {
+            relation_kind: Availability::Available(match kind.as_str() {
+                "r" => RelationKind::Table,
+                "p" => RelationKind::PartitionedTable,
+                "v" => RelationKind::View,
+                "m" => RelationKind::MaterializedView,
+                "f" => RelationKind::ForeignTable,
+                _ => return Err(DbError::new(DbErrorKind::Unsupported)),
+            }),
             estimated_rows: estimate.map_or(Availability::Unavailable, Availability::Available),
             table_bytes: available_bytes(get(&row, "table_bytes")?),
             index_bytes: available_bytes(get(&row, "index_bytes")?),
             total_bytes: available_bytes(get(&row, "total_bytes")?),
         })
+    }
+
+    /// Return the trusted namespace for PostGIS functions, if the extension is
+    /// installed in this database. The namespace is quoted before SQL use.
+    pub async fn postgis_schema(&self) -> Result<Option<String>, DbError> {
+        self.bounded(
+            sqlx::query_scalar::<_, String>(
+                r#"SELECT n.nspname::text
+                   FROM pg_catalog.pg_extension e
+                   JOIN pg_catalog.pg_namespace n ON n.oid=e.extnamespace
+                   WHERE e.extname='postgis' LIMIT 1"#,
+            )
+            .fetch_optional(&self.pool),
+        )
+        .await
     }
 
     /// Metadata only. Never invoke routines or read sequence values.
@@ -640,9 +665,14 @@ impl PgCatalog {
 }
 
 // RPITIT: consumers of the engine-neutral interface never access pg_catalog SQL.
+#[async_trait::async_trait]
 impl DatabaseAdapter for PgCatalog {
     fn engine(&self) -> Engine {
         Engine::PostgreSql
+    }
+
+    fn sort_supported(&self, native_type: &str) -> bool {
+        super::row_query::sort_supported(native_type)
     }
     fn supports(&self, capability: Capability) -> bool {
         matches!(
@@ -654,6 +684,7 @@ impl DatabaseAdapter for PgCatalog {
                 | Capability::ForeignKeys
                 | Capability::EstimatedRows
                 | Capability::StorageSizes
+                | Capability::SpatialTypes
                 | Capability::Routines
                 | Capability::Sequences
                 | Capability::UserTypes
@@ -709,6 +740,45 @@ impl DatabaseAdapter for PgCatalog {
     }
     async fn rows(&self, id: &RelationId, opts: PageRequest) -> Result<RowPage, DbError> {
         self.offset_page(id, opts).await
+    }
+    async fn list_schemas(&self) -> Result<CatalogList<Namespace>, DbError> {
+        PgCatalog::list_schemas(self).await
+    }
+    async fn list_relations(&self, namespace: &str) -> Result<CatalogList<Relation>, DbError> {
+        PgCatalog::list_relations(self, namespace).await
+    }
+    async fn describe_columns(
+        &self,
+        id: &RelationId,
+    ) -> Result<CatalogList<ColumnDetail>, DbError> {
+        PgCatalog::describe_columns(self, id).await
+    }
+    async fn list_constraints(&self, id: &RelationId) -> Result<CatalogList<Constraint>, DbError> {
+        PgCatalog::list_constraints(self, id).await
+    }
+    async fn list_indexes(&self, id: &RelationId) -> Result<CatalogList<Index>, DbError> {
+        PgCatalog::list_indexes(self, id).await
+    }
+    async fn list_partitions(
+        &self,
+        id: &RelationId,
+    ) -> Result<CatalogList<PartitionLink>, DbError> {
+        PgCatalog::list_partitions(self, id).await
+    }
+    async fn list_advanced(&self, namespace: &str) -> Result<CatalogList<CatalogObject>, DbError> {
+        PgCatalog::list_advanced(self, namespace).await
+    }
+    async fn advanced_overview(&self) -> Result<Overview, DbError> {
+        PgCatalog::advanced_overview(self).await
+    }
+    async fn relation_statistics(&self, id: &RelationId) -> Result<RelationStats, DbError> {
+        PgCatalog::relation_statistics(self, id).await
+    }
+    async fn fetch_rows(&self, id: &RelationId, opts: RowOptions) -> Result<RowPage, DbError> {
+        PgCatalog::fetch_rows(self, id, opts).await
+    }
+    async fn postgis_schema(&self) -> Result<Option<String>, DbError> {
+        PgCatalog::postgis_schema(self).await
     }
 }
 

@@ -17,3 +17,4 @@
 .vscode/
 
 # Commit Cargo.lock and bun.lock after first install for repeatable builds.
+assets/.design

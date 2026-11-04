@@ -54,6 +54,7 @@ pub struct Config {
     pub port: u16,
     pub limits: Limits,
     database_url: Option<SecretUrl>,
+    pub sqlite_root: std::path::PathBuf,
 }
 
 /// An invalid setting with a useful, secret-free error message.
@@ -203,6 +204,10 @@ impl Config {
             "must be a whole number between 1024 and 1048576",
         )? as usize;
 
+        let sqlite_root = read("CUADB_SQLITE_ROOT")?
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| "/data".into());
+
         let database_url = match read("CUADB_DATABASE_URL")? {
             Some(value) if value.is_empty() || value.len() > 8192 || value.trim() != value => {
                 return Err(ConfigError::invalid(
@@ -228,6 +233,7 @@ impl Config {
                 max_request_body_bytes,
             },
             database_url,
+            sqlite_root,
         })
     }
 }
@@ -264,6 +270,7 @@ mod tests {
         assert_eq!(config.host, IpAddr::from([127, 0, 0, 1]));
         assert_eq!(config.port, 4848);
         assert!(config.database_url().is_none());
+        assert_eq!(config.sqlite_root, std::path::PathBuf::from("/data"));
         assert_eq!(config.limits.connection_timeout, Duration::from_secs(5));
         assert_eq!(config.limits.query_timeout, Duration::from_secs(15));
         assert_eq!(config.limits.request_timeout, Duration::from_secs(30));

@@ -1,5 +1,5 @@
 ---
-{id: TSK-16AEEF4061F8,name: Wire paging controls and page size to the Rust server,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.572Z,updated_at: 2026-11-04T07:32:06.572Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8B8935A1684A],order: 2048}
+{id: TSK-16AEEF4061F8,name: Wire paging controls and page size to the Rust server,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.572Z,updated_at: 2026-11-04T11:29:41.555Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8B8935A1684A],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.555Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-16AEEF4061F8/1793791781557-start,started_at: 2026-11-04T11:29:41.570Z}]}}}
 ---
 
 # Wire paging controls and page size to the Rust server

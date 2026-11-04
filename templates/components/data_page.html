@@ -1,87 +1,85 @@
-<section id="catalog-panel" aria-label="Read-only data grid"
-  class="rounded-xl border border-slate-800 bg-slate-900 p-4" aria-live="polite">
-  <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-    <h2 class="font-semibold text-sm">{{ title }}</h2>
-    <a href="/catalog/schemas" hx-get="/catalog/schemas" hx-target="#catalog-panel"
-      hx-swap="outerHTML" class="text-xs text-indigo-300">Schemas</a>
+<section id="catalog-panel" class="data-panel" aria-label="Read-only data grid" aria-live="polite" hx-history="false">
+  <header class="bar">
+    <h1><span>{{ title }}</span></h1>
+    <span class="meta">{{ shown_from }}–{{ shown_to }} · ~{{ approximate_total }} rows</span>
+    <span class="spacer"></span>
+    <div class="grid-actions">
+      <button class="view-link" type="button" data-pop="columns-pop" aria-controls="columns-pop" aria-expanded="false">Columns</button>
+      <button class="view-link" type="button" data-compact-toggle aria-pressed="{{ compact }}">Compact</button>
+      <button class="view-link" type="button" disabled title="Bounded server export is not available yet">Export ▾</button>
+      <div class="pop" id="columns-pop" hidden>
+        <div class="pq"><button class="view-link" type="button" data-columns-all>Show all</button><button class="view-link" type="button" data-columns-none>Hide all</button></div>
+        {% for column in available_columns %}<label class="column-choice"><input type="checkbox" data-column-choice="{{ column.name }}" {% if column.selected %}checked{% endif %}><span>{{ column.name }}</span><small>{{ column.native_type }}</small></label>{% endfor %}
+      </div>
+    </div>
+    <div class="seg" aria-label="Table view">
+      <button type="button" class="on" aria-current="page">Data</button>
+      <a class="view-link" href="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}" hx-get="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}" hx-target="#catalog-panel" hx-swap="outerHTML">Structure</a>
+      <a class="view-link" href="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}" hx-get="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}" hx-target="#catalog-panel" hx-swap="outerHTML">Indexes</a>
+    </div>
+  </header>
+  <div class="toolbar">
+    <form class="row-search" action="/catalog/data" method="get" role="search" hx-get="/catalog/data" hx-target="#catalog-panel" hx-swap="outerHTML" hx-trigger="submit, keyup changed delay:350ms from:input[name=filter]">
+      <input type="hidden" name="schema" value="{{ schema }}">
+      <input type="hidden" name="relation" value="{{ relation }}">
+      <input type="hidden" name="size" value="{{ page_size }}">
+      {% if geojson_active %}<input type="hidden" name="spatial" value="geojson">{% endif %}
+      {% match sort %}{% when Some with (column) %}<input type="hidden" name="sort" value="{{ column }}"><input type="hidden" name="direction" value="{% match direction %}{% when Some with (value) %}{{ value }}{% when None %}{% endmatch %}">{% when None %}{% endmatch %}
+      {% for column in selected_columns %}<input type="hidden" name="column" value="{{ column }}">{% endfor %}
+      <input class="inp" name="filter" value="{{ filter }}" maxlength="128" placeholder="Search rows…" aria-label="Search rows">
+      <button class="view-link" type="submit">Search</button>
+    </form>
+    {% if has_spatial %}<a class="view-link" href="{{ geojson_url }}" hx-get="{{ geojson_url }}" hx-target="#catalog-panel" hx-swap="outerHTML">{% if geojson_active %}Hide GeoJSON details{% else %}Show GeoJSON details{% endif %}</a>{% endif %}
+    <span class="spacer"></span>
+    <span class="tag">SELECT only</span>
   </div>
-  <p class="mb-3 text-xs text-slate-400">
-    Read-only · {{ shown_from }}–{{ shown_to }} · page {{ page_number }}
-    · up to {{ limit }} records per page
-    {% if keyset %} · Indexed cursor available{% else %} · Bounded offset{% endif %}
-  </p>
-  {% if stable %}{% else %}
-  <p class="mb-3 text-xs text-amber-300">
-    No suitable unique key. Order is best-effort; concurrent changes may repeat or skip rows.
-  </p>
-  {% endif %}
-  {% if truncated_columns %}
-  <p class="mb-3 text-xs text-amber-300">
-    Showing the first 24 columns. Use a catalog-qualified column selection for other fields.
-  </p>
-  {% endif %}
-  <div class="overflow-x-auto">
-    <table class="min-w-full border-collapse text-left text-xs">
-      <thead><tr class="border-b border-slate-700">
-        <th scope="col" class="px-2 py-2 text-slate-400">#</th>
-        {% for col in headers %}
-        <th scope="col" class="min-w-24 px-2 py-2">
-          <span class="font-medium text-slate-200">{{ col.name }}</span>
-          <span class="block text-slate-500">{{ col.native_type }}</span>
-          <span class="flex gap-2">
-            <a href="{{ col.asc }}" hx-get="{{ col.asc }}" hx-target="#catalog-panel"
-              hx-swap="outerHTML" class="text-indigo-300" aria-label="Sort {{ col.name }} ascending">↑</a>
-            <a href="{{ col.desc }}" hx-get="{{ col.desc }}" hx-target="#catalog-panel"
-              hx-swap="outerHTML" class="text-indigo-300" aria-label="Sort {{ col.name }} descending">↓</a>
-          </span>
-        </th>
-        {% endfor %}
-      </tr></thead>
-      <tbody class="divide-y divide-slate-800">
-        {% for row in rows %}
-        <tr class="hover:bg-slate-800/40">
-          <th scope="row" class="px-2 py-2 font-normal text-slate-500">{{ row.number }}</th>
-          {% for cell in row.values %}
-          <td title="{{ cell.native_type }}" class="max-w-64 break-words px-2 py-2 font-mono
-            {% if cell.is_null %}italic text-slate-500{% else %}text-slate-200{% endif %}">
-            {{ cell.text }}{% if cell.truncated %}<span title="{{ cell.native_type }} · Value truncated" class="text-amber-300">…</span>{% endif %}
-          </td>
+  {% if geojson_active %}<p class="catalog-note" role="status">Spatial values remain in their stored coordinate reference system; no reprojection or map rendering is applied.</p>{% endif %}
+  {% if stable %}{% else %}<p class="catalog-note" role="status">No suitable unique key. Ordering is best effort; concurrent changes may repeat or skip rows.</p>{% endif %}
+  {% if truncated_columns %}<p class="catalog-note" role="status">Showing the first 24 columns; explicit catalog-qualified selection is available.</p>{% endif %}
+  <div class="grid-wrap">
+    <div class="grid-scroll">
+      <table class="data-grid {% if compact %}compact{% endif %}">
+        <thead><tr><th scope="col" class="row-number">#</th>
+          {% for col in headers %}
+          <th scope="col" aria-sort="{% match col.sort_direction %}{% when Some with (direction) %}{{ direction }}{% when None %}none{% endmatch %}">
+            <span>{{ col.name }}</span><small>{{ col.native_type }}</small>
+            {% if col.sortable %}<span class="sort-links">
+              <a href="{{ col.asc }}" hx-get="{{ col.asc }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-label="{% if col.is_ascending %}Clear sort on {{ col.name }}{% else %}Sort {{ col.name }} ascending{% endif %}" title="{% if col.is_ascending %}Clear sort{% else %}Sort ascending{% endif %}">↑</a>
+              <a href="{{ col.desc }}" hx-get="{{ col.desc }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-label="{% if col.is_descending %}Clear sort on {{ col.name }}{% else %}Sort {{ col.name }} descending{% endif %}" title="{% if col.is_descending %}Clear sort{% else %}Sort descending{% endif %}">↓</a>
+            </span>{% else %}<span class="sort-disabled" aria-label="Sorting is not supported for {{ col.native_type }}">↕</span>{% endif %}
+          </th>
           {% endfor %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </tr></thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <th scope="row" class="row-number">{{ row.number }}</th>
+            {% for cell in row.values %}
+            <td class="{{ cell.class }}{% if cell.is_null %} null-value{% endif %}" title="{{ cell.native_type }}">
+              <button type="button" class="cell-value" data-detail="{{ cell.detail }}" data-type="{{ cell.native_type }}" aria-label="Inspect {{ cell.native_type }} value">{% if cell.is_null %}NULL{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}</button>
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+          {% if rows.is_empty() %}<tr><td colspan="25" class="empty-row">No rows are visible for this relation.</td></tr>{% endif %}
+        </tbody>
+      </table>
+    </div>
+    <aside id="insp" aria-label="Cell details" hidden>
+      <h2>Cell detail <button type="button" data-close-detail aria-label="Close detail">×</button></h2>
+      <p data-detail-type></p><pre data-detail-value></pre>
+      <button type="button" data-copy-detail>Copy value</button>
+    </aside>
   </div>
-  {% if has_more %}
-  <p class="mt-2 text-xs text-slate-400">More rows may be available.</p>
-  {% endif %}
-  {% if has_previous %}
-  <span class="sr-only">A previous page exists.</span>
-  {% endif %}
-  {% if rows.is_empty() %}
-  <p class="py-6 text-sm text-slate-400">No rows are visible.</p>
-  {% endif %}
-  <nav aria-label="Data pages" class="mt-4 flex items-center gap-4 text-xs">
-    {% if previous_url.is_empty() %}
-    <span class="text-slate-500">Previous</span>
-    {% else %}
-    <a href="{{ previous_url }}" hx-get="{{ previous_url }}"
-      hx-target="#catalog-panel" hx-swap="outerHTML" class="text-indigo-300">Previous</a>
-    {% endif %}
-    {% if next_url.is_empty() %}
-    <span class="text-slate-500">Next</span>
-    {% else %}
-    <a href="{{ next_url }}" hx-get="{{ next_url }}"
-      hx-target="#catalog-panel" hx-swap="outerHTML" class="text-indigo-300">Next</a>
-    {% endif %}
-    <span class="ml-auto flex gap-2">
-      <a href="{{ size_25 }}" hx-get="{{ size_25 }}" hx-target="#catalog-panel"
-        hx-swap="outerHTML" class="text-indigo-300">25</a>
-      <a href="{{ size_50 }}" hx-get="{{ size_50 }}" hx-target="#catalog-panel"
-        hx-swap="outerHTML" class="text-indigo-300">50</a>
-      <a href="{{ size_100 }}" hx-get="{{ size_100 }}" hx-target="#catalog-panel"
-        hx-swap="outerHTML" class="text-indigo-300">100</a>
-      <span class="text-slate-500">SELECT only</span>
-    </span>
-  </nav>
+  <footer class="foot">
+    {% if previous_url.is_empty() %}<button type="button" disabled>Previous</button>{% else %}<a href="{{ previous_url }}" hx-get="{{ previous_url }}" hx-target="#catalog-panel" hx-swap="outerHTML">Previous</a>{% endif %}
+    <span>{{ shown_from }}–{{ shown_to }} · page {{ page_number }}</span>
+    {% if next_url.is_empty() %}<button type="button" disabled>Next</button>{% else %}<a href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="#catalog-panel" hx-swap="outerHTML">Next</a>{% endif %}
+    <span class="spacer"></span>
+    <span>{{ headers.len() }} columns</span>
+    <a href="{{ size_25 }}" hx-get="{{ size_25 }}" hx-target="#catalog-panel" hx-swap="outerHTML">25</a>
+    <a href="{{ size_50 }}" hx-get="{{ size_50 }}" hx-target="#catalog-panel" hx-swap="outerHTML">50</a>
+    <a href="{{ size_100 }}" hx-get="{{ size_100 }}" hx-target="#catalog-panel" hx-swap="outerHTML">100</a>
+    <span class="tag">SELECT only</span>
+  </footer>
 </section>

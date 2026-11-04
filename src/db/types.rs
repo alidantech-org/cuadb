@@ -79,6 +79,7 @@ pub struct Column {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelationStats {
+    pub relation_kind: Availability<RelationKind>,
     /// Approximate from pg_class.reltuples, not SELECT COUNT(*).
     pub estimated_rows: Availability<i64>,
     pub table_bytes: Availability<u64>,
@@ -207,8 +208,13 @@ pub struct RowOptions {
     pub limit: u32,
     pub page: u32,
     pub selected_columns: Vec<String>,
+    pub column_selection_explicit: bool,
     pub sort: Option<SortSpec>,
     pub cursor: Option<String>,
+    /// Optional literal substring matched against catalogued relation columns.
+    pub filter: Option<String>,
+    /// Request bounded GeoJSON inspector details for PostGIS values.
+    pub spatial_geojson: bool,
 }
 impl Default for RowOptions {
     fn default() -> Self {
@@ -216,8 +222,11 @@ impl Default for RowOptions {
             limit: 25,
             page: 0,
             selected_columns: vec![],
+            column_selection_explicit: false,
             sort: None,
             cursor: None,
+            filter: None,
+            spatial_geojson: false,
         }
     }
 }
@@ -228,6 +237,7 @@ pub struct RowPreview {
     pub text: String,
     pub truncated: bool,
     pub type_name: String,
+    pub detail: Option<String>,
 }
 
 /// Server-enforced limits are independent of client-provided paging choices.
@@ -239,6 +249,7 @@ pub struct PageRequest {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RowPage {
+    pub available_columns: Vec<Column>,
     pub columns: Vec<Column>,
     pub rows: Vec<Vec<Cell>>,
     pub has_more: bool,

@@ -1,5 +1,5 @@
 ---
-{id: TSK-FFD6A5B94574,name: Build Askama view models and reusable fragment templates,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:05.740Z,updated_at: 2026-11-04T07:32:05.740Z,tags: [cuadb,http],depends_on: [TSK-DC88ADC32B93],order: 2048}
+{id: TSK-FFD6A5B94574,name: Build Askama view models and reusable fragment templates,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.740Z,updated_at: 2026-11-04T11:25:00.389Z,tags: [cuadb,http],depends_on: [TSK-DC88ADC32B93],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:25:00.389Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-FFD6A5B94574/1793791500391-start,started_at: 2026-11-04T11:25:00.407Z}]}}}
 ---
 
 # Build Askama view models and reusable fragment templates
@@ -16,11 +16,11 @@ This task belongs to **05 — HTTP read endpoints and HTML fragments**. The grou
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Create typed view models for sidebar tree, relation header, grid and inspector tabs.
+- [x] Create typed view models for sidebar tree, relation header, grid and inspector tabs.
 - [ ] Reuse components across full pages and HTMX responses without duplicate markup.
-- [ ] Verify HTML escaping for suspicious table names, cell contents and error messages.
-- [ ] Render explicit empty and inaccessible states with clear next actions.
-- [ ] Keep template code free of direct driver calls or raw SQL statements.
+- [x] Verify HTML escaping for suspicious table names, cell contents and error messages.
+- [x] Render explicit empty and inaccessible states with clear next actions.
+- [x] Keep template code free of direct driver calls or raw SQL statements.
 
 ## Canonical UI fidelity
 
@@ -33,3 +33,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T11:29:33.158Z · PETER IRUNGU
+
+Introduced reusable escaped catalog fragments and compact app shell regions for schema navigation, main content, connection state, loading and empty/error messaging. Tested suspicious markup escaping and disconnected state. The full demo toolbar, grid, inspector and metadata object views remain incomplete.

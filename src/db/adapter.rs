@@ -8,71 +8,98 @@ use super::types::{
     Index, Namespace, Overview, PageRequest, PartitionLink, Relation, RelationId, RelationStats,
     RowOptions, RowPage,
 };
-use std::future::Future;
-
+#[async_trait::async_trait]
 pub trait DatabaseAdapter: Send + Sync {
     fn engine(&self) -> Engine;
+    async fn detected_engine(&self) -> Engine {
+        self.engine()
+    }
+    fn sort_supported(&self, native_type: &str) -> bool {
+        let _ = native_type;
+        true
+    }
     fn supports(&self, capability: Capability) -> bool;
-    fn namespaces(&self) -> impl Future<Output = Result<Vec<Namespace>, DbError>> + Send;
-    fn relations(
-        &self,
-        namespace: &str,
-    ) -> impl Future<Output = Result<Vec<Relation>, DbError>> + Send;
-    fn columns(
-        &self,
-        relation: &RelationId,
-    ) -> impl Future<Output = Result<Vec<Column>, DbError>> + Send;
-    fn statistics(
-        &self,
-        relation: &RelationId,
-    ) -> impl Future<Output = Result<RelationStats, DbError>> + Send;
+    async fn namespaces(&self) -> Result<Vec<Namespace>, DbError>;
+    async fn relations(&self, namespace: &str) -> Result<Vec<Relation>, DbError>;
+    async fn columns(&self, relation: &RelationId) -> Result<Vec<Column>, DbError>;
+    async fn statistics(&self, relation: &RelationId) -> Result<RelationStats, DbError>;
     /// Optional extended metadata. Other engines explicitly return Unsupported.
-    fn column_details(
-        &self,
-        _: &RelationId,
-    ) -> impl Future<Output = Result<CatalogList<ColumnDetail>, DbError>> + Send {
-        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    async fn column_details(&self, _: &RelationId) -> Result<CatalogList<ColumnDetail>, DbError> {
+        Err(DbError::new(super::types::DbErrorKind::Unsupported))
     }
-    fn constraints(
-        &self,
-        _: &RelationId,
-    ) -> impl Future<Output = Result<CatalogList<Constraint>, DbError>> + Send {
-        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    async fn constraints(&self, _: &RelationId) -> Result<CatalogList<Constraint>, DbError> {
+        Err(DbError::new(super::types::DbErrorKind::Unsupported))
     }
-    fn indexes(
-        &self,
-        _: &RelationId,
-    ) -> impl Future<Output = Result<CatalogList<Index>, DbError>> + Send {
-        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    async fn indexes(&self, _: &RelationId) -> Result<CatalogList<Index>, DbError> {
+        Err(DbError::new(super::types::DbErrorKind::Unsupported))
     }
-    fn partitions(
-        &self,
-        _: &RelationId,
-    ) -> impl Future<Output = Result<CatalogList<PartitionLink>, DbError>> + Send {
-        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    async fn partitions(&self, _: &RelationId) -> Result<CatalogList<PartitionLink>, DbError> {
+        Err(DbError::new(super::types::DbErrorKind::Unsupported))
     }
-    fn advanced_objects(
-        &self,
-        _: &str,
-    ) -> impl Future<Output = Result<CatalogList<CatalogObject>, DbError>> + Send {
-        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    async fn advanced_objects(&self, _: &str) -> Result<CatalogList<CatalogObject>, DbError> {
+        Err(DbError::new(super::types::DbErrorKind::Unsupported))
     }
-    fn overview(&self) -> impl Future<Output = Result<Overview, DbError>> + Send {
-        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    async fn overview(&self) -> Result<Overview, DbError> {
+        Err(DbError::new(super::types::DbErrorKind::Unsupported))
     }
     /// Extended paging, optional on other database engines.
-    fn page(
-        &self,
-        _: &RelationId,
-        _: RowOptions,
-    ) -> impl Future<Output = Result<RowPage, DbError>> + Send {
-        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    async fn page(&self, _: &RelationId, _: RowOptions) -> Result<RowPage, DbError> {
+        Err(DbError::new(super::types::DbErrorKind::Unsupported))
     }
-    fn rows(
+    async fn rows(&self, relation: &RelationId, request: PageRequest) -> Result<RowPage, DbError>;
+
+    async fn list_schemas(&self) -> Result<CatalogList<Namespace>, DbError> {
+        Ok(CatalogList {
+            items: self.namespaces().await?,
+            truncated: false,
+        })
+    }
+    async fn list_relations(&self, namespace: &str) -> Result<CatalogList<Relation>, DbError> {
+        Ok(CatalogList {
+            items: self.relations(namespace).await?,
+            truncated: false,
+        })
+    }
+    async fn describe_columns(
         &self,
         relation: &RelationId,
-        request: PageRequest,
-    ) -> impl Future<Output = Result<RowPage, DbError>> + Send;
+    ) -> Result<CatalogList<ColumnDetail>, DbError> {
+        self.column_details(relation).await
+    }
+    async fn list_constraints(
+        &self,
+        relation: &RelationId,
+    ) -> Result<CatalogList<Constraint>, DbError> {
+        self.constraints(relation).await
+    }
+    async fn list_indexes(&self, relation: &RelationId) -> Result<CatalogList<Index>, DbError> {
+        self.indexes(relation).await
+    }
+    async fn list_partitions(
+        &self,
+        relation: &RelationId,
+    ) -> Result<CatalogList<PartitionLink>, DbError> {
+        self.partitions(relation).await
+    }
+    async fn list_advanced(&self, namespace: &str) -> Result<CatalogList<CatalogObject>, DbError> {
+        self.advanced_objects(namespace).await
+    }
+    async fn advanced_overview(&self) -> Result<Overview, DbError> {
+        self.overview().await
+    }
+    async fn relation_statistics(&self, relation: &RelationId) -> Result<RelationStats, DbError> {
+        self.statistics(relation).await
+    }
+    async fn fetch_rows(
+        &self,
+        relation: &RelationId,
+        options: RowOptions,
+    ) -> Result<RowPage, DbError> {
+        self.page(relation, options).await
+    }
+    async fn postgis_schema(&self) -> Result<Option<String>, DbError> {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
@@ -82,6 +109,7 @@ mod tests {
 
     // This fake proves HTTP-facing code can be tested without opening a socket.
     struct Stub;
+    #[async_trait::async_trait]
     impl DatabaseAdapter for Stub {
         fn engine(&self) -> Engine {
             Engine::Sqlite
@@ -102,6 +130,7 @@ mod tests {
         }
         async fn statistics(&self, _: &RelationId) -> Result<RelationStats, DbError> {
             Ok(RelationStats {
+                relation_kind: Availability::Unavailable,
                 estimated_rows: Availability::Unavailable,
                 table_bytes: Availability::Unavailable,
                 index_bytes: Availability::Unavailable,

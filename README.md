@@ -48,10 +48,10 @@ The HTML demo uses simulated connection names, data, statistics and client-side 
 - **Rust + Axum**: HTTP server (one port), bounded HTTP requests and safe diagnostics.
 - **Askama**: compiled, escaped server-rendered HTML templates.
 - **HTMX 2**: HTML-fragment updates without React or Next.js.
-- **Tailwind CSS 4 + small custom CSS**: minimal interface and future data grid.
+- **Tailwind CSS 4 + small custom CSS**: compact explorer and read-only data grid.
 - **Vanilla JavaScript**: browser-only interactions such as sidebar toggling.
 - **Bun**: root task runner and frontend build tooling. Bun is **not** the production server.
-- **SQLx PostgreSQL**: bounded lazy connections, read-only sessions, protected URL validation and cached status (no SQL editor).
+- **SQLx PostgreSQL, MySQL and MariaDB**: bounded lazy pools, read-only sessions and protected URL validation (no SQL editor).
 - **Docker**: a single multi-stage image and **one** runtime container.
 
 ## Prerequisites
@@ -67,7 +67,7 @@ cargo fmt --version
 cargo clippy --version
 ```
 
-**PostgreSQL credentials are optional**: without them the shell and tests work in disconnected mode. A configured URL is validated at startup; the status indicator then probes the database without delaying the health endpoint.
+**Database credentials are optional**: without them the shell and tests work in disconnected mode. A configured PostgreSQL, MySQL, MariaDB or SQLite URL is validated at startup; the status indicator probes the database without delaying the health endpoint. SQLite files must be mounted under the configured allowed root.
 
 ## Quick start (from the repository root)
 
@@ -131,15 +131,16 @@ CuaDB validates typed settings before binding its HTTP listener. Errors identify
 | --- | --- | --- | --- |
 | `CUADB_HOST` | `127.0.0.1` | IPv4 or IPv6 literal | HTTP listener |
 | `CUADB_PORT` | `4848` | 1–65535 | HTTP listener |
-| `CUADB_DATABASE_URL` | Unset | PostgreSQL URL with host/user/database, plus password unless the host is loopback | Validated and used by the PostgreSQL pool |
+| `CUADB_DATABASE_URL` | Unset | PostgreSQL, MySQL, MariaDB, or SQLite URL; remote server URLs require credentials | Validated and used by a bounded read-only adapter |
+| `CUADB_SQLITE_ROOT` | `/data` | Absolute filesystem directory | Allowed root for SQLite database files |
 | `CUADB_CONNECTION_TIMEOUT_MS` | `5000` | 100–60000 | SQLx pool acquisition/connection deadline |
-| `CUADB_QUERY_TIMEOUT_MS` | `15000` | 100–120000 | PostgreSQL statement/lock timeouts and status probe |
-| `CUADB_REQUEST_TIMEOUT_MS` | `30000` | 500–180000 | Future HTTP request bounds |
-| `CUADB_DEFAULT_PAGE_SIZE` | `25` | 1–500; cannot exceed maximum | Future grid |
-| `CUADB_MAX_PAGE_SIZE` | `100` | 1–500 | Future grid |
+| `CUADB_QUERY_TIMEOUT_MS` | `15000` | 100–120000 | Database query deadlines and status probe |
+| `CUADB_REQUEST_TIMEOUT_MS` | `30000` | 500–180000 | Maximum HTTP request duration |
+| `CUADB_DEFAULT_PAGE_SIZE` | `25` | 1–500; cannot exceed maximum | Default data grid page size |
+| `CUADB_MAX_PAGE_SIZE` | `100` | 1–500 | Maximum data grid page size |
 | `CUADB_MAX_POOL_CONNECTIONS` | `4` | 1–32 | Maximum SQLx pooled connections |
 
-The default page size reduces automatically when only the maximum is lowered; an explicitly configured default above the maximum is rejected. The PostgreSQL adapter checks URL structure, disallows arbitrary driver parameters, requires an explicit host/user/database and a password for non-loopback hosts. Passwordless URLs are accepted only for localhost/loopback development, where TLS defaults to disabled; remote connections still default to certificate- and hostname-verified TLS (`sslmode=verify-full`). An explicit `sslmode=disable` is permitted on other trusted private networks when using a password. A configured URL triggers a background connection probe, but does not enable table browsing yet. See [PostgreSQL connection and security guide](docs/postgresql-connections.md).
+The default page size reduces automatically when only the maximum is lowered; an explicitly configured default above the maximum is rejected. PostgreSQL, MySQL and MariaDB URL parsers reject unsupported driver parameters and require passwords for non-loopback hosts. Loopback development may omit passwords and defaults to TLS disabled. Remote URLs use verified TLS by default. MySQL/MariaDB allow only the explicit `ssl-mode` option. SQLite URLs must use a file under `CUADB_SQLITE_ROOT`, default `/data` in Docker; details and fixture instructions are in [docs/sqlite.md](docs/sqlite.md), [docs/mysql-mariadb.md](docs/mysql-mariadb.md) and the [PostgreSQL connection and security guide](docs/postgresql-connections.md).
 
 To change the local port:
 

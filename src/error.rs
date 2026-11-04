@@ -96,7 +96,7 @@ impl IntoResponse for AppError {
         // Both fields originate from a closed enum, never from database content.
         let body = format!(
             concat!(
-                "<section role=\"alert\" class=\"cuadb-error\" data-error=\"{}\">",
+                "<section role=\"alert\" aria-live=\"assertive\" class=\"cuadb-error\" data-error=\"{}\">",
                 "<strong>Request failed</strong><p>{}</p></section>"
             ),
             self.kind.code(),

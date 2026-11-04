@@ -1,5 +1,5 @@
 ---
-{id: TSK-E09AA19D0352,name: "Harden browser responses, headers and fragment cache behavior",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:05.812Z,updated_at: 2026-11-04T07:32:05.812Z,tags: [cuadb,http],depends_on: [TSK-FFD6A5B94574],order: 3072}
+{id: TSK-E09AA19D0352,name: "Harden browser responses, headers and fragment cache behavior",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.812Z,updated_at: 2026-11-04T11:29:07.459Z,tags: [cuadb,http],depends_on: [TSK-FFD6A5B94574],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:07.459Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-E09AA19D0352/1793791747476-start,started_at: 2026-11-04T11:29:07.497Z}]}}}
 ---
 
 # Harden browser responses, headers and fragment cache behavior
@@ -16,11 +16,11 @@ This task belongs to **05 — HTTP read endpoints and HTML fragments**. The grou
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Add no-store cache behavior to all authenticated or database-bearing HTML responses.
-- [ ] Define CSP, clickjacking and MIME-sniffing protections compatible with bundled assets.
-- [ ] Disable HTMX history caching of sensitive database fragments and test navigation behavior.
-- [ ] Verify that unsafe origins or methods cannot trigger unauthorized future state changes.
-- [ ] Add response security regression tests and document local-only deployment assumptions.
+- [x] Add no-store cache behavior to all authenticated or database-bearing HTML responses.
+- [x] Define CSP, clickjacking and MIME-sniffing protections compatible with bundled assets.
+- [x] Disable HTMX history caching of sensitive database fragments and test navigation behavior.
+- [x] Verify that unsafe origins or methods cannot trigger unauthorized future state changes.
+- [x] Add response security regression tests and document local-only deployment assumptions.
 
 ## Canonical UI fidelity
 
@@ -29,7 +29,13 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 ### Reference-specific acceptance
 - [ ] Keep database-bearing HTML no-store and disable sensitive HTMX history snapshots without breaking the demo's interaction pattern, visual states, popovers or row inspector.
 - [ ] Allow local persistence only for non-sensitive demo settings and per-table sort/hidden-column names; never save cell values, raw SQL, connection credentials or URLs.
-- [ ] Serve all CSS, HTMX and browser JavaScript from the Rust app with content security headers that do not break supported popup, copy, search or preference behavior.
+- [x] Serve all CSS, HTMX and browser JavaScript from the Rust app with content security headers that do not break supported popup, copy, search or preference behavior.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T11:29:33.423Z · PETER IRUNGU
+
+Verified global no-store for HTML/database routes, CSP, frame denial, nosniff and referrer policy via regression tests. Disabled HTMX history snapshots for database fragments and set historyCacheSize to zero. CSS, JS and HTMX remain same-origin bundled assets.

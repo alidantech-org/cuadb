@@ -1,5 +1,5 @@
 ---
-{id: TSK-0D56383DBA25,name: "Implement MySQL/MariaDB URL parsing, pools and capabilities",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.499Z,updated_at: 2026-11-04T07:32:07.499Z,tags: [cuadb,mysql],depends_on: [TSK-A3CFF0B5E267,TSK-55D20E7D39E9],order: 1024}
+{id: TSK-0D56383DBA25,name: "Implement MySQL/MariaDB URL parsing, pools and capabilities",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.499Z,updated_at: 2026-11-04T12:10:59.177Z,tags: [cuadb,mysql],depends_on: [TSK-A3CFF0B5E267,TSK-55D20E7D39E9],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T12:10:59.177Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-0D56383DBA25/1793794259179-start,started_at: 2026-11-04T12:10:59.202Z}]}}}
 ---
 
 # Implement MySQL/MariaDB URL parsing, pools and capabilities
@@ -16,11 +16,17 @@ This task belongs to **09 — MySQL and MariaDB compatibility**. The group outco
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Recognize supported MySQL URLs and reject unsupported option or host forms.
-- [ ] Create bounded connection pools with redacted errors and configurable timeouts.
-- [ ] Expose engine/flavor capabilities to the common UI contract.
-- [ ] Enforce least-privilege read-only access as far as the engine supports it.
+- [x] Recognize supported MySQL URLs and reject unsupported option or host forms.
+- [x] Create bounded connection pools with redacted errors and configurable timeouts.
+- [x] Expose engine/flavor capabilities to the common UI contract.
+- [x] Enforce least-privilege read-only access as far as the engine supports it.
 - [ ] Add independent MySQL and MariaDB connection failure integration tests.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T12:20:01.226Z · PETER IRUNGU
+
+Implemented strict redacted mysql:// and mariadb:// parsing, loopback/remote TLS policy, bounded SQLx pool, read-only session mode, cached server flavor probe, common adapter routing, and fixture-gated catalog integration. Evidence: cargo check; cargo test mysql::url::tests; cargo test --test mysql_catalog; CUADB_TEST_MARIADB_URL=... cargo test --test mysql_catalog disposable_mariadb_catalog_and_rows; bun run format:check; task validate. MariaDB 11.8 fixture verified using a restricted reader. MySQL 8 container pull unavailable; invalid-auth live test still needs fixture evidence. Keep corresponding acceptance items unchecked for unsupported proof.

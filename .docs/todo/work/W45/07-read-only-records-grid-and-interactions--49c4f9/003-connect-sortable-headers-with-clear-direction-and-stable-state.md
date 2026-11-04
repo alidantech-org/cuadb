@@ -1,5 +1,5 @@
 ---
-{id: TSK-812F816785FD,name: Connect sortable headers with clear direction and stable state,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.702Z,updated_at: 2026-11-04T07:32:06.702Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-16AEEF4061F8,TSK-84DCF1B4A953],order: 3072}
+{id: TSK-812F816785FD,name: Connect sortable headers with clear direction and stable state,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.702Z,updated_at: 2026-11-04T11:29:41.718Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-16AEEF4061F8,TSK-84DCF1B4A953],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.718Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-812F816785FD/1793791781721-start,started_at: 2026-11-04T11:29:41.736Z}]}}}
 ---
 
 # Connect sortable headers with clear direction and stable state

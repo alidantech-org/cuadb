@@ -1,5 +1,5 @@
 ---
-{id: TSK-7D658997F68C,name: Provide safe SQLite row pagination and dynamic type rendering,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:08.195Z,updated_at: 2026-11-04T07:32:08.195Z,tags: [cuadb,sqlite],depends_on: [TSK-B2D3EC3E1F6B,TSK-8B8935A1684A],order: 3072}
+{id: TSK-7D658997F68C,name: Provide safe SQLite row pagination and dynamic type rendering,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:08.195Z,updated_at: 2026-11-04T12:46:13.778Z,tags: [cuadb,sqlite],depends_on: [TSK-B2D3EC3E1F6B,TSK-8B8935A1684A],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T12:46:13.778Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-7D658997F68C/1793796373780-start,started_at: 2026-11-04T12:46:13.806Z}]}}}
 ---
 
 # Provide safe SQLite row pagination and dynamic type rendering
@@ -16,11 +16,17 @@ This task belongs to **10 — SQLite file-based database adapter**. The group ou
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Implement validated table and column resolution with safe SQLite identifier quoting.
-- [ ] Retrieve bounded pages with clear first/last states and sorting controls.
+- [x] Implement validated table and column resolution with safe SQLite identifier quoting.
+- [x] Retrieve bounded pages with clear first/last states and sorting controls.
 - [ ] Handle rowid, WITHOUT ROWID and unstable ordering explicitly.
 - [ ] Display SQLite storage classes including NULL, integer, real, text and blob.
 - [ ] Test large blobs, mixed-typed columns and readonly connection behavior.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T12:45:49.805Z · PETER IRUNGU
+
+Progress evidence (2026-11-04): SQLite row queries use catalog-resolved quoted identifiers, bounded pages and dynamic SQLite value decoding. cargo test --test sqlite_catalog passed, including bounded page and integer/blob checks; read-only mutation denial passed in the SQLite unit tests. Still open: sorting/mixed-type/large-blob edge fixtures and explicit WITHOUT ROWID/stability behavior.

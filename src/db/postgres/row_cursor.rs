@@ -14,6 +14,8 @@ pub struct Scope {
     columns: Vec<String>,
     sort: Option<SortSpec>,
     limit: u32,
+    filter: Option<String>,
+    spatial_geojson: bool,
 }
 impl Scope {
     pub fn new(relation: &RelationId, options: &RowOptions) -> Self {
@@ -22,6 +24,8 @@ impl Scope {
             columns: options.selected_columns.clone(),
             sort: options.sort.clone(),
             limit: options.limit,
+            filter: options.filter.clone(),
+            spatial_geojson: options.spatial_geojson,
         }
     }
 }
@@ -111,5 +115,13 @@ mod tests {
             &options,
         );
         assert!(store.resolve(&token, &other).is_err());
+        let filtered = Scope::new(
+            &id,
+            &RowOptions {
+                filter: Some("different".into()),
+                ..RowOptions::default()
+            },
+        );
+        assert!(store.resolve(&token, &filtered).is_err());
     }
 }

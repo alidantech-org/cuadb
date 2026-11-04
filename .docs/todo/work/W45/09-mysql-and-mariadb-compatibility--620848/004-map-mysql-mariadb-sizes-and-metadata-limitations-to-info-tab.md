@@ -1,5 +1,5 @@
 ---
-{id: TSK-5689F3668ED7,name: Map MySQL/MariaDB sizes and metadata limitations to Info tab,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.816Z,updated_at: 2026-11-04T07:32:07.816Z,tags: [cuadb,mysql],depends_on: [TSK-242B6B658703,TSK-0AA246B508ED],order: 4096}
+{id: TSK-5689F3668ED7,name: Map MySQL/MariaDB sizes and metadata limitations to Info tab,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.816Z,updated_at: 2026-11-04T12:46:13.382Z,tags: [cuadb,mysql],depends_on: [TSK-242B6B658703,TSK-0AA246B508ED],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T12:46:13.382Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-5689F3668ED7/1793796373384-start,started_at: 2026-11-04T12:46:13.411Z}]}}}
 ---
 
 # Map MySQL/MariaDB sizes and metadata limitations to Info tab
@@ -16,11 +16,17 @@ This task belongs to **09 — MySQL and MariaDB compatibility**. The group outco
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Read supported table and index size metrics without costly full-table scans.
-- [ ] Label approximate row counts and unsupported storage values honestly.
+- [x] Read supported table and index size metrics without costly full-table scans.
+- [x] Label approximate row counts and unsupported storage values honestly.
 - [ ] Verify behavior with views, empty tables and different storage engines where available.
-- [ ] Keep the Structure and Info tabs reusable across PostgreSQL and MySQL adapters.
-- [ ] Document MySQL/MariaDB-specific caveats and validated database versions.
+- [x] Keep the Structure and Info tabs reusable across PostgreSQL and MySQL adapters.
+- [x] Document MySQL/MariaDB-specific caveats and validated database versions.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T12:20:01.631Z · PETER IRUNGU
+
+Implemented INFORMATION_SCHEMA TABLE_ROWS, DATA_LENGTH and INDEX_LENGTH metrics and common availability-aware statistics display. Values are engine-reported estimates that may be stale or absent; no full scans. MariaDB fixture verified estimated rows. Caveats added to docs/mysql-mariadb.md; MySQL 8 and alternate storage engines remain unverified.

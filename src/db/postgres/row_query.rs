@@ -41,6 +41,8 @@ pub struct BuiltQuery {
     pub page: u32,
     pub offset: i64,
     pub seek_value: Option<i64>,
+    pub filter_value: Option<String>,
+    pub spatial_geojson: bool,
 }
 pub fn sort_supported(native: &str) -> bool {
     let x = native.to_ascii_lowercase();
@@ -62,6 +64,7 @@ pub fn build(
     options: &RowOptions,
     max_page_size: usize,
     seek: Option<Seek>,
+    postgis_schema: Option<&str>,
 ) -> Result<BuiltQuery, DbError> {
     if options.limit == 0
         || options.limit > MAX_PAGE_SIZE
@@ -73,10 +76,11 @@ pub fn build(
     if columns.is_empty() {
         return Err(DbError::new(DbErrorKind::Unsupported));
     }
-    let truncated_columns =
-        options.selected_columns.is_empty() && columns.len() > MAX_VISIBLE_COLUMNS;
+    let truncated_columns = !options.column_selection_explicit
+        && options.selected_columns.is_empty()
+        && columns.len() > MAX_VISIBLE_COLUMNS;
     let mut selected: Vec<ColumnDetail> = vec![];
-    if options.selected_columns.is_empty() {
+    if options.selected_columns.is_empty() && !options.column_selection_explicit {
         selected.extend(columns.iter().take(MAX_VISIBLE_COLUMNS).cloned());
     } else {
         if options.selected_columns.len() > MAX_VISIBLE_COLUMNS {
@@ -117,9 +121,26 @@ pub fn build(
     let mut projections = Vec::new();
     for (n, col) in selected.iter().enumerate() {
         let name = format!("t.{}", quote(&col.column.name)?);
+        let native = col.column.native_type.to_ascii_lowercase();
+        let display = if (native.starts_with("geometry") || native.starts_with("geography"))
+            && let Some(schema) = postgis_schema
+        {
+            format!("{}.ST_AsText({name})", quote(schema)?)
+        } else {
+            format!("{name}::text")
+        };
         projections.push(format!(
-            "CASE WHEN {name} IS NULL THEN NULL ELSE left({name}::text,{PREVIEW_CHARACTERS}) END AS \"c{n}\""
+            "CASE WHEN {name} IS NULL THEN NULL ELSE left({display},{PREVIEW_CHARACTERS}) END AS \"c{n}\""
         ));
+        if options.spatial_geojson
+            && (native.starts_with("geometry") || native.starts_with("geography"))
+            && let Some(schema) = postgis_schema
+        {
+            projections.push(format!(
+                "CASE WHEN {name} IS NULL THEN NULL ELSE left({}.ST_AsGeoJSON({name}),1025) END AS \"g{n}\"",
+                quote(schema)?
+            ));
+        }
     }
     let key_projection = match key {
         Some(k) if k.integer => format!("t.{}::bigint AS \"__cuadb_key\"", quote(&k.column)?),
@@ -163,7 +184,7 @@ pub fn build(
         order.push(format!("t.{} ASC NULLS LAST", quote(&first.column.name)?));
     }
 
-    let predicate = if let Some(seek) = seek {
+    let seek_predicate = if let Some(seek) = seek {
         let key = key.ok_or_else(invalid)?;
         let op = match (direction, seek.direction) {
             (SortDirection::Asc, SeekDirection::Forward)
@@ -174,6 +195,14 @@ pub fn build(
     } else {
         "$1::bigint IS NULL".to_string()
     };
+    let search_values = columns
+        .iter()
+        .map(|col| Ok(format!("t.{}::text", quote(&col.column.name)?)))
+        .collect::<Result<Vec<_>, DbError>>()?;
+    let predicate = format!(
+        "({seek_predicate}) AND ($4::text IS NULL OR concat_ws(' ', {}) ILIKE ('%' || $4::text || '%'))",
+        search_values.join(", ")
+    );
     let offset = if seek.is_some() {
         0
     } else {
@@ -201,6 +230,8 @@ pub fn build(
         page: options.page,
         offset: offset as i64,
         seek_value: seek.map(|s| s.value),
+        filter_value: options.filter.clone(),
+        spatial_geojson: options.spatial_geojson,
     })
 }
 
@@ -256,6 +287,7 @@ mod tests {
             &options,
             100,
             None,
+            None,
         )
         .unwrap();
         assert!(plan.sql.contains("LIMIT $2::bigint OFFSET $3::bigint"));
@@ -269,9 +301,66 @@ mod tests {
                 Some(&key),
                 &options,
                 100,
-                None
+                None,
+                None,
             )
             .is_err()
+        );
+    }
+    #[test]
+    fn row_filter_is_bound_and_scoped_to_selected_columns() {
+        let columns = [col("name", "text"), col("secret", "text")];
+        let options = RowOptions {
+            selected_columns: vec!["name".into()],
+            filter: Some("%' OR true --".into()),
+            ..RowOptions::default()
+        };
+        let plan = build("public", "t", &columns, None, &options, 100, None, None).unwrap();
+        assert!(plan.sql.contains("$4::text IS NULL"));
+        assert!(plan.sql.contains("t.\"name\"::text"));
+        assert!(plan.sql.contains("t.\"secret\"::text"));
+        assert!(!plan.sql.contains("OR true"));
+        assert_eq!(plan.filter_value.as_deref(), Some("%' OR true --"));
+    }
+    #[test]
+    fn postgis_values_use_quoted_bounded_text_conversion_only_when_available() {
+        let columns = [col("shape", "geometry(Point,4326)")];
+        let options = RowOptions::default();
+        let spatial = build(
+            "public",
+            "places",
+            &columns,
+            None,
+            &options,
+            100,
+            None,
+            Some("geo schema"),
+        )
+        .unwrap();
+        assert!(spatial.sql.contains("\"geo schema\".ST_AsText"));
+        assert!(spatial.sql.contains("left(\"geo schema\".ST_AsText"));
+        let plain = build(
+            "public", "places", &columns, None, &options, 100, None, None,
+        )
+        .unwrap();
+        assert!(plain.sql.contains("t.\"shape\"::text"));
+        let mut geojson_options = options;
+        geojson_options.spatial_geojson = true;
+        let geojson = build(
+            "public",
+            "places",
+            &columns,
+            None,
+            &geojson_options,
+            100,
+            None,
+            Some("geo schema"),
+        )
+        .unwrap();
+        assert!(
+            geojson
+                .sql
+                .contains("left(\"geo schema\".ST_AsGeoJSON(t.\"shape\"),1025)")
         );
     }
     #[test]
@@ -281,13 +370,13 @@ mod tests {
             limit: 101,
             ..RowOptions::default()
         };
-        assert!(build("public", "t", &columns, None, &options, 100, None).is_err());
+        assert!(build("public", "t", &columns, None, &options, 100, None, None).is_err());
         options.limit = 25;
         options.page = 101;
-        assert!(build("public", "t", &columns, None, &options, 100, None).is_err());
+        assert!(build("public", "t", &columns, None, &options, 100, None, None).is_err());
         options.page = 0;
         options.selected_columns = vec!["id".into(), "id".into()];
-        assert!(build("public", "t", &columns, None, &options, 100, None).is_err());
+        assert!(build("public", "t", &columns, None, &options, 100, None, None).is_err());
     }
     #[test]
     fn cursor_direction_reverses_key_order() {
@@ -308,6 +397,7 @@ mod tests {
                 value: 7,
                 direction: SeekDirection::Forward,
             }),
+            None,
         )
         .unwrap();
         assert!(next.sql.contains("\"id\" > $1::bigint"));
@@ -322,6 +412,7 @@ mod tests {
                 value: 7,
                 direction: SeekDirection::Backward,
             }),
+            None,
         )
         .unwrap();
         assert!(previous.sql.contains("\"id\" < $1::bigint"));

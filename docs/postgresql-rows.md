@@ -20,6 +20,28 @@ Exact-case schema and relation names are required. Sorting needs both
 not arbitrary SQL. Size defaults to 25 and is capped at 100, with at most
 24 selected columns and 256 bytes per rendered cell.
 
+An optional `filter` is capped at 128 bytes and bound as a value. PostgreSQL
+matches it against the text forms of catalogued columns before paging. This
+may scan the relation, so the configured statement deadline remains in force.
+Filtered row-count estimates are reported unavailable instead of reusing the
+whole-relation estimate. Filtering is rejected when column metadata is
+truncated, avoiding a misleading partial search.
+
+When PostGIS geometry or geography columns are present, their native type
+label includes the declared subtype and SRID and the grid uses bounded WKT
+previews. An explicit **Show GeoJSON details** control requests GeoJSON only
+for the visible page; each inspector value is capped at 1024 characters and
+is not reprojected. Plain PostgreSQL databases omit the control. This does
+not perform map rendering or bulk geometry conversion.
+
+The catalog endpoints are `GET /catalog/schemas`, `/catalog/relations?schema=…`,
+`/catalog/structure?schema=…&relation=…`, `/catalog/indexes`, `/catalog/stats`,
+`/catalog/advanced?schema=…`, and `/catalog/overview`. Query strings are
+deserialized into closed typed request models; repeated scalar fields and
+unknown parameters are rejected. These routes currently render HTML for both
+direct navigation and HTMX swaps. `/catalog/data` supports repeated `column`
+parameters and bounded sort/page state; no request accepts a database URL or SQL.
+
 PostgreSQL converts each selected cell to a maximum 257-character text
 preview before network transfer; Rust further limits its UTF-8 byte length.
 NULL, empty and truncated data have separate representations. Numeric,
@@ -39,7 +61,8 @@ Numbered pages use a maximum of 10,000 OFFSET rows. A non-partial,
 single-column unique NOT NULL key provides stable tie-breaking.
 Integer keys additionally permit next/previous indexed keyset navigation.
 Server-issued 256-bit random cursors expire after five minutes and are
-validated against the exact relation, column selection, sort and page size.
+validated against the exact relation, column selection, sort, page size and
+filter.
 A bounded in-memory registry holds up to 1024 tokens; restarting the server
 invalidates tokens. Cursor values contain no database keys or cell values.
 

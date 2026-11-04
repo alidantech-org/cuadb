@@ -1,0 +1,7 @@
+# MySQL and MariaDB support
+
+CuaDB accepts one trusted `CUADB_DATABASE_URL` using `mysql://` or `mariadb://`. Loopback connections may omit a password and default to TLS disabled; remote connections require a password and default to certificate and hostname verification. Only an explicit `ssl-mode` URL option is accepted. The MariaDB scheme is normalized internally for SQLx while the connection status reports the detected server flavor.
+
+The adapter applies bounded pool sizes and query deadlines, starts sessions in read-only transaction mode, quotes only catalog-discovered identifiers, and reads databases, tables, views, columns, indexes, constraints, rows and storage estimates from `information_schema`. Production credentials must still use a server-side SELECT-only role; session read-only mode is defense in depth. Row counts and storage values are engine-reported estimates and may be absent or stale. Views generally have no storage metrics. Keyset cursors and PostGIS values are not supported on MySQL/MariaDB. Large binary values and text are bounded for display.
+
+`tests/mysql_catalog.rs` contains an opt-in fixture check gated by `CUADB_TEST_MARIADB_URL`. The URL must target a disposable database whose name starts with `cuadb_fixture_`; the fixture SQL is under `tests/fixtures/mysql-catalog.sql`. The MariaDB 11.8 fixture passed locally with a restricted reader account. MySQL 8 was not available in the implementation environment, so that engine needs CI or operator fixture validation before claiming cross-version release acceptance.
