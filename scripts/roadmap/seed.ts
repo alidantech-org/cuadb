@@ -130,7 +130,7 @@ function commandAvailable(executable: string): boolean {
 }
 
 function taskCommand(): string {
-  const command = ['task', 'taskcode'].find(commandAvailable);
+  const command = ['taskcode', 'task'].find(commandAvailable);
   if (!command) {
     throw new Error(
       'Task CLI not found. Install the taskcode executable, confirm "task --version", then retry. Do not run task init: this repository already has task.yaml.'
@@ -292,8 +292,28 @@ function seed(): void {
 function verify(): void {
   validateWorkspace();
   const executable = taskCommand();
+  const savedGroups = asArray<GroupRecord>(taskJson(executable, ['group', 'list']), 'group list');
+  const savedTasks = [
+    ...asArray<TaskRecord>(taskJson(executable, ['list']), 'list'),
+    ...asArray<TaskRecord>(taskJson(executable, ['list', '--archived']), 'list --archived'),
+  ];
+  const savedDocs = asArray<DocRecord>(taskJson(executable, ['docs', 'list']), 'docs list');
+  const groupNames = new Set(savedGroups.map((group) => group.name));
+  const taskNames = new Set(savedTasks.map((task) => task.name));
+  const docPaths = new Set(savedDocs.map((doc) => doc.path.replace(/^\\.docs\\//, '')));
+  const missingGroups = groups.filter((group) => !groupNames.has(group.title));
+  const missingTasks = groups.flatMap((group) => group.tasks).filter((task) => !taskNames.has(task.title));
+  const missingDocs = documents.filter((doc) => !docPaths.has(doc.path));
+
   console.log(taskRun(executable, ['validate']));
-  console.log('Task workspace verification complete.');
+  if (missingGroups.length || missingTasks.length || missingDocs.length) {
+    throw new Error(
+      `Roadmap is incomplete: missing ${missingGroups.length} groups, ${missingTasks.length} tasks, ${missingDocs.length} documents. Run bun run task:seed.`,
+    );
+  }
+  console.log(
+    `Task roadmap verified: ${groups.length} groups, ${groups.reduce((count, group) => count + group.tasks.length, 0)} tasks, ${documents.length} documents.`,
+  );
 }
 
 try {
