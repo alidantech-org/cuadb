@@ -25,10 +25,11 @@ Scope: CuaDB is a **local-first, read-only** database explorer: one Rust process
 - **Denial of service:** page size ≤ 100, offset ≤ 10,000, ≤ 24 visible columns, 128-byte filters, 64 KiB request bodies, in-flight request cap, request and **server-side query timeouts** on every engine (100 ms setting aborts a 1M-row scan in ~105 ms; see `docs/performance.md`), export caps (10k rows, 16 MiB, 8 relations).
 - **Cache/Clipboard leaks:** database-bearing responses are `Cache-Control: no-store`; HTMX history snapshots disabled on panels. Clipboard copy is user-initiated, in the page.
 - **Filesystem escape (SQLite):** canonical path must stay under `CUADB_SQLITE_ROOT`; symlink targets re-checked.
+- **Unauthorized access (when authentication is enabled):** server-side sessions (hashed tokens, idle/absolute expiry, rotation on login), CSRF token plus Origin checks on all state changes, Argon2id passwords, login lockout, deny-by-default grants enforced in every handler and applied to list filtering and exports (`tests/auth_http.rs`, `tests/auth_service.rs`).
 - **Cross-profile leakage:** per-profile adapters and cursors; cursors from one profile are rejected on another.
 
 ## Residual risks and required controls before non-localhost use
-1. **No authentication or TLS in CuaDB.** Anyone who can reach the port can read everything the role can. Put it behind an authenticating reverse proxy with TLS, or keep the default `127.0.0.1` publish.
+1. **Authentication is opt-in and there is no TLS in CuaDB.** Until an administrator is bootstrapped (`docs/auth.md`) anyone who can reach the port can read everything the role can. Once one exists, sessions, CSRF protection, deny-by-default grants and an audit log apply, but traffic is still plain HTTP: put it behind a TLS reverse proxy, or keep the default `127.0.0.1` publish.
 2. **Read-only is defense in depth only.** Use a dedicated SELECT-only database role; session flags can be undone by a role with write rights.
 3. **Data sensitivity:** column-level secrets (password hashes, tokens) are displayed if the role can SELECT them; use views/grants to hide them.
 4. **Passwordless trust authentication** (as in local fixtures) is accepted only for loopback hosts; remote hosts require passwords and verified TLS.

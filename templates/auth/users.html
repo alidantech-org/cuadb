@@ -1,0 +1,14 @@
+<section id="admin-users" aria-label="Users">
+  <h1>Users</h1>
+  <table>
+    <thead><tr><th>Id</th><th>Login</th><th>Role</th><th>Status</th></tr></thead>
+    <tbody>{% for user in users %}<tr><td>{{ user.id }}</td><td>{{ user.login }}</td><td>{{ user.role }}</td><td>{{ user.status }}</td></tr>{% endfor %}</tbody>
+  </table>
+  <form method="post" action="/admin/users">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input name="login" placeholder="login" required>
+    <input name="password" type="password" placeholder="password" required>
+    <select name="role"><option>viewer</option><option>editor</option><option>admin</option></select>
+    <button type="submit">Create user</button>
+  </form>
+</section>

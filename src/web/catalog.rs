@@ -8,12 +8,14 @@ use axum::{
 };
 
 use crate::{
+    auth::{Action, Resource},
     db::types::{
         Availability, CatalogList, ColumnDetail, Constraint, DbError, DbErrorKind, Index,
         PartitionLink, RelationId, RelationStats,
     },
     error::{AppError, ErrorKind},
     state::{AppState, Lookup, checked_profile},
+    web::auth::Auth,
 };
 
 #[derive(Clone)]
@@ -406,12 +408,19 @@ where
 
 pub async fn schemas(
     State(state): State<AppState>,
+    auth: Auth,
     Query(query): Query<ProfileQuery>,
 ) -> Result<Response, AppError> {
     let profile = checked_profile(query.profile)?;
     let profile = profile.as_deref();
+    let pid = state.effective_profile(profile);
     let c = match state.catalog_for(profile) {
-        Lookup::Found(c) => c,
+        Lookup::Found(c) => {
+            auth.authorize(&state, Action::View, &Resource::profile(&pid))
+                .await?;
+            crate::auth::audit_profile_access(&state, &auth.0, &pid).await;
+            c
+        }
         Lookup::Unknown => return Err(AppError::new(ErrorKind::UnknownProfile)),
         Lookup::NotConfigured => {
             return tree_response(SchemaTreeTemplate {
@@ -440,6 +449,7 @@ pub async fn schemas(
     let schemas = entries
         .items
         .into_iter()
+        .filter(|schema| auth.0.can_see_schema(&pid, &schema.name))
         .map(|schema| SchemaItem {
             href: format!(
                 "/catalog/relations?schema={}{}",
@@ -460,11 +470,18 @@ pub async fn schemas(
 }
 pub async fn relations(
     State(state): State<AppState>,
+    auth: Auth,
     Query(query): Query<SchemaQuery>,
 ) -> Result<Response, AppError> {
     let schema = checked_query_name(query.schema)?;
     let profile = checked_profile(query.profile)?;
     let profile = profile.as_deref();
+    let pid = state.effective_profile(profile);
+    if !auth.0.can_see_schema(&pid, &schema) {
+        auth.denied(&state, Action::View, &format!("{pid}/{schema}"))
+            .await;
+        return Err(AppError::new(ErrorKind::Forbidden));
+    }
     let needle = match query.q {
         Some(q) if q.is_empty() => None,
         Some(q) if q.chars().count() > 64 || q.chars().any(char::is_control) => {
@@ -481,6 +498,12 @@ pub async fn relations(
     let relations = entries
         .items
         .into_iter()
+        .filter(|relation| {
+            auth.0.allows(
+                Action::View,
+                &Resource::relation(&pid, &schema, &relation.id.name),
+            )
+        })
         .filter(|relation| {
             needle
                 .as_ref()
@@ -507,6 +530,7 @@ pub async fn relations(
 }
 pub async fn structure(
     State(state): State<AppState>,
+    auth: Auth,
     Query(query): Query<RelationQuery>,
 ) -> Result<Response, AppError> {
     let id = RelationId {
@@ -515,6 +539,13 @@ pub async fn structure(
     };
     let profile = checked_profile(query.profile)?;
     let profile = profile.as_deref();
+    let pid = state.effective_profile(profile);
+    auth.authorize(
+        &state,
+        Action::View,
+        &Resource::relation(&pid, &id.namespace, &id.name),
+    )
+    .await?;
     let c = catalog(&state, profile)?;
     let (cols, constraints, partitions) = tokio::try_join!(
         c.describe_columns(&id),
@@ -551,6 +582,7 @@ pub async fn structure(
 }
 pub async fn indexes(
     State(state): State<AppState>,
+    auth: Auth,
     Query(query): Query<RelationQuery>,
 ) -> Result<Response, AppError> {
     let id = RelationId {
@@ -559,6 +591,13 @@ pub async fn indexes(
     };
     let profile = checked_profile(query.profile)?;
     let profile = profile.as_deref();
+    let pid = state.effective_profile(profile);
+    auth.authorize(
+        &state,
+        Action::View,
+        &Resource::relation(&pid, &id.namespace, &id.name),
+    )
+    .await?;
     let c = catalog(&state, profile)?;
     let (entries, statistics) =
         tokio::try_join!(c.list_indexes(&id), c.relation_statistics(&id)).map_err(err)?;
@@ -575,6 +614,7 @@ pub async fn indexes(
 }
 pub async fn stats(
     State(state): State<AppState>,
+    auth: Auth,
     Query(query): Query<RelationQuery>,
 ) -> Result<Response, AppError> {
     let id = RelationId {
@@ -583,6 +623,13 @@ pub async fn stats(
     };
     let profile = checked_profile(query.profile)?;
     let profile = profile.as_deref();
+    let pid = state.effective_profile(profile);
+    auth.authorize(
+        &state,
+        Action::View,
+        &Resource::relation(&pid, &id.namespace, &id.name),
+    )
+    .await?;
     let s = catalog(&state, profile)?
         .relation_statistics(&id)
         .await
@@ -598,10 +645,17 @@ pub async fn stats(
 }
 pub async fn advanced(
     State(state): State<AppState>,
+    auth: Auth,
     Query(query): Query<SchemaQuery>,
 ) -> Result<Response, AppError> {
     let schema = checked_query_name(query.schema)?;
     let profile = checked_profile(query.profile)?;
+    let pid = state.effective_profile(profile.as_deref());
+    if !auth.0.allows_wide(Action::View, &pid, Some(&schema)) {
+        auth.denied(&state, Action::View, &format!("{pid}/{schema} (advanced)"))
+            .await;
+        return Err(AppError::new(ErrorKind::Forbidden));
+    }
     let entries = catalog(&state, profile.as_deref())?
         .list_advanced(&schema)
         .await
@@ -625,10 +679,17 @@ pub async fn advanced(
 }
 pub async fn overview(
     State(state): State<AppState>,
+    auth: Auth,
     Query(query): Query<ProfileQuery>,
 ) -> Result<Response, AppError> {
     let profile = checked_profile(query.profile)?;
     let profile = profile.as_deref();
+    let pid = state.effective_profile(profile);
+    if !auth.0.allows_wide(Action::View, &pid, None) {
+        auth.denied(&state, Action::View, &format!("{pid} (overview)"))
+            .await;
+        return Err(AppError::new(ErrorKind::Forbidden));
+    }
     let o = catalog(&state, profile)?
         .advanced_overview()
         .await

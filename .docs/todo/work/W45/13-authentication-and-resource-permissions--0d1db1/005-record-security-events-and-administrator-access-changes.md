@@ -16,11 +16,17 @@ This task belongs to **13 — Authentication and resource permissions**. The gro
 CuaDB is a local-first database workspace served by one Rust/Axum process. The core explorer remains read-only. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and never expose credentials or arbitrary connection targets to browser state. Do not add data writes or SQL execution outside the later dedicated SQL workspace tasks, which require the authentication and resource-permission group first. Keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Record authentication outcomes, session revocations and permission changes.
+- [x] Record authentication outcomes, session revocations and permission changes.
 - [ ] Record profile access and later SQL/edit actions with user and resource identifiers.
-- [ ] Redact credentials, raw connection strings, query parameters and row contents.
-- [ ] Restrict audit viewing to authorized administrators and bound retention/queries.
-- [ ] Test audit coverage for denied access and successful privileged actions.
+- [x] Redact credentials, raw connection strings, query parameters and row contents.
+- [x] Restrict audit viewing to authorized administrators and bound retention/queries.
+- [x] Test audit coverage for denied access and successful privileged actions.
 
 ## Verification and handoff
 Verify the expected result and realistic failure cases with the smallest relevant test set. Use disposable PostgreSQL and SQLite fixtures for the core milestone; do not add MySQL/MariaDB or other engines to routine verification. Run `bun run format:check`, `bun run check` and `bun run test` at meaningful group boundaries. Do not test against a personal or production database. Document unsupported capabilities honestly, record concise evidence in a Task comment, tick accepted items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T16:33:01.190Z · PETER IRUNGU
+
+Items 1,3,4,5 verified: append-only audit_events (trigger blocks UPDATE and deleting rows <90 days old), closed event vocabulary, bounded/clean values, admin-only /admin/audit (limit<=200, before cursor), tests for denied access, failed/locked logins, grant/user changes, export, secrets absent from the view. Item 2 stays OPEN: profile access and exports are recorded, SQL/edit actions arrive with Group 14 (kinds sql_execute, data_change, tx_* are reserved).

@@ -110,6 +110,7 @@ pub enum Lookup {
 pub struct AppState {
     entries: Arc<Vec<Entry>>,
     default: usize,
+    auth: Option<crate::auth::AuthService>,
 }
 
 fn build_runtime(
@@ -164,6 +165,7 @@ impl AppState {
         Ok(Self {
             entries: Arc::new(entries),
             default: set.default,
+            auth: None,
         })
     }
 
@@ -171,6 +173,7 @@ impl AppState {
         Self {
             entries: Arc::new(Vec::new()),
             default: 0,
+            auth: None,
         }
     }
 
@@ -185,6 +188,7 @@ impl AppState {
                 catalog: adapter,
             }]),
             default: 0,
+            auth: None,
         }
     }
 
@@ -203,7 +207,60 @@ impl AppState {
                     .collect(),
             ),
             default: 0,
+            auth: None,
         }
+    }
+
+    /// Attach the auth service (tests and startup).
+    pub fn with_auth(mut self, auth: crate::auth::AuthService) -> Self {
+        self.auth = Some(auth);
+        self
+    }
+
+    pub fn auth(&self) -> Option<&crate::auth::AuthService> {
+        self.auth.as_ref()
+    }
+
+    /// Open CuaDB's own state store when it exists (or when `CUADB_AUTH=required`).
+    /// A store that exists but cannot be opened fails startup rather than silently
+    /// running without authentication.
+    pub async fn with_auth_from_config(self, config: &Config) -> Result<Self, StateError> {
+        use crate::{
+            auth::{AuthService, AuthStore, service::SessionPolicy, store::DB_FILE},
+            config::AuthMode,
+        };
+        let required = config.auth_mode == AuthMode::Required;
+        let present = config.data_dir.join(DB_FILE).is_file();
+        if !present && !required {
+            return Ok(self);
+        }
+        let store = AuthStore::open(&config.data_dir, required)
+            .await
+            .map_err(|e| StateError::Profiles(format!("authentication store: {e}")))?;
+        let secure = config.cookie_secure.unwrap_or(!config.host.is_loopback());
+        let policy = SessionPolicy {
+            idle_secs: (config.session_idle_minutes * 60) as i64,
+            max_secs: (config.session_max_hours * 3600) as i64,
+            cookie_secure: secure,
+        };
+        let service = AuthService::new(store, policy, required)
+            .await
+            .map_err(|e| StateError::Profiles(format!("authentication store: {e}")))?;
+        if required && service.store.active_admin_count().await.unwrap_or(0) == 0 {
+            return Err(StateError::Profiles(
+                "CUADB_AUTH=required but no administrator exists; run `cuadb admin bootstrap`"
+                    .into(),
+            ));
+        }
+        Ok(self.with_auth(service))
+    }
+
+    /// The profile id a request refers to (`None` means the default profile).
+    pub fn effective_profile(&self, profile: Option<&str>) -> String {
+        profile
+            .map(str::to_string)
+            .or_else(|| self.default_profile_id().map(str::to_string))
+            .unwrap_or_else(|| crate::profiles::DEFAULT_PROFILE_ID.to_string())
     }
 
     fn default_entry(&self) -> Option<&Entry> {

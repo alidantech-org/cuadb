@@ -1,0 +1,8 @@
+<section id="admin-audit" aria-label="Audit log">
+  <h1>Audit log</h1>
+  <table>
+    <thead><tr><th>Id</th><th>Time</th><th>Actor</th><th>Event</th><th>Profile</th><th>Resource</th><th>Outcome</th><th>Detail</th></tr></thead>
+    <tbody>{% for event in events %}<tr><td>{{ event.id }}</td><td>{{ event.ts }}</td><td>{{ event.actor }}</td><td>{{ event.kind }}</td><td>{{ event.profile }}</td><td>{{ event.resource }}</td><td>{{ event.outcome }}</td><td>{{ event.detail }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% if let Some(next) = next_before %}<a href="/admin/audit?before={{ next }}">Older</a>{% endif %}
+</section>

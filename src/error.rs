@@ -16,6 +16,8 @@ pub enum ErrorKind {
     InvalidInput,
     /// The named connection profile is not configured (or was removed).
     UnknownProfile,
+    /// Sign-in required (no valid session).
+    Unauthorized,
     Forbidden,
     DatabaseUnavailable,
     TimedOut,
@@ -30,6 +32,7 @@ impl ErrorKind {
         match self {
             Self::InvalidInput => StatusCode::BAD_REQUEST,
             Self::UnknownProfile => StatusCode::NOT_FOUND,
+            Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::DatabaseUnavailable | Self::Overloaded => StatusCode::SERVICE_UNAVAILABLE,
             Self::TimedOut => StatusCode::GATEWAY_TIMEOUT,
@@ -43,6 +46,7 @@ impl ErrorKind {
         match self {
             Self::InvalidInput => "invalid_input",
             Self::UnknownProfile => "unknown_profile",
+            Self::Unauthorized => "unauthorized",
             Self::Forbidden => "access_denied",
             Self::DatabaseUnavailable => "database_unavailable",
             Self::TimedOut => "request_timeout",
@@ -58,6 +62,7 @@ impl ErrorKind {
         match self {
             Self::InvalidInput => "The request is not valid.",
             Self::UnknownProfile => "That connection is not available.",
+            Self::Unauthorized => "Please sign in to continue.",
             Self::Forbidden => "You do not have access to this resource.",
             Self::DatabaseUnavailable => "The database is currently unavailable.",
             Self::TimedOut => "The request took too long. Please try again.",
@@ -125,6 +130,7 @@ mod tests {
         for (kind, status) in [
             (ErrorKind::InvalidInput, 400),
             (ErrorKind::UnknownProfile, 404),
+            (ErrorKind::Unauthorized, 401),
             (ErrorKind::Forbidden, 403),
             (ErrorKind::DatabaseUnavailable, 503),
             (ErrorKind::TimedOut, 504),

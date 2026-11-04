@@ -365,10 +365,18 @@ fn link(nav: &Navigation, page: u32, cursor: Option<&str>, sort: Option<SortSpec
 }
 pub async fn data(
     State(state): State<AppState>,
+    auth: crate::web::auth::Auth,
     RawQuery(raw): RawQuery,
 ) -> Result<Response, AppError> {
     let query = DataQuery::from_raw(raw.as_deref())?;
     let nav = parse(query)?;
+    let pid = state.effective_profile(nav.profile.as_deref());
+    auth.authorize(
+        &state,
+        crate::auth::Action::View,
+        &crate::auth::Resource::relation(&pid, &nav.id.namespace, &nav.id.name),
+    )
+    .await?;
     let catalog = state.adapter(nav.profile.as_deref())?;
     let page = catalog
         .fetch_rows(&nav.id, nav.options.clone())

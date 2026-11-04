@@ -6,7 +6,17 @@ use std::{error::Error, time::Duration};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_env()?;
-    let state = AppState::from_config(&config)?;
+    if std::env::args().nth(1).as_deref() == Some("admin") {
+        return admin_command(&config).await;
+    }
+    let state = AppState::from_config(&config)?
+        .with_auth_from_config(&config)
+        .await?;
+    if state.auth().is_none() {
+        eprintln!(
+            "level=warn event=auth_not_configured message=\"no administrator exists: the local read-only explorer is open to anyone who can reach this port; run `cuadb admin bootstrap` before exposing it\""
+        );
+    }
     let listener = tokio::net::TcpListener::bind((config.host, config.port)).await?;
     let router = app::router_with_state(&config.limits, state.clone());
     state.start_probe();
@@ -91,4 +101,69 @@ async fn termination_signal() {
     {
         let _ = tokio::signal::ctrl_c().await;
     }
+}
+
+/// `cuadb admin bootstrap|reset-password --login <name> --password-stdin` and
+/// `cuadb admin list-users`. Local operator commands; secrets are read from stdin
+/// only and are never printed or logged.
+async fn admin_command(config: &Config) -> Result<(), Box<dyn Error>> {
+    use cuadb::auth::{AuthStore, bootstrap};
+    use std::io::Read;
+
+    let args: Vec<String> = std::env::args().skip(2).collect();
+    let action = args.first().map(String::as_str).unwrap_or_default();
+    let login = args
+        .iter()
+        .position(|a| a == "--login")
+        .and_then(|i| args.get(i + 1))
+        .cloned();
+    let from_stdin = args.iter().any(|a| a == "--password-stdin");
+    let read_password = || -> Result<String, Box<dyn Error>> {
+        if !from_stdin {
+            return Err("pass the password on standard input with --password-stdin".into());
+        }
+        let mut raw = String::new();
+        std::io::stdin().read_to_string(&mut raw)?;
+        Ok(raw
+            .strip_suffix('\n')
+            .unwrap_or(&raw)
+            .trim_end_matches('\r')
+            .to_string())
+    };
+    match action {
+        "bootstrap" => {
+            let login = login.ok_or("--login <name> is required")?;
+            let password = read_password()?;
+            let store = AuthStore::open(&config.data_dir, true).await?;
+            bootstrap::bootstrap_admin(&store, &login, &password).await?;
+            store.close().await;
+            println!(
+                "Administrator created. Authentication is now enforced for this data directory."
+            );
+        }
+        "reset-password" => {
+            let login = login.ok_or("--login <name> is required")?;
+            let password = read_password()?;
+            let store = AuthStore::open(&config.data_dir, false).await?;
+            bootstrap::reset_password(&store, &login, &password).await?;
+            store.close().await;
+            println!("Password reset, account enabled and sessions revoked.");
+        }
+        "list-users" => {
+            let store = AuthStore::open(&config.data_dir, false).await?;
+            for user in store.list_users().await? {
+                println!(
+                    "{}\t{}\t{}",
+                    user.login,
+                    user.role,
+                    if user.active { "active" } else { "disabled" }
+                );
+            }
+            store.close().await;
+        }
+        _ => {
+            return Err("usage: cuadb admin <bootstrap|reset-password|list-users> [--login NAME] [--password-stdin]".into());
+        }
+    }
+    Ok(())
 }

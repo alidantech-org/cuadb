@@ -1,0 +1,7 @@
+<section id="admin-grants" aria-label="Grants">
+  <h1>Grants for user {{ user_id }}</h1>
+  <table>
+    <thead><tr><th>Id</th><th>Profile</th><th>Schema</th><th>Relation</th><th>Actions</th></tr></thead>
+    <tbody>{% for grant in grants %}<tr><td>{{ grant.id }}</td><td>{{ grant.profile }}</td><td>{{ grant.schema }}</td><td>{{ grant.relation }}</td><td>{{ grant.actions }}</td></tr>{% endfor %}</tbody>
+  </table>
+</section>

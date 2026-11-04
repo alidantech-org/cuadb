@@ -61,6 +61,20 @@ pub struct Config {
     /// JSON file of trusted connection profiles (mutually exclusive with the single URL).
     pub profiles_file: Option<std::path::PathBuf>,
     pub sqlite_root: std::path::PathBuf,
+    /// Writable directory for CuaDB's own state (users, sessions, audit). Never a target database.
+    pub data_dir: std::path::PathBuf,
+    /// `required`: refuse to run without an administrator; `auto`: enforce once one exists.
+    pub auth_mode: AuthMode,
+    pub session_idle_minutes: u64,
+    pub session_max_hours: u64,
+    /// Add `Secure` to the session cookie (`auto`: only when not bound to loopback).
+    pub cookie_secure: Option<bool>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthMode {
+    Auto,
+    Required,
 }
 
 /// An invalid setting with a useful, secret-free error message.
@@ -246,6 +260,47 @@ impl Config {
             None => None,
         };
 
+        let data_dir = read("CUADB_DATA_DIR")?
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| "./data".into());
+        let auth_mode = match read("CUADB_AUTH")?.as_deref() {
+            None | Some("auto") => AuthMode::Auto,
+            Some("required") => AuthMode::Required,
+            Some(_) => {
+                return Err(ConfigError::invalid(
+                    "CUADB_AUTH",
+                    "must be 'auto' or 'required'",
+                ));
+            }
+        };
+        let session_idle_minutes = bounded_number(
+            &mut read,
+            "CUADB_SESSION_IDLE_MINUTES",
+            30,
+            1,
+            1_440,
+            "must be a whole number between 1 and 1440",
+        )?;
+        let session_max_hours = bounded_number(
+            &mut read,
+            "CUADB_SESSION_MAX_HOURS",
+            12,
+            1,
+            168,
+            "must be a whole number between 1 and 168",
+        )?;
+        let cookie_secure = match read("CUADB_COOKIE_SECURE")?.as_deref() {
+            None | Some("auto") => None,
+            Some("true") => Some(true),
+            Some("false") => Some(false),
+            Some(_) => {
+                return Err(ConfigError::invalid(
+                    "CUADB_COOKIE_SECURE",
+                    "must be 'auto', 'true' or 'false'",
+                ));
+            }
+        };
+
         Ok(Self {
             host,
             port,
@@ -262,6 +317,11 @@ impl Config {
             database_url,
             profiles_file,
             sqlite_root,
+            data_dir,
+            auth_mode,
+            session_idle_minutes,
+            session_max_hours,
+            cookie_secure,
         })
     }
 }

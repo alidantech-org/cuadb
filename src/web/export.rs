@@ -227,6 +227,7 @@ async fn related_zip(
     catalog: &dyn DatabaseAdapter,
     root: RelationId,
     depth: u8,
+    may_export: &(dyn Fn(&RelationId) -> bool + Sync),
 ) -> Result<(Vec<u8>, bool), AppError> {
     use std::io::Write;
     ExportPlan {
@@ -252,6 +253,10 @@ async fn related_zip(
                 let Some(target) = constraint.references else {
                     continue;
                 };
+                // Relations the user may not export are neither followed nor revealed.
+                if !may_export(&target) {
+                    continue;
+                }
                 edges.push(serde_json::json!({
                     "from": format!("{}.{}", id.namespace, id.name),
                     "to": format!("{}.{}", target.namespace, target.name),
@@ -328,6 +333,7 @@ async fn related_zip(
 
 pub async fn export(
     State(state): State<AppState>,
+    auth: crate::web::auth::Auth,
     RawQuery(raw): RawQuery,
 ) -> Result<Response, AppError> {
     let query = ExportQuery::from_raw(raw.as_deref())?;
@@ -345,9 +351,30 @@ pub async fn export(
             namespace: super::rows::name(&query.schema)?,
             name: super::rows::name(&query.relation)?,
         };
-        let catalog = state.adapter(crate::state::checked_profile(query.profile)?.as_deref())?;
-        let (bytes, truncated) =
-            related_zip(catalog.as_ref(), id.clone(), query.depth.unwrap_or(1)).await?;
+        let zip_profile = crate::state::checked_profile(query.profile)?;
+        let catalog = state.adapter(zip_profile.as_deref())?;
+        let pid = state.effective_profile(zip_profile.as_deref());
+        auth.authorize(
+            &state,
+            crate::auth::Action::Export,
+            &crate::auth::Resource::relation(&pid, &id.namespace, &id.name),
+        )
+        .await?;
+        let principal = auth.0.clone();
+        let may_export = move |target: &RelationId| {
+            principal.allows(
+                crate::auth::Action::Export,
+                &crate::auth::Resource::relation(&pid, &target.namespace, &target.name),
+            )
+        };
+        crate::auth::audit_export(&state, &auth.0, &id, "zip").await;
+        let (bytes, truncated) = related_zip(
+            catalog.as_ref(),
+            id.clone(),
+            query.depth.unwrap_or(1),
+            &may_export,
+        )
+        .await?;
         let mut response = bytes.into_response();
         let headers = response.headers_mut();
         headers.insert(
@@ -403,6 +430,14 @@ pub async fn export(
         profile: query.profile,
         column: query.column,
     })?;
+    let pid = state.effective_profile(nav.profile.as_deref());
+    auth.authorize(
+        &state,
+        crate::auth::Action::Export,
+        &crate::auth::Resource::relation(&pid, &nav.id.namespace, &nav.id.name),
+    )
+    .await?;
+    crate::auth::audit_export(&state, &auth.0, &nav.id, &query.format).await;
     let catalog = state.adapter(nav.profile.as_deref())?;
 
     let Collected {

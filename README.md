@@ -76,7 +76,7 @@ Several trusted connections can be served by one CuaDB process. The browser only
 
 ## More documentation
 
-[Threat model](docs/threat-model.md) · [Release checklist and compatibility matrix](docs/release.md) · [Running tests and fixtures](docs/testing.md) · [Docker verification](docs/docker.md) · [Performance](docs/performance.md) · [SQLite](docs/sqlite.md) · [MySQL/MariaDB](docs/mysql-mariadb.md)
+[Authentication and permissions](docs/auth.md) · [Threat model](docs/threat-model.md) · [Release checklist and compatibility matrix](docs/release.md) · [Running tests and fixtures](docs/testing.md) · [Docker verification](docs/docker.md) · [Performance](docs/performance.md) · [SQLite](docs/sqlite.md) · [MySQL/MariaDB](docs/mysql-mariadb.md)
 
 ## Canonical frontend UI reference
 

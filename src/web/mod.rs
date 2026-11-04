@@ -1,5 +1,6 @@
 //! HTML endpoints: full pages and reusable fragments rendered by Askama.
 
+pub mod auth;
 pub mod catalog;
 pub mod export;
 pub mod rows;
@@ -69,10 +70,20 @@ pub struct StatusQuery {
 /// Failed probes are cached briefly, so repeated HTMX requests are inexpensive.
 pub async fn connection_status(
     State(state): State<AppState>,
+    auth: auth::Auth,
     axum::extract::Query(query): axum::extract::Query<StatusQuery>,
 ) -> Result<Response, AppError> {
     let profile = crate::state::checked_profile(query.profile)?;
     let profile = profile.as_deref();
+    if state.is_configured() {
+        let pid = state.effective_profile(profile);
+        auth.authorize(
+            &state,
+            crate::auth::Action::View,
+            &crate::auth::Resource::profile(&pid),
+        )
+        .await?;
+    }
     // No profile named: the default profile, or "not configured" with no database.
     let snapshot = match profile {
         None => state.connection_snapshot().await,
@@ -114,10 +125,16 @@ struct ProfileListTemplate {
 /// thing the browser may send back (`profile=<id>`).
 pub async fn connection_profiles(
     State(state): State<AppState>,
+    auth: auth::Auth,
     axum::extract::Query(query): axum::extract::Query<StatusQuery>,
 ) -> Result<Response, AppError> {
     let chosen = crate::state::checked_profile(query.profile)?;
-    let infos = state.profiles();
+    // Profiles the user has no grant for are not even listed.
+    let infos: Vec<_> = state
+        .profiles()
+        .into_iter()
+        .filter(|info| auth.0.can_see_profile(&info.id))
+        .collect();
     if let Some(id) = chosen.as_deref()
         && !infos.iter().any(|info| info.id == id)
     {

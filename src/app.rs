@@ -17,7 +17,7 @@ use axum::{
     http::{Method, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use tokio::{sync::Semaphore, time};
 use tower_http::services::ServeDir;
@@ -56,38 +56,30 @@ pub fn router() -> Router {
     router_with_limits(&defaults.limits)
 }
 
-/// Construct the production router with explicitly validated resource limits.
-pub fn router_with_limits(limits: &Limits) -> Router {
-    let routes = Router::new()
+fn api_routes() -> Router<crate::state::AppState> {
+    Router::new()
         .route("/", get(web::explorer))
         .route("/health", get(web::health))
         .route("/fragments/status", get(web::status))
         .route("/connection/status", get(web::connection_status))
-        .route("/connection/profiles", get(web::connection_profiles))
-        .route("/catalog/schemas", get(web::catalog::schemas))
-        .route("/catalog/relations", get(web::catalog::relations))
-        .route("/catalog/structure", get(web::catalog::structure))
-        .route("/catalog/indexes", get(web::catalog::indexes))
-        .route("/catalog/stats", get(web::catalog::stats))
-        .route("/catalog/advanced", get(web::catalog::advanced))
-        .route("/catalog/overview", get(web::catalog::overview))
-        .route("/catalog/data", get(web::rows::data))
-        .route("/catalog/export", get(web::export::export))
-        .nest_service("/static", ServeDir::new("public"));
-
-    apply_policy(
-        routes.with_state(crate::state::AppState::disconnected()),
-        RequestPolicy::from_limits(limits),
-    )
-}
-
-/// Real server router shares one connection state across all request handlers.
-pub fn router_with_state(limits: &Limits, state: crate::state::AppState) -> Router {
-    let routes = Router::new()
-        .route("/", get(web::explorer))
-        .route("/health", get(web::health))
-        .route("/fragments/status", get(web::status))
-        .route("/connection/status", get(web::connection_status))
+        .route("/login", get(web::auth::login_form).post(web::auth::login))
+        .route("/logout", post(web::auth::logout))
+        .route("/account/password", post(web::auth::account_password))
+        .route(
+            "/admin/users",
+            get(web::auth::admin_users).post(web::auth::admin_create_user),
+        )
+        .route("/admin/users/status", post(web::auth::admin_user_status))
+        .route(
+            "/admin/users/password",
+            post(web::auth::admin_user_password),
+        )
+        .route(
+            "/admin/grants",
+            get(web::auth::admin_grants).post(web::auth::admin_grant_add),
+        )
+        .route("/admin/grants/remove", post(web::auth::admin_grant_remove))
+        .route("/admin/audit", get(web::auth::admin_audit))
         .route("/connection/profiles", get(web::connection_profiles))
         .route("/catalog/schemas", get(web::catalog::schemas))
         .route("/catalog/relations", get(web::catalog::relations))
@@ -99,7 +91,23 @@ pub fn router_with_state(limits: &Limits, state: crate::state::AppState) -> Rout
         .route("/catalog/data", get(web::rows::data))
         .route("/catalog/export", get(web::export::export))
         .nest_service("/static", ServeDir::new("public"))
-        .with_state(state);
+}
+
+/// Construct the router for an unconfigured (disconnected) server.
+pub fn router_with_limits(limits: &Limits) -> Router {
+    router_with_state(limits, crate::state::AppState::disconnected())
+}
+
+/// Real server router shares one connection state across all request handlers.
+/// The authentication layer is always installed: it either resolves a session or,
+/// while no administrator exists, hands handlers the open read-only principal.
+pub fn router_with_state(limits: &Limits, state: crate::state::AppState) -> Router {
+    let routes = api_routes()
+        .with_state(state.clone())
+        .layer(middleware::from_fn_with_state(
+            state,
+            web::auth::authenticate,
+        ));
     apply_policy(routes, RequestPolicy::from_limits(limits))
 }
 
