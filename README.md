@@ -2,7 +2,7 @@
 
 **CuaDB** is a fast, local-first, **read-only database explorer** for the browser. The goal is to connect to a database, browse schemas and tables, and inspect paginated records, column types, indexes and storage details—without a SQL runner or a bulky administration UI.
 
-> **Current status: runnable application shell (milestone 0).** The Rust HTTP server, Askama page, Tailwind styling, HTMX fragment and Bun commands are scaffolded. **No database connection, table discovery or row queries are implemented yet.** The UI's preview is intentionally a placeholder.
+> **Current status: database connection foundation (Group 02).** The single-binary Rust/Askama/HTMX application now accepts a trusted server-side PostgreSQL URL, initializes a bounded read-only SQLx pool, and displays safe connection status. **Schema discovery, table grids, and actual database row queries are not implemented yet.** The data grid is still a placeholder.
 
 ## Canonical frontend UI reference
 
@@ -12,12 +12,13 @@ The HTML demo uses simulated connection names, data, statistics and client-side 
 
 ## Stack
 
-- **Rust + Axum**: HTTP server (one port).
+- **Rust + Axum**: HTTP server (one port), bounded HTTP requests and safe diagnostics.
 - **Askama**: compiled, escaped server-rendered HTML templates.
 - **HTMX 2**: HTML-fragment updates without React or Next.js.
 - **Tailwind CSS 4 + small custom CSS**: minimal interface and future data grid.
 - **Vanilla JavaScript**: browser-only interactions such as sidebar toggling.
 - **Bun**: root task runner and frontend build tooling. Bun is **not** the production server.
+- **SQLx PostgreSQL**: bounded lazy connections, read-only sessions, protected URL validation and cached status (no SQL editor).
 - **Docker**: a single multi-stage image and **one** runtime container.
 
 ## Prerequisites
@@ -33,7 +34,7 @@ cargo fmt --version
 cargo clippy --version
 ```
 
-**No PostgreSQL credentials are needed to start or test the app shell.** A working browser page is the acceptance criterion for this milestone.
+**PostgreSQL credentials are optional**: without them the shell and tests work in disconnected mode. A configured URL is validated at startup; the status indicator then probes the database without delaying the health endpoint.
 
 ## Quick start (from the repository root)
 
@@ -46,13 +47,14 @@ bun run dev
 
 Open **http://localhost:4848**. On the first invocation the Bun dispatcher installs missing JS tooling automatically, builds CSS, copies HTMX and the local JS into `public/`, and launches Rust. Subsequent code changes under `src/` or `templates/` restart the Rust process; Tailwind watches styles. Reload the browser after changes. Restart `bun run dev` if you create a *new nested directory*, change environment variables, or add dependencies.
 
-On a fresh clone, the first Rust compilation downloads crates from crates.io and can take longer than later incremental builds. `bun.lock` and `Cargo.lock` are committed for reproducible dependency resolution.
+On a fresh clone, the first Rust compilation downloads crates from crates.io. Bun uses its committed lockfile. **After pulling the new SQLx dependencies for Group 02, run `bun run deps:sync` once on Fedora to refresh Cargo.lock, then commit that lockfile.** Subsequent commands enforce locked builds. Do not run a release build before the new lockfile is generated.
 
 ## Root commands
 
 | Command | Behavior |
 | --- | --- |
-| `bun run setup` | Install frontend tooling, generate web assets and fetch Rust crates. |
+| `bun run setup` | Install frontend tooling, generate web assets and fetch locked Rust crates. |
+| `bun run deps:sync` | Explicitly resolve new Rust dependencies and refresh Cargo.lock after Cargo.toml changes. |
 | `bun run dev` | Build assets and launch Rust + Tailwind watches; restart Rust on source/template changes. |
 | `bun run check` | Rust formatting check, type/compile check, strict Clippy, and TypeScript/JavaScript type check. |
 | `bun run build` | Build minified assets and a release Rust binary. |
@@ -86,7 +88,7 @@ bun run test
 
 The browser home page should show a **CuaDB** sidebar, a **Not connected** label, a disabled table preview, and a **Check status** button. That button exercises an HTMX request and replaces only the status fragment. The **Sidebar** button is handled locally in vanilla JS.
 
-The `/health` endpoint tests the HTTP server, **not a database connection**.
+The `/health` endpoint tests the HTTP server, **not a database connection**. `GET /connection/status` renders a separate, redacted HTML connection status and can report **Not configured**, **Connected**, **Unavailable**, **Authentication failed**, or **Insufficient permissions**.
 
 ## Validated server configuration
 
@@ -96,15 +98,15 @@ CuaDB validates typed settings before binding its HTTP listener. Errors identify
 | --- | --- | --- | --- |
 | `CUADB_HOST` | `127.0.0.1` | IPv4 or IPv6 literal | HTTP listener |
 | `CUADB_PORT` | `4848` | 1–65535 | HTTP listener |
-| `CUADB_DATABASE_URL` | Unset | Optional nonempty string up to 8192 bytes | Safely stored but not yet connected |
-| `CUADB_CONNECTION_TIMEOUT_MS` | `5000` | 100–60000 | Future database connection |
-| `CUADB_QUERY_TIMEOUT_MS` | `15000` | 100–120000 | Future database queries |
+| `CUADB_DATABASE_URL` | Unset | Explicit PostgreSQL URL with trusted hostname, user/password, database and approved TLS options | Validated and used by the PostgreSQL pool |
+| `CUADB_CONNECTION_TIMEOUT_MS` | `5000` | 100–60000 | SQLx pool acquisition/connection deadline |
+| `CUADB_QUERY_TIMEOUT_MS` | `15000` | 100–120000 | PostgreSQL statement/lock timeouts and status probe |
 | `CUADB_REQUEST_TIMEOUT_MS` | `30000` | 500–180000 | Future HTTP request bounds |
 | `CUADB_DEFAULT_PAGE_SIZE` | `25` | 1–500; cannot exceed maximum | Future grid |
 | `CUADB_MAX_PAGE_SIZE` | `100` | 1–500 | Future grid |
-| `CUADB_MAX_POOL_CONNECTIONS` | `4` | 1–32 | Future database pool |
+| `CUADB_MAX_POOL_CONNECTIONS` | `4` | 1–32 | Maximum SQLx pooled connections |
 
-The default page size reduces automatically when only the maximum is lowered; an explicitly configured default above the maximum is rejected. PostgreSQL URL schemes, hosts, TLS and authentication will be validated by the dedicated connection task—not this configuration milestone. **Setting a database URL does not yet connect the shell.**
+The default page size reduces automatically when only the maximum is lowered; an explicitly configured default above the maximum is rejected. The PostgreSQL adapter checks URL structure, disallows arbitrary driver parameters, requires an explicit host/user/password/database, and defaults to certificate- and hostname-verified TLS (`sslmode=verify-full`); an explicit `sslmode=disable` is permitted for trusted private local networks. A configured URL triggers a background connection probe, but does not enable table browsing yet. See [PostgreSQL connection and security guide](docs/postgresql-connections.md).
 
 To change the local port:
 
@@ -152,7 +154,7 @@ Open **http://localhost:4848**. The Dockerfile uses Bun only for asset compilati
 
 The browser port is published on the host loopback interface by default. The native server binds to `127.0.0.1:4848` by default, while the Docker image sets `CUADB_HOST=0.0.0.0` inside the container so port forwarding works.
 
-For a future PostgreSQL connection, your existing `postgis` container can share a user-defined Docker network with CuaDB and use a URL like `postgresql://viewer:password@postgis:5432/mydb`. **The app does not consume `CUADB_DATABASE_URL` yet**. Do not supply real credentials until the read-only adapter exists.
+For a PostgreSQL connection, join the CuaDB and existing `postgis` containers to a user-defined Docker network and configure `CUADB_DATABASE_URL` using the hostname `postgis` rather than 127.0.0.1. **Use a dedicated least-privilege reader role, not a privileged database account.** Full steps are in [docs/postgresql-connections.md](docs/postgresql-connections.md).
 
 For an alternate host port, use `docker run --rm -p 127.0.0.1:PORT:4848 cuadb:local`, keeping `CUADB_PORT=4848` inside the container.
 
@@ -173,10 +175,16 @@ cuadb/
 │   ├── app.rs                 # Router, tracing and request limits
 │   ├── config.rs              # Typed server configuration
 │   ├── error.rs               # Browser-safe error contract
+│   ├── state.rs               # Shared connection lifecycle
 │   ├── db/
-│   │   ├── mod.rs             # Database integration boundary (empty)
-│   │   └── postgres/mod.rs    # PostgreSQL adapter placeholder (empty)
-│   └── web/mod.rs             # Askama pages and HTML-fragment handlers
+│   │   ├── mod.rs             # Engine-neutral database boundary
+│   │   ├── types.rs           # Common data/metadata/capability models
+│   │   ├── adapter.rs         # Testable cross-engine adapter trait
+│   │   └── postgres/
+│   │       ├── mod.rs
+│   │       ├── url.rs         # Restricted, redacted PostgreSQL URL validation
+│   │       └── manager.rs     # SQLx pool, read-only initialization, probes
+│   └── web/mod.rs             # Askama pages and connection-status fragments
 ├── templates/
 │   ├── base.html
 │   ├── pages/explorer.html
@@ -212,7 +220,7 @@ CuaDB is intentionally **not** a SQL console, migration system, editor or full d
 - There is no external CSS/JS CDN dependency: generated CSS and HTMX are served by Rust.
 - UI placeholders must never pretend a real database query succeeded.
 
-**Next milestone:** Follow the managed Task roadmap, beginning with Rust foundation and secure connection contracts. The shell has been verified on Fedora; actual database browsing is not implemented yet.
+**Next milestone:** PostgreSQL catalog discovery and safe row pagination. The connection lifecycle is implemented; schema/table browsing is deliberately planned in later Task groups. Follow the managed Task workspace in `.docs/`.
 
 ## Task-managed implementation roadmap
 

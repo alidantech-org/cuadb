@@ -62,8 +62,24 @@ pub fn router_with_limits(limits: &Limits) -> Router {
         .route("/", get(web::explorer))
         .route("/health", get(web::health))
         .route("/fragments/status", get(web::status))
+        .route("/connection/status", get(web::connection_status))
         .nest_service("/static", ServeDir::new("public"));
 
+    apply_policy(
+        routes.with_state(crate::state::AppState::disconnected()),
+        RequestPolicy::from_limits(limits),
+    )
+}
+
+/// Real server router shares one connection state across all request handlers.
+pub fn router_with_state(limits: &Limits, state: crate::state::AppState) -> Router {
+    let routes = Router::new()
+        .route("/", get(web::explorer))
+        .route("/health", get(web::health))
+        .route("/fragments/status", get(web::status))
+        .route("/connection/status", get(web::connection_status))
+        .nest_service("/static", ServeDir::new("public"))
+        .with_state(state);
     apply_policy(routes, RequestPolicy::from_limits(limits))
 }
 

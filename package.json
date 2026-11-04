@@ -19,7 +19,8 @@
     "task:seed": "bun scripts/roadmap/seed.ts --seed",
     "task:verify": "bun scripts/roadmap/seed.ts --verify",
     "task:repair": "bun scripts/roadmap/seed.ts --repair",
-    "smoke": "bun scripts/tasks.ts smoke"
+    "smoke": "bun scripts/tasks.ts smoke",
+    "deps:sync": "bun scripts/tasks.ts deps:sync"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.4",

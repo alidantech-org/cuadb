@@ -60,6 +60,18 @@ function buildAssets(release = false): void {
   copyFileSync(path('assets/js/app.js'), path('public/app.js'));
 }
 
+/**
+ * Explicit, one-time Cargo dependency sync after changing Cargo.toml.
+ *
+ * Ordinary commands remain locked and reproducible. Commit the generated
+ * Cargo.lock together with Cargo.toml before creating a release image.
+ */
+function syncDependencies(): void {
+  ensureRust();
+  run('cargo', ['check', '--all-targets']);
+  console.log('Cargo dependency resolution complete. Review and commit Cargo.lock.');
+}
+
 function build(): void {
   ensureRust();
   buildAssets(true);
@@ -180,6 +192,9 @@ function start(): void {
 function main(): void {
   const action = process.argv[2];
   switch (action) {
+    case 'deps:sync':
+      syncDependencies();
+      break;
     case 'setup':
       ensureRust();
       buildAssets();
@@ -214,7 +229,7 @@ function main(): void {
       buildAssets(true);
       break;
     default:
-      console.error('Usage: bun run <setup|dev|check|build|start|format|format:check|test|smoke>');
+      console.error('Usage: bun run <setup|deps:sync|dev|check|build|start|format|format:check|test|smoke>');
       process.exit(1);
   }
 }

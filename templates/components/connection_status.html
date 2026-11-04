@@ -1,0 +1,6 @@
+<span id="connection-indicator" role="status" aria-live="polite"
+  title="{{ detail }}"
+  hx-get="/connection/status" hx-trigger="every 12s" hx-swap="outerHTML"
+  class="ml-auto rounded-full border px-3 py-1 text-xs font-medium {% if ready %}border-emerald-500/30 bg-emerald-500/10 text-emerald-200{% else %}border-amber-500/30 bg-amber-500/10 text-amber-200{% endif %}">
+  {{ label }}
+</span>

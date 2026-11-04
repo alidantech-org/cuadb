@@ -98,8 +98,9 @@ HTTP 503 **without allocating an unbounded queue**. A handler that exceeds
 its deadline receives HTTP 504; dropping its future cancels cooperative
 in-flight work. **A detached background task and response-body streaming
 need their own cancellation, timeout and size bounds** when implemented.
-Connection/query timeouts are only reserved config values for now, not active
-database protections. Ordinary GET-only routes don't consume request bodies,
+PostgreSQL connection/query deadlines are now active for pool acquisition,
+read-only connection initialization and connection probes. Future row streams
+must enforce their own bounded SQL execution and response-size limits. Ordinary GET-only routes don't consume request bodies,
 so the extractor limit primarily protects future routes.
 
 Shutdown is signaled by Ctrl+C (SIGINT) or SIGTERM on Unix, including
@@ -115,9 +116,10 @@ handler, shell routes and Task roadmap validity. `bun run smoke` checks a
 real HTTP listener and bundled assets. These tests do not depend on your
 personal PostgreSQL/PostGIS container.
 
-Future engine integration tests must be **opt-in and disposable**, and must
-use an isolated database fixture plus a dedicated least-privilege SELECT
-role. Never run fixtures against an existing user or production database.
+PostgreSQL connection integration tests are **opt-in and disposable**, and
+must use an isolated database fixture plus a dedicated least-privilege SELECT
+role. See [PostgreSQL connections](postgresql-connections.md) for fixture
+variables, TLS options, grants and Docker networking. Never run fixtures against an existing user or production database.
 Do not claim completion before running `bun run format:check`,
 `bun run check`, `bun run test`, `bun run smoke` and
 `task validate` on the relevant developer platform.
@@ -125,3 +127,23 @@ Do not claim completion before running `bun run format:check`,
 Managed task IDs, statuses, checklist ticks, and history are owned by the
 Task CLI in `.docs/`. Use `task start`, `task check`, `task comment`,
 `task update`, and `task validate` rather than hand-editing Task metadata.
+
+## PostgreSQL connection foundation
+
+The default shell needs no credentials and never waits for the database to
+answer `/health`. When `CUADB_DATABASE_URL` is present, CuaDB validates a
+restricted PostgreSQL URL at startup, constructs a bounded SQLx pool with no
+minimum connections, and begins a single cached read-only probe. A failed
+connection changes only the status fragment; it does not bring down the
+HTTP server. Credentials and database hostnames are never included in
+browser fragments or diagnostic logs.
+
+If `Cargo.toml` changes, run `bun run deps:sync` intentionally **once** to
+refresh the dependency lockfile, inspect `Cargo.lock`, commit it, and then
+use locked commands as normal. Never hide lockfile drift by silently updating
+it during production builds. The existing `bun run smoke` test intentionally
+starts a disconnected server to remain fast and deterministic.
+
+Full role setup, PostgreSQL URL/TLS requirements, opt-in fixture tests and
+PostGIS container networking are documented in
+[PostgreSQL connections](postgresql-connections.md).

@@ -1,4 +1,5 @@
-//! PostgreSQL adapter placeholder.
-//!
-//! The first implementation milestone will add URL-based connection handling,
-//! catalog discovery, pagination and metadata under this module.
+//! PostgreSQL-only URL validation, connections and introspection safety.
+pub mod manager;
+pub mod url;
+
+pub use manager::PgManager;

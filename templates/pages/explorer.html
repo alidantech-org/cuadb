@@ -28,8 +28,10 @@
         Sidebar
       </button>
       <span class="text-sm text-slate-400">Workspace / Overview</span>
-      <span class="ml-auto rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200">
-        Not connected
+      <span id="connection-indicator" role="status" aria-live="polite"
+        hx-get="/connection/status" hx-trigger="load, every 12s" hx-swap="outerHTML"
+        class="ml-auto rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-300">
+        Checking connection…
       </span>
     </header>
 

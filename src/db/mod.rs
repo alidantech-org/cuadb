@@ -1,6 +1,4 @@
-//! Database integration boundary (not yet implemented).
-//!
-//! Future adapters will discover schemas, tables and rows using engine-specific,
-//! read-only queries. The current milestone intentionally opens no DB connections.
-
+//! Read-only database abstraction; engine-specific code lives below postgres/.
+pub mod adapter;
 pub mod postgres;
+pub mod types;

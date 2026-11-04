@@ -1,9 +1,13 @@
 //! HTML endpoints: full pages and reusable fragments rendered by Askama.
 
 use askama::Template;
-use axum::response::Html;
+use axum::{
+    extract::State,
+    http::{HeaderValue, header},
+    response::{Html, IntoResponse, Response},
+};
 
-use crate::error::AppError;
+use crate::{error::AppError, state::AppState};
 
 #[derive(Template)]
 #[template(path = "pages/explorer.html")]
@@ -41,4 +45,29 @@ pub async fn status() -> Result<Html<String>, AppError> {
 /// Liveness only: never wait for the database or issue a SQL query here.
 pub async fn health() -> &'static str {
     "ok"
+}
+
+#[derive(Template)]
+#[template(path = "components/connection_status.html")]
+struct ConnectionStatusTemplate {
+    label: &'static str,
+    detail: &'static str,
+    ready: bool,
+}
+
+/// Database status stays separate from /health and never renders credentials.
+/// Failed probes are cached briefly, so repeated HTMX requests are inexpensive.
+pub async fn connection_status(State(state): State<AppState>) -> Result<Response, AppError> {
+    let snapshot = state.connection_snapshot().await;
+    let view = ConnectionStatusTemplate {
+        label: snapshot.label(),
+        detail: snapshot.detail(),
+        ready: snapshot.is_ready(),
+    };
+    let mut response = html(view)?.into_response();
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    );
+    Ok(response)
 }

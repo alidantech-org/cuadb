@@ -1,13 +1,15 @@
 //! Start the local-only server with bounded shutdown and no database connection.
 
-use cuadb::{app, config::Config};
+use cuadb::{app, config::Config, state::AppState};
 use std::{error::Error, time::Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_env()?;
+    let state = AppState::from_config(&config)?;
     let listener = tokio::net::TcpListener::bind((config.host, config.port)).await?;
-    let router = app::router_with_limits(&config.limits);
+    let router = app::router_with_state(&config.limits, state.clone());
+    state.start_probe();
 
     println!(
         "CuaDB shell ready at http://{}:{}",
@@ -41,6 +43,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
+    }
+    // Close checked-out connection resources after the listener has drained.
+    if tokio::time::timeout(Duration::from_secs(2), state.close()).await.is_err() {
+        eprintln!("level=warn event=database_pool_close code=deadline_exceeded");
     }
     Ok(())
 }
