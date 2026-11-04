@@ -21,8 +21,8 @@ export const documents: DocumentSpec[] = [
       'A browser selects a configured connection, schema, relation, page and sort. The typed route resolves the trusted connection profile, consults the adapter and validates relation identifiers against catalog metadata. The adapter executes only bounded, read-only queries. It returns typed cells and availability-aware metadata. Rust maps this into an Askama view model; HTMX swaps a small HTML fragment. Sensitive rows are never stored in the browser as a durable client cache or exposed through a generic JSON SQL API.',
       '',
       '## Evolution rules',
-      'Keep modules small and testable: config, errors, state, web handlers, templates and engine adapters. Avoid complex domain service hierarchies, plugin frameworks and multiple runtime services until measurable needs justify them. The Task workspace in .docs/ remains the single source of truth for execution status; this architecture document records boundaries and decisions, not a parallel task checklist.'
-    ].join('\n')
+      'Keep modules small and testable: config, errors, state, web handlers, templates and engine adapters. Avoid complex domain service hierarchies, plugin frameworks and multiple runtime services until measurable needs justify them. The Task workspace in .docs/ remains the single source of truth for execution status; this architecture document records boundaries and decisions, not a parallel task checklist.',
+    ].join('\n'),
   },
   {
     key: 'security',
@@ -44,8 +44,8 @@ export const documents: DocumentSpec[] = [
       'Escape all database-provided text in Askama. Use local bundled JavaScript and CSS, a compatible restrictive content security policy, no-store cache headers for database-bearing responses, frame protection and secure content-type settings. Disable HTMX history snapshot caching of row contents and prevent stale asynchronous responses from replacing the active table. No credentials or raw database rows should enter persistent browser preferences. Error fragments must not leak SQL text, driver stack traces or full URLs.',
       '',
       '## Verification',
-      'Use negative tests for SQL identifier injection, XSS strings, special names, invalid cursors, unauthorized reads, huge binary/JSON values, connection failures and filesystem traversal. Integration fixtures must be disposable and must never perform setup writes against the developer’s actual data. Document residual risks, especially RLS behavior, views executing privileged functions, metadata visibility and external network deployment.'
-    ].join('\n')
+      'Use negative tests for SQL identifier injection, XSS strings, special names, invalid cursors, unauthorized reads, huge binary/JSON values, connection failures and filesystem traversal. Integration fixtures must be disposable and must never perform setup writes against the developer’s actual data. Document residual risks, especially RLS behavior, views executing privileged functions, metadata visibility and external network deployment.',
+    ].join('\n'),
   },
   {
     key: 'frontend',
@@ -67,8 +67,8 @@ export const documents: DocumentSpec[] = [
       'The records grid is semantic HTML and remains read-only. It shows actual column names, typed values, visible NULL markers, sortable headers and previous/next navigation using real continuation state. Display only a bounded page, usually 50 rows, never an entire table. Large JSON, arrays, bytea and spatial values are truncated with a safe detail view; copying a cell is a browser-only action. The UI must distinguish estimated row counts from exact counts and disclose when a table has no stable pagination key.',
       '',
       '## Accessibility and verification',
-      'Use visible keyboard focus, aria-sort on active sortable headers, labeled buttons and appropriately announced loading or failure feedback. Test narrow viewports, long column names, Unicode names, many columns, dark/light themes, rapid sorting, stale HTMX responses and large-cell detail interactions. Keep event handlers delegated to persistent elements or explicitly reinitialized after swaps. No browser-only interaction should start a database query unnecessarily.'
-    ].join('\n')
+      'Use visible keyboard focus, aria-sort on active sortable headers, labeled buttons and appropriately announced loading or failure feedback. Test narrow viewports, long column names, Unicode names, many columns, dark/light themes, rapid sorting, stale HTMX responses and large-cell detail interactions. Keep event handlers delegated to persistent elements or explicitly reinitialized after swaps. No browser-only interaction should start a database query unnecessarily.',
+    ].join('\n'),
   },
   {
     key: 'testing',
@@ -87,8 +87,8 @@ export const documents: DocumentSpec[] = [
       'Live PostgreSQL, PostGIS, MySQL, MariaDB and SQLite tests are opt-in and must use disposable fixtures. Seed tables with composite keys, unusual quoted identifiers, NULL values, JSON, large text, timestamps and related relations. Use both a setup role and a restricted viewer role; never mutate a developer’s existing user database. Confirm that catalog visibility, read-only permissions, query timeouts and expected metadata are correct. SQL Server may be added to this matrix after the driver feasibility task.',
       '',
       '## Performance and release checks',
-      'Measure server response size, rendering time, database query time, pool utilization, deep-page behavior and wide-grid usability on synthetic datasets. Verify that no implicit COUNT(*) full scan or unrestricted SELECT occurs during initial table browsing. Docker acceptance includes one published loopback UI port, non-root runtime, bundled assets, startup/shutdown behavior and a shared-network connection to an external PostgreSQL container. Record exceptions and unsupported engine features explicitly rather than weakening tests.'
-    ].join('\n')
+      'Measure server response size, rendering time, database query time, pool utilization, deep-page behavior and wide-grid usability on synthetic datasets. Verify that no implicit COUNT(*) full scan or unrestricted SELECT occurs during initial table browsing. Docker acceptance includes one published loopback UI port, non-root runtime, bundled assets, startup/shutdown behavior and a shared-network connection to an external PostgreSQL container. Record exceptions and unsupported engine features explicitly rather than weakening tests.',
+    ].join('\n'),
   },
   {
     key: 'roadmap',
@@ -107,7 +107,7 @@ export const documents: DocumentSpec[] = [
       'After PostgreSQL and the browser experience are reliable, build MySQL/MariaDB and SQLite adapters against the same capability contract. Then introduce multiple trusted server-side connection profiles and complete security, performance, Docker and documentation acceptance. SQL Server is deliberately a post-core extension with a driver feasibility gate. Avoid claiming feature parity for statistics, namespaces and special data types across engines.',
       '',
       '## Execution discipline',
-      'For each work session, inspect task list and the exact task, check its dependencies, move it to in-progress, implement only its scope, and run relevant verification. Record findings and decisions in the Task workspace, tick checklist items through task check, and move the task to completed only when its acceptance criteria and checks pass. Keep one small piece of work active at a time and prefer a complete vertical slice to broad untested scaffolding.'
-    ].join('\n')
-  }
+      'For each work session, inspect task list and the exact task, check its dependencies, move it to in-progress, implement only its scope, and run relevant verification. Record findings and decisions in the Task workspace, tick checklist items through task check, and move the task to completed only when its acceptance criteria and checks pass. Keep one small piece of work active at a time and prefer a complete vertical slice to broad untested scaffolding.',
+    ].join('\n'),
+  },
 ];

@@ -1,0 +1,26 @@
+---
+{id: TSK-ABE2D51C83F3,name: Add safe expanded cell detail and copy actions,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.797Z,updated_at: 2026-11-04T07:32:06.797Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8DB2E738839F],order: 4096}
+---
+
+# Add safe expanded cell detail and copy actions
+
+## Goal
+Let users inspect JSON, long text, arrays and other complex values without cluttering the grid. A detail drawer should show the complete supported value when within limits and clearly mark truncation or unavailable content.
+
+## Context
+Many database records include substantial JSON or serialized payloads. A naïve renderer would send megabytes per page. The detail request must remain read-only, identify the exact row and column safely and handle records with no stable row key honestly. Clipboard actions can use vanilla JavaScript without server calls.
+
+This task belongs to **07 — Read-only records grid and interactions**. The group outcome is: Deliver the central CuaDB experience: an efficient, readable grid for inspecting records in permitted tables or views. Users should open a table and immediately see bounded data, click column headers to sort, move through pages and inspect large cells without accidentally editing anything.
+
+## Implementation boundaries
+CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
+
+## Acceptance checklist
+- [ ] Build an accessible reusable detail panel with formatted text and JSON when supported.
+- [ ] Use bounded detail fetches tied to validated relation, column and row identity.
+- [ ] Show truncation and privacy-safe fallbacks for huge or unsupported values.
+- [ ] Implement local copy actions without exposing credentials or unsafe HTML.
+- [ ] Test large JSON, control characters, Unicode and missing-key row scenarios.
+
+## Verification and handoff
+Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

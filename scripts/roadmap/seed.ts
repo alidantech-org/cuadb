@@ -40,7 +40,7 @@ function groupGoal(group: GroupSpec): string {
     'This group is complete when its implemented behavior is verifiable through the documented checks, not merely when files exist. Functionality must remain read-only and obey the shared database capability contract. All error states need truthful, usable messages and no credential disclosures. Work should be integrated with the existing single-process Rust application and browser shell, without introducing a separate runtime service. The group tasks describe individual deliverables and must be completed through Task checklists rather than a parallel root TODO file.',
     '',
     '## Boundaries',
-    'Do not implement adjacent groups speculatively. Keep changes modular, add tests that can run without a live database when possible, and document any fixture-only validation explicitly. Preserve the existing Bun root commands and localhost deployment assumptions. Record decisions and unexpected compatibility limits in the Task workspace.'
+    'Do not implement adjacent groups speculatively. Keep changes modular, add tests that can run without a live database when possible, and document any fixture-only validation explicitly. Preserve the existing Bun root commands and localhost deployment assumptions. Record decisions and unexpected compatibility limits in the Task workspace.',
   ].join('\n');
 }
 
@@ -58,7 +58,7 @@ function groupPlan(group: GroupSpec): string {
     'Work through the tasks in their listed order unless dependencies or test evidence justify another sequence. Before editing code, inspect the task using the CLI and check any blocking task links. Move exactly the selected task to in-progress, implement a coherent slice, add tests for errors and edge cases, and run Bun format/check/test plus focused live database checks where specified. Do not edit Task-managed IDs or status history manually. Use task comment for findings and task check for accepted items, and run task validate before recording completion. Any discovered work that falls outside the current task should be discussed and created as a separate detailed Task record rather than silently enlarging the scope.',
     '',
     '## Deliverables',
-    'The group is accepted when its linked tasks are completed with evidence, its README or architecture documentation accurately reflects the implemented features, and the app remains usable with the existing shell and single Docker container constraints.'
+    'The group is accepted when its linked tasks are completed with evidence, its README or architecture documentation accurately reflects the implemented features, and the app remains usable with the existing shell and single Docker container constraints.',
   ].join('\n');
 }
 
@@ -82,7 +82,7 @@ function taskBody(group: GroupSpec, task: TaskSpec): string {
     checklist,
     '',
     '## Verification and handoff',
-    'Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.'
+    'Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.',
   ].join('\n');
 }
 
@@ -133,7 +133,7 @@ function taskCommand(): string {
   const command = ['taskcode', 'task'].find(commandAvailable);
   if (!command) {
     throw new Error(
-      'Task CLI not found. Install the taskcode executable, confirm "task --version", then retry. Do not run task init: this repository already has task.yaml.'
+      'Task CLI not found. Install the taskcode executable, confirm "task --version", then retry. Do not run task init: this repository already has task.yaml.',
     );
   }
   return command;
@@ -147,7 +147,10 @@ function taskRun(executable: string, args: string[]): string {
   });
   if (processResult.error || processResult.status !== 0) {
     throw new Error(
-      `Task command failed: ${executable} ${args.filter((a) => !a.includes('\n')).slice(0, 9).join(' ')}\n${processResult.stderr || processResult.error || processResult.stdout}`
+      `Task command failed: ${executable} ${args
+        .filter((a) => !a.includes('\n'))
+        .slice(0, 9)
+        .join(' ')}\n${processResult.stderr || processResult.error || processResult.stdout}`,
     );
   }
   return processResult.stdout;
@@ -170,12 +173,19 @@ function taskJson<T>(executable: string, args: string[]): T {
 function validateWorkspace(): void {
   const config = readFileSync(join(root, 'task.yaml'), 'utf8');
   if (!/^workspace:\s*["']?\.docs["']?\s*$/m.test(config)) {
-    throw new Error('Expected task.yaml to select workspace: ".docs". Review config before seeding.');
+    throw new Error(
+      'Expected task.yaml to select workspace: ".docs". Review config before seeding.',
+    );
   }
 }
 
 /** Save only temporary body files; Task CLI creates the actual managed Markdown. */
-function withTextFile<T>(directory: string, filename: string, body: string, callback: (path: string) => T): T {
+function withTextFile<T>(
+  directory: string,
+  filename: string,
+  body: string,
+  callback: (path: string) => T,
+): T {
   const filepath = join(directory, filename);
   writeFileSync(filepath, body, 'utf8');
   return callback(filepath);
@@ -183,11 +193,15 @@ function withTextFile<T>(directory: string, filename: string, body: string, call
 
 function preview(): void {
   console.log('CuaDB Task roadmap preview (read-only)');
-  console.log(`Workspace: .docs/ | ${groups.length} groups | ${groups.reduce((count, group) => count + group.tasks.length, 0)} tasks | ${documents.length} documents`);
+  console.log(
+    `Workspace: .docs/ | ${groups.length} groups | ${groups.reduce((count, group) => count + group.tasks.length, 0)} tasks | ${documents.length} documents`,
+  );
   for (const group of groups) {
     console.log(`\n${group.title} [${group.key}]`);
     for (const task of group.tasks) {
-      console.log(`  - ${task.title}${task.dependsOn?.length ? ` (needs: ${task.dependsOn.join(', ')})` : ''}`);
+      console.log(
+        `  - ${task.title}${task.dependsOn?.length ? ` (needs: ${task.dependsOn.join(', ')})` : ''}`,
+      );
     }
   }
   console.log('\nNo Task workspace records were created or changed.');
@@ -210,20 +224,33 @@ function seed(): void {
         continue;
       }
       taskJson<DocRecord>(executable, [
-        'docs', 'create', '--title', doc.title,
-        '--path', doc.path, '--body', doc.body,
-        '--tag', 'cuadb,architecture',
+        'docs',
+        'create',
+        '--title',
+        doc.title,
+        '--path',
+        doc.path,
+        '--body',
+        doc.body,
+        '--tag',
+        'cuadb,architecture',
       ]);
       newDocuments++;
       console.log(`Created document: ${doc.path}`);
     }
 
-    const existingGroups = asArray<GroupRecord>(taskJson(executable, ['group', 'list']), 'group list');
+    const existingGroups = asArray<GroupRecord>(
+      taskJson(executable, ['group', 'list']),
+      'group list',
+    );
     const groupsByName = new Map(existingGroups.map((group) => [group.name, group.id]));
 
     // Read both active and archived names so rerunning never creates duplicates.
     const active = asArray<TaskRecord>(taskJson(executable, ['list']), 'list');
-    const archived = asArray<TaskRecord>(taskJson(executable, ['list', '--archived']), 'list --archived');
+    const archived = asArray<TaskRecord>(
+      taskJson(executable, ['list', '--archived']),
+      'list --archived',
+    );
     const tasksByName = new Map([...archived, ...active].map((task) => [task.name, task.id]));
     const taskIds = new Map<string, string>();
 
@@ -231,13 +258,23 @@ function seed(): void {
       let groupId = groupsByName.get(group.title);
       if (!groupId) {
         const slug = group.key.replace(/[^a-z0-9-]/g, '-');
-        const created = withTextFile(tempDirectory, `${slug}-goal.md`, groupGoal(group), (goalFile) =>
-          withTextFile(tempDirectory, `${slug}-plan.md`, groupPlan(group), (planFile) =>
-            taskJson<GroupRecord>(executable, [
-              'group', 'create', '--title', group.title,
-              '--goal-file', goalFile, '--plan-file', planFile,
-            ])
-          )
+        const created = withTextFile(
+          tempDirectory,
+          `${slug}-goal.md`,
+          groupGoal(group),
+          (goalFile) =>
+            withTextFile(tempDirectory, `${slug}-plan.md`, groupPlan(group), (planFile) =>
+              taskJson<GroupRecord>(executable, [
+                'group',
+                'create',
+                '--title',
+                group.title,
+                '--goal-file',
+                goalFile,
+                '--plan-file',
+                planFile,
+              ]),
+            ),
         );
         groupId = created.id;
         groupsByName.set(group.title, groupId);
@@ -261,10 +298,15 @@ function seed(): void {
           return id;
         });
         const args = [
-          'create', '--title', task.title,
-          '--group', groupId,
-          '--priority', group.key === 'foundation' || group.key === 'contracts' ? 'high' : 'medium',
-          '--tag', `cuadb,${group.key}`,
+          'create',
+          '--title',
+          task.title,
+          '--group',
+          groupId,
+          '--priority',
+          group.key === 'foundation' || group.key === 'contracts' ? 'high' : 'medium',
+          '--tag',
+          `cuadb,${group.key}`,
         ];
         if (dependencies.length > 0) args.push('--depends-on', dependencies.join(','));
         const created = withTextFile(
@@ -282,7 +324,7 @@ function seed(): void {
 
     taskRun(executable, ['validate']);
     console.log(
-      `\nTask workspace validated. Added ${newGroups} groups, ${newTasks} tasks and ${newDocuments} documents.\nReview: task group list; task list; task docs list; git status`
+      `\nTask workspace validated. Added ${newGroups} groups, ${newTasks} tasks and ${newDocuments} documents.\nReview: task group list; task list; task docs list; git status`,
     );
   } finally {
     rmSync(tempDirectory, { force: true, recursive: true });
@@ -300,9 +342,13 @@ function verify(): void {
   const savedDocs = asArray<DocRecord>(taskJson(executable, ['docs', 'list']), 'docs list');
   const groupNames = new Set(savedGroups.map((group) => group.name));
   const taskNames = new Set(savedTasks.map((task) => task.name));
-  const docPaths = new Set(savedDocs.map((doc) => doc.path.startsWith('.docs/') ? doc.path.slice(6) : doc.path));
+  const docPaths = new Set(
+    savedDocs.map((doc) => (doc.path.startsWith('.docs/') ? doc.path.slice(6) : doc.path)),
+  );
   const missingGroups = groups.filter((group) => !groupNames.has(group.title));
-  const missingTasks = groups.flatMap((group) => group.tasks).filter((task) => !taskNames.has(task.title));
+  const missingTasks = groups
+    .flatMap((group) => group.tasks)
+    .filter((task) => !taskNames.has(task.title));
   const missingDocs = documents.filter((doc) => !docPaths.has(doc.path));
 
   console.log(taskRun(executable, ['validate']));

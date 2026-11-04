@@ -1,0 +1,26 @@
+---
+{id: TSK-A7B0DFC23314,name: "Discover MySQL/MariaDB namespaces, relations and columns",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.605Z,updated_at: 2026-11-04T07:32:07.605Z,tags: [cuadb,mysql],depends_on: [TSK-0D56383DBA25],order: 2048}
+---
+
+# Discover MySQL/MariaDB namespaces, relations and columns
+
+## Goal
+Map engine catalog metadata into the common database explorer tree. Users should browse available databases, tables and views, then inspect column types, defaults, indexes, primary keys and foreign-key references without a SQL editor.
+
+## Context
+MySQL typically treats a database as the namespace equivalent; do not present fictitious PostgreSQL-style nested schemas. Preserve exact identifier case where the server permits it and account for collation and filesystem case-sensitivity differences. Metadata must reflect the connected role’s visibility.
+
+This task belongs to **09 — MySQL and MariaDB compatibility**. The group outcome is: Bring MySQL and MariaDB into CuaDB through a separate adapter while preserving the same read-only navigation and data-grid contract. Reuse common models and browser components, but implement engine-specific discovery, identifier quoting, data decoding and statistics rather than assuming PostgreSQL SQL syntax works everywhere.
+
+## Implementation boundaries
+CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
+
+## Acceptance checklist
+- [ ] List accessible databases, tables and views with engine-correct object types.
+- [ ] Return columns, defaults, nullable flags, primary keys and foreign-key relationships.
+- [ ] Handle identifier quoting and case behavior without SQL injection risk.
+- [ ] Report unsupported metadata capability rather than fabricating fields.
+- [ ] Test mixed-case, empty and permission-restricted fixture databases.
+
+## Verification and handoff
+Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

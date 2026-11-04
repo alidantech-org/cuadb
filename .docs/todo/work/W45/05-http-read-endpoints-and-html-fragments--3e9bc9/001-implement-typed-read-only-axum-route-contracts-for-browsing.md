@@ -1,0 +1,26 @@
+---
+{id: TSK-DC88ADC32B93,name: Implement typed read-only Axum route contracts for browsing,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:05.669Z,updated_at: 2026-11-04T07:32:05.669Z,tags: [cuadb,http],depends_on: [TSK-A3CFF0B5E267,TSK-23F3D2D0DDE1],order: 1024}
+---
+
+# Implement typed read-only Axum route contracts for browsing
+
+## Goal
+Design and implement HTTP GET endpoints for connection status, schemas, tables, data rows, structure and info. Routes should delegate to adapters, return stable status codes and support both direct navigation and HTMX requests.
+
+## Context
+The existing router serves a shell and a status fragment. Future handlers must not issue inline vendor-specific SQL or pass raw database driver objects into templates. Each route needs a validated relation identifier and clear output semantics, including what to do when a table becomes inaccessible between requests.
+
+This task belongs to **05 — HTTP read endpoints and HTML fragments**. The group outcome is: Expose the database adapter through safe Axum routes that return full pages and HTMX fragments. Keep typed parsing, permission handling and server state separate from Askama templates. Browser requests may select an existing connection, relation, page and sort, but may not supply arbitrary SQL or raw external connection targets.
+
+## Implementation boundaries
+CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
+
+## Acceptance checklist
+- [ ] Define documented route paths and typed path/query request parsing.
+- [ ] Delegate discovery and row reads to the adapter through application state.
+- [ ] Reject invalid identifiers, directions, page sizes and unsupported relation types.
+- [ ] Support full-page requests and HTMX fragment responses where appropriate.
+- [ ] Add isolated router tests with a fake adapter rather than requiring a live database.
+
+## Verification and handoff
+Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

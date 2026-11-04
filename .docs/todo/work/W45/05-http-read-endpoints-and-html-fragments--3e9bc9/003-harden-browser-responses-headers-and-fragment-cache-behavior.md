@@ -1,0 +1,26 @@
+---
+{id: TSK-E09AA19D0352,name: "Harden browser responses, headers and fragment cache behavior",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:05.812Z,updated_at: 2026-11-04T07:32:05.812Z,tags: [cuadb,http],depends_on: [TSK-FFD6A5B94574],order: 3072}
+---
+
+# Harden browser responses, headers and fragment cache behavior
+
+## Goal
+Protect local database content from accidental exposure through HTTP caches, browser history snapshots and cross-origin interactions. Keep web access on localhost by default and document the boundary for any later remote deployment.
+
+## Context
+CuaDB is a browser-based interface to sensitive database values. Even read-only responses may contain personal or proprietary information. HTMX must not persist data snapshots unexpectedly, while CSS and JS should be bundled locally. Security headers should permit intended HTMX behavior without opening permissive script or embedding policies.
+
+This task belongs to **05 — HTTP read endpoints and HTML fragments**. The group outcome is: Expose the database adapter through safe Axum routes that return full pages and HTMX fragments. Keep typed parsing, permission handling and server state separate from Askama templates. Browser requests may select an existing connection, relation, page and sort, but may not supply arbitrary SQL or raw external connection targets.
+
+## Implementation boundaries
+CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
+
+## Acceptance checklist
+- [ ] Add no-store cache behavior to all authenticated or database-bearing HTML responses.
+- [ ] Define CSP, clickjacking and MIME-sniffing protections compatible with bundled assets.
+- [ ] Disable HTMX history caching of sensitive database fragments and test navigation behavior.
+- [ ] Verify that unsafe origins or methods cannot trigger unauthorized future state changes.
+- [ ] Add response security regression tests and document local-only deployment assumptions.
+
+## Verification and handoff
+Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
