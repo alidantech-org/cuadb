@@ -17,7 +17,8 @@
     "docker:run": "docker run --rm --name cuadb -p 127.0.0.1:4848:4848 cuadb:local",
     "task:preview": "bun scripts/roadmap/seed.ts --preview",
     "task:seed": "bun scripts/roadmap/seed.ts --seed",
-    "task:verify": "bun scripts/roadmap/seed.ts --verify"
+    "task:verify": "bun scripts/roadmap/seed.ts --verify",
+    "task:repair": "bun scripts/roadmap/seed.ts --repair"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.4",

@@ -8,15 +8,17 @@
  * Usage:
  *   bun run task:preview  # inspect only, no Task installation required
  *   bun run task:seed     # create records in .docs/, then task validate
+ *   bun run task:repair   # repair first bootstrap's group goals via Task CLI
  *   bun run task:verify   # validate existing Task workspace
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { documents, groups } from './spec';
 import type { GroupSpec, TaskSpec } from './types';
+import { groupGoal, LEGACY_GOAL_PARAGRAPH } from './goals';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -26,22 +28,6 @@ type DocRecord = { id: string; name: string; path: string };
 
 function words(value: string): number {
   return value.match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu)?.length ?? 0;
-}
-
-/** Task quality policy: detailed goal/plan and at least three real acceptance steps. */
-function groupGoal(group: GroupSpec): string {
-  return [
-    `# ${group.title} — Goal`,
-    '',
-    '## Outcome',
-    group.goal,
-    '',
-    '## Definition of done',
-    'This group is complete when its implemented behavior is verifiable through the documented checks, not merely when files exist. Functionality must remain read-only and obey the shared database capability contract. All error states need truthful, usable messages and no credential disclosures. Work should be integrated with the existing single-process Rust application and browser shell, without introducing a separate runtime service. The group tasks describe individual deliverables and must be completed through Task checklists rather than a parallel root TODO file.',
-    '',
-    '## Boundaries',
-    'Do not implement adjacent groups speculatively. Keep changes modular, add tests that can run without a live database when possible, and document any fixture-only validation explicitly. Preserve the existing Bun root commands and localhost deployment assumptions. Record decisions and unexpected compatibility limits in the Task workspace.',
-  ].join('\n');
 }
 
 function groupPlan(group: GroupSpec): string {
@@ -139,9 +125,14 @@ function taskCommand(): string {
   return command;
 }
 
-function taskRun(executable: string, args: string[]): string {
+function taskRun(
+  executable: string,
+  args: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): string {
   const processResult = spawnSync(executable, args, {
     cwd: root,
+    env,
     encoding: 'utf8',
     maxBuffer: 4 * 1024 * 1024,
   });
@@ -205,6 +196,52 @@ function preview(): void {
     }
   }
   console.log('\nNo Task workspace records were created or changed.');
+}
+
+/**
+ * Repair ONLY the known, legacy boilerplate in group goal bodies.
+ *
+ * Task CLI's `docs open` passes a temporary body-only file to the editor and
+ * writes it back through its managed-document API. IDs and YAML metadata are
+ * neither read into our editor nor hand-written by this code.
+ */
+function repairExistingGroupGoals(executable: string): number {
+  const savedGroups = asArray<GroupRecord>(taskJson(executable, ['group', 'list']), 'group list');
+  const byName = new Map(savedGroups.map((group) => [group.name, group]));
+  const workspaceRoot = resolve(root, '.docs');
+  const approvedRoot = resolve(workspaceRoot, 'todo') + sep;
+  let repaired = 0;
+
+  for (const group of groups) {
+    const existing = byName.get(group.title);
+    if (!existing) continue;
+    if (!existing.path) throw new Error(`Task group ${existing.id} has no filesystem path`);
+
+    const goalPath = resolve(workspaceRoot, existing.path, 'goal.md');
+    if (!goalPath.startsWith(approvedRoot)) {
+      throw new Error(`Unexpected Task group path for ${existing.id}; refusing repair`);
+    }
+    if (!existsSync(goalPath)) throw new Error(`Missing goal document for ${existing.id}`);
+
+    const current = readFileSync(goalPath, 'utf8');
+    if (!current.includes(LEGACY_GOAL_PARAGRAPH)) continue;
+
+    // No in-place frontmatter edits: use the Task document editor operation.
+    const editorPath = resolve(root, 'scripts/roadmap/repair-goal-editor.ts');
+    const editorCommand = `bun "${editorPath.replaceAll('"', '\\"')}"`;
+    taskRun(
+      executable,
+      ['docs', 'open', `GOAL-${existing.id}`],
+      { ...process.env, EDITOR: editorCommand, CUADB_REPAIR_GROUP: group.key },
+    );
+
+    if (readFileSync(goalPath, 'utf8').includes(LEGACY_GOAL_PARAGRAPH)) {
+      throw new Error(`Task CLI did not persist repaired goal for ${existing.id}`);
+    }
+    console.log(`Repaired group goal: ${existing.name}`);
+    repaired++;
+  }
+  return repaired;
 }
 
 function seed(): void {
@@ -322,13 +359,22 @@ function seed(): void {
       }
     }
 
+    const repaired = repairExistingGroupGoals(executable);
     taskRun(executable, ['validate']);
     console.log(
-      `\nTask workspace validated. Added ${newGroups} groups, ${newTasks} tasks and ${newDocuments} documents.\nReview: task group list; task list; task docs list; git status`,
+      `\nTask workspace validated. Added ${newGroups} groups, ${newTasks} tasks and ${newDocuments} documents; repaired ${repaired} existing group goals.\nReview: task group list; task list; task docs list; git status`,
     );
   } finally {
     rmSync(tempDirectory, { force: true, recursive: true });
   }
+}
+
+function repair(): void {
+  validateWorkspace();
+  const executable = taskCommand();
+  const repaired = repairExistingGroupGoals(executable);
+  console.log(taskRun(executable, ['validate']));
+  console.log(`Task workspace validated; repaired ${repaired} generated group goals.`);
 }
 
 function verify(): void {
@@ -366,9 +412,10 @@ try {
   validateSpecs();
   const action = process.argv[2] ?? '--preview';
   if (action === '--preview') preview();
+  else if (action === '--repair') repair();
   else if (action === '--verify') verify();
   else if (action === '--seed') seed();
-  else throw new Error('Usage: bun scripts/roadmap/seed.ts --preview|--seed|--verify');
+  else throw new Error('Usage: bun scripts/roadmap/seed.ts --preview|--seed|--repair|--verify');
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { documents, groups } from './spec';
+import { groupGoal, groupDefinitionOfDone, LEGACY_GOAL_PARAGRAPH } from './goals';
 
 describe('CuaDB Task roadmap definition', () => {
   test('defines ordered groups and complete documentation', () => {
@@ -44,6 +45,19 @@ describe('CuaDB Task roadmap definition', () => {
       }
     }
     expect(count).toBe(55);
+  });
+
+  test('renders meaningful group-specific goals that satisfy Task quality markers', () => {
+    const placeholderMarker = /\b(?:TODO|TBD|FIXME)\b|\b(?:lorem ipsum|to be (?:written|defined|determined)|describe here|fill (?:this|me) in)\b/i;
+    for (const group of groups) {
+      const goal = groupGoal(group);
+      expect(goal).toContain(group.goal);
+      expect(goal).toContain(group.tasks[0]!.title);
+      expect(goal).toContain(groupDefinitionOfDone(group));
+      expect(goal).not.toMatch(placeholderMarker);
+      expect(goal.split(/\s+/).length).toBeGreaterThan(100);
+      expect(goal).not.toContain(LEGACY_GOAL_PARAGRAPH);
+    }
   });
 
   test('has unique document paths and meaningful documentation bodies', () => {

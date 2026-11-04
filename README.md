@@ -170,6 +170,18 @@ task list
 task docs list
 ```
 
+### Repair the initial generated group goals
+
+The first bootstrap contained an uppercase task marker in a shared goal paragraph, which the Task quality checker rejects. The Task CLI already created the group and task records, so **do not delete or reinitialize the workspace**. A targeted repair updates only the affected goal bodies through `taskcode docs open` and preserves IDs, frontmatter, status history and dependency links.
+
+```bash
+git pull --ff-only origin main
+bun run task:repair
+bun run task:verify
+```
+
+The repair command checks for the exact original paragraph before editing, replaces it with group-specific acceptance criteria, and validates the entire workspace. It is safe to rerun; goals without the original paragraph are left untouched. If the bootstrap was interrupted before creating every task, run `bun run task:seed` afterward to fill only missing records. Check `git diff -- .docs` before committing the repaired files.
+
 If `task` is not installed, install the `taskcode` CLI using its upstream installation instructions; the bootstrap also recognizes an executable named `taskcode`. **Do not install or run Task as part of the CuaDB runtime container.** The tasks are developer workflow metadata only. The seeder safely skips existing documents, named groups and named tasks on reruns, making it possible to resume after a partial failure. It will not overwrite existing task bodies or status history.
 
 After successful validation, commit the CLI-generated Markdown on the existing `main` branch:
