@@ -444,7 +444,7 @@ async fn relation_search_is_literal_case_insensitive_bounded_and_escaped() {
 async fn many_relations_render_a_bounded_tree_and_search_reports_incompleteness() {
     let (status, body) = get(Mode::Healthy, "/catalog/relations?schema=big", 5000).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body.matches("table_").count() >= 500, true);
+    assert!(body.matches("table_").count() >= 500);
     assert!(body.contains("incomplete"));
     let (_, body) = get(
         Mode::Healthy,
