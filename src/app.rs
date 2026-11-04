@@ -1,15 +1,267 @@
-//! Axum route registration. Keep routing independent from database adapters.
+//! HTTP routing plus small, bounded request middleware.
+//!
+//! The limits apply to the handler future; streaming response bodies and later
+//! database tasks must enforce their own byte/row/query deadlines as well.
 
-use axum::{Router, routing::get};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::{Duration, Instant},
+};
+
+use axum::{
+    Router,
+    extract::{DefaultBodyLimit, MatchedPath, Request, State},
+    http::{Method, header},
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
+    routing::get,
+};
+use tokio::{sync::Semaphore, time};
 use tower_http::services::ServeDir;
 
-use crate::web;
+use crate::{
+    config::Limits,
+    error::{AppError, ErrorKind},
+    web,
+};
 
-/// Construct the router for both the binary and integration tests.
+static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Router-level limits share permits across requests, not per handler.
+#[derive(Debug, Clone)]
+pub struct RequestPolicy {
+    timeout: Duration,
+    max_body_bytes: usize,
+    in_flight: Arc<Semaphore>,
+}
+
+impl RequestPolicy {
+    /// Limits have already been range-checked by the typed config parser.
+    pub fn from_limits(limits: &Limits) -> Self {
+        Self {
+            timeout: limits.request_timeout,
+            max_body_bytes: limits.max_request_body_bytes,
+            in_flight: Arc::new(Semaphore::new(limits.max_in_flight_requests)),
+        }
+    }
+}
+
+/// Construct the default disconnected shell for isolated HTTP tests.
 pub fn router() -> Router {
-    Router::new()
+    let defaults = crate::config::Config::from_values(&[])
+        .expect("constant default CuaDB configuration must parse");
+    router_with_limits(&defaults.limits)
+}
+
+/// Construct the production router with explicitly validated resource limits.
+pub fn router_with_limits(limits: &Limits) -> Router {
+    let routes = Router::new()
         .route("/", get(web::explorer))
         .route("/health", get(web::health))
         .route("/fragments/status", get(web::status))
-        .nest_service("/static", ServeDir::new("public"))
+        .nest_service("/static", ServeDir::new("public"));
+
+    apply_policy(routes, RequestPolicy::from_limits(limits))
+}
+
+fn apply_policy(router: Router, policy: RequestPolicy) -> Router {
+    let body_limit = policy.max_body_bytes;
+    router
+        // DefaultBodyLimit covers future Axum body extractors.
+        .layer(DefaultBodyLimit::max(body_limit))
+        .layer(middleware::from_fn_with_state(policy, bound_request))
+        // Outermost: every completed request, including rejected ones, gets a
+        // generated request ID. Never log a URI, query string, headers or body.
+        .layer(middleware::from_fn(trace_request))
+}
+
+/// Immediately reject overload rather than allocating an unbounded wait queue.
+async fn bound_request(
+    State(policy): State<RequestPolicy>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if let Some(header_value) = request.headers().get(header::CONTENT_LENGTH) {
+        match header_value.to_str().ok().and_then(|s| s.parse::<u64>().ok()) {
+            Some(size) if size <= policy.max_body_bytes as u64 => {}
+            Some(_) => return AppError::new(ErrorKind::PayloadTooLarge).into_response(),
+            None => return AppError::new(ErrorKind::InvalidInput).into_response(),
+        }
+    }
+
+    let Ok(permit) = policy.in_flight.clone().try_acquire_owned() else {
+        return AppError::new(ErrorKind::Overloaded).into_response();
+    };
+
+    // Dropping Next's future on timeout cancels in-flight handler work that
+    // correctly respects cancellation; later detached SQL tasks need explicit
+    // cancellation and independent query timeouts.
+    let result = time::timeout(policy.timeout, next.run(request)).await;
+    drop(permit);
+
+    match result {
+        Ok(response) => response,
+        Err(_) => AppError::new(ErrorKind::TimedOut).into_response(),
+    }
+}
+
+async fn trace_request(request: Request, next: Next) -> Response {
+    let id = NEXT_REQUEST_ID.fetch_add(1, Ordering::Relaxed);
+    let request_id = format!("cuadb-{id:016x}");
+    let method = if request.method() == Method::GET {
+        "GET"
+    } else if request.method() == Method::HEAD {
+        "HEAD"
+    } else if request.method() == Method::OPTIONS {
+        "OPTIONS"
+    } else {
+        "OTHER"
+    };
+    // MatchedPath contains only the route pattern defined by this program.
+    // Never substitute request.uri() because it may contain credentials.
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str)
+        .unwrap_or("<unmatched>")
+        .to_owned();
+    let began = Instant::now();
+
+    let mut response = next.run(request).await;
+    let code = response
+        .headers()
+        .get("x-cuadb-error")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("none");
+    eprintln!(
+        concat!(
+            "level=info event=http_request request_id={} method={} ",
+            "route={} status={} error_code={} elapsed_ms={}"
+        ),
+        request_id,
+        method,
+        route,
+        response.status().as_u16(),
+        code,
+        began.elapsed().as_millis()
+    );
+
+    // The value is generated internally and contains only hexadecimal digits.
+    if let Ok(value) = request_id.parse() {
+        response.headers_mut().insert("x-request-id", value);
+    }
+    response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{RequestPolicy, apply_policy, router};
+    use axum::{
+        Router,
+        body::{Body, to_bytes},
+        http::{Request, StatusCode},
+        routing::get,
+    };
+    use std::{
+        future::pending,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
+    use tokio::sync::Semaphore;
+    use tower::ServiceExt;
+
+    fn policy(timeout: Duration) -> RequestPolicy {
+        RequestPolicy {
+            timeout,
+            max_body_bytes: 1024,
+            in_flight: Arc::new(Semaphore::new(1)),
+        }
+    }
+
+    #[tokio::test]
+    async fn generates_request_id_without_echoing_query_values() {
+        let response = router()
+            .oneshot(
+                Request::builder()
+                    .uri("/health?secret=do_not_log_me")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response.headers().contains_key("x-request-id"));
+        let body = to_bytes(response.into_body(), 1024).await.unwrap();
+        assert_eq!(body.as_ref(), b"ok");
+    }
+
+    #[tokio::test]
+    async fn rejects_oversized_requests() {
+        let response = apply_policy(
+            Router::new().route("/read", get(|| async { "ok" })),
+            policy(Duration::from_millis(100)),
+        )
+        .oneshot(
+            Request::builder()
+                .uri("/read")
+                .header("content-length", "1025")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn rejects_overloaded_requests_without_waiting() {
+        let policy = policy(Duration::from_secs(1));
+        let permit = policy.in_flight.clone().try_acquire_owned().unwrap();
+        let response = apply_policy(
+            Router::new().route("/read", get(|| async { "ok" })),
+            policy,
+        )
+        .oneshot(Request::builder().uri("/read").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        drop(permit);
+    }
+
+    #[tokio::test]
+    async fn timeout_cancels_the_in_flight_handler_future() {
+        struct OnDrop(Arc<AtomicBool>);
+        impl Drop for OnDrop {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let marker = cancelled.clone();
+        let route = Router::new().route(
+            "/slow",
+            get(move || {
+                let marker = marker.clone();
+                async move {
+                    let _drop_guard = OnDrop(marker);
+                    pending::<()>().await;
+                    "unreachable"
+                }
+            }),
+        );
+        let response = apply_policy(route, policy(Duration::from_millis(10)))
+            .oneshot(Request::builder().uri("/slow").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::GATEWAY_TIMEOUT);
+        assert!(cancelled.load(Ordering::SeqCst));
+    }
 }

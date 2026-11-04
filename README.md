@@ -59,7 +59,8 @@ On a fresh clone, the first Rust compilation downloads crates from crates.io and
 | `bun run start` | Start `target/release/cuadb`; build it first if missing. |
 | `bun run format` | Apply rustfmt and Prettier to Rust, scripts and CSS/JS. |
 | `bun run format:check` | Verify formatting without writing changes. |
-| `bun run test` | Run Rust unit/integration tests and frontend script type checks. |
+| `bun run test` | Build assets; run locked Rust tests, roadmap tests, and JS/TS checks. |
+| `bun run smoke` | Build and launch a release server on a temporary localhost port; test routes, assets and shutdown. |
 | `bun run docker:build` | Build the single-image Docker deployment (`cuadb:local`). |
 | `bun run docker:run` | Start the Docker container publishing only `127.0.0.1:4848`. |
 
@@ -114,6 +115,32 @@ CUADB_PORT=5050 bun run dev
 
 The Rust server reads **process environment variables**. The example file is documentation, not automatically loaded by the application; export variables or use your local environment loader. Never commit a real credential-bearing `.env`.
 
+## Request safety, shutdown and reproducible checks
+
+The foundation implements a typed browser-safe error contract and a compact
+server request log. Every request gets an internal `x-request-id`; logs contain
+only the static route pattern, safe error code, method, status and elapsed time,
+**never the full URI, query text, connection URL or database row content**.
+The error mappings are documented in [developer workflow](docs/development.md).
+
+The HTTP shell enforces a bounded number of concurrent requests (default 64),
+a 64 KiB declared request-size/extractor limit, and a handler deadline
+(default 30 seconds). These are independent of future SQL deadlines and
+per-cell limits. The server handles SIGINT and Docker SIGTERM; shutdown drains
+handlers for at most eight seconds.
+
+All Bun installs use `--frozen-lockfile`, and Cargo commands use `--locked`.
+Run `bun run smoke` to build and exercise a real release HTTP listener and
+all bundled assets without a database. Use `bun run format` before
+`bun run check` when modifying Rust or frontend sources.
+
+| Variable | Default | Allowed values |
+| --- | --- | --- |
+| `CUADB_MAX_IN_FLIGHT_REQUESTS` | `64` | 1–512 |
+| `CUADB_MAX_REQUEST_BODY_BYTES` | `65536` | 1024–1048576 |
+
+For more details, see [docs/development.md](docs/development.md).
+
 ## Docker: one container and one frontend port
 
 ```bash
@@ -139,12 +166,13 @@ cuadb/
 ├── package.json               # Bun scripts and frontend dev dependencies
 ├── tsconfig.json              # Strict TS + browser JS type checking
 ├── Dockerfile
-├── .env.example              # Host and port defaults
+├── .env.example               # Host, port and resource defaults
 ├── src/
 │   ├── lib.rs                 # Testable library entry points
 │   ├── main.rs                # HTTP listener
-│   ├── app.rs                 # Router and static assets
-│   ├── config.rs              # Server configuration + unit tests
+│   ├── app.rs                 # Router, tracing and request limits
+│   ├── config.rs              # Typed server configuration
+│   ├── error.rs               # Browser-safe error contract
 │   ├── db/
 │   │   ├── mod.rs             # Database integration boundary (empty)
 │   │   └── postgres/mod.rs    # PostgreSQL adapter placeholder (empty)
@@ -157,8 +185,11 @@ cuadb/
 │   ├── css/app.css            # Tailwind source + specialized CSS
 │   └── js/app.js              # Local browser interactions
 ├── public/                    # Generated, not committed
-├── scripts/tasks.ts           # Single typed Bun command dispatcher
-└── tests/shell.rs             # HTTP smoke tests without database
+├── scripts/
+│   ├── tasks.ts                # Single typed Bun command dispatcher
+│   └── smoke.test.ts           # Live release HTTP smoke test
+├── docs/development.md        # Quality gates and security notes
+└── tests/                     # Offline Rust tests
 ```
 
 **Ownership rules:** HTTP and templates must not contain engine-specific SQL. Future `src/db/<engine>/` adapters will implement metadata discovery and paginated data retrieval. Askama templates contain presentation, and `assets/js/` is limited to browser-only actions. Add files when needed instead of creating empty framework layers.

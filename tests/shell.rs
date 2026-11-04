@@ -57,3 +57,20 @@ async fn status_fragment_returns_html() {
             .contains("App shell ready")
     );
 }
+
+#[tokio::test]
+async fn repeated_requests_receive_distinct_trace_ids() {
+    let app = cuadb::app::router();
+    let first = app
+        .clone()
+        .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let second = app
+        .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let first_id = first.headers().get("x-request-id").unwrap();
+    let second_id = second.headers().get("x-request-id").unwrap();
+    assert_ne!(first_id, second_id);
+}

@@ -1,9 +1,9 @@
 //! CuaDB application entry points.
 //!
-//! The library exposes the router separately from the executable so HTTP tests
-//! can run without opening a listening socket or connecting to a database.
+//! Keep the server router testable without binding a port or connecting to SQL.
 
 pub mod app;
 pub mod config;
 pub mod db;
+pub mod error;
 pub mod web;

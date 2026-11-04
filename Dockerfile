@@ -2,14 +2,14 @@
 FROM oven/bun:1 AS assets
 WORKDIR /app
 COPY . .
-RUN bun install
+RUN bun install --frozen-lockfile
 RUN bun run assets:build
 
 # Build Rust and compile Askama templates. Existing Cargo.lock is respected.
 FROM rust:1-bookworm AS builder
 WORKDIR /app
 COPY . .
-RUN cargo build --release
+RUN cargo build --locked --release
 
 # One runtime container, one HTTP port: no Node, Bun, Nginx or database.
 FROM debian:bookworm-slim AS runtime

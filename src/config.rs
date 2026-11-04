@@ -43,6 +43,8 @@ pub struct Limits {
     pub default_page_size: usize,
     pub max_page_size: usize,
     pub max_pool_connections: u32,
+    pub max_in_flight_requests: usize,
+    pub max_request_body_bytes: usize,
 }
 
 /// Typed settings. The optional connection URL is intentionally private.
@@ -184,6 +186,23 @@ impl Config {
 
         // URL scheme/host/TLS validation belongs to the PostgreSQL URL task.
         // Here we only reject empty or clearly excessive credential input.
+        let max_in_flight_requests = bounded_number(
+            &mut read,
+            "CUADB_MAX_IN_FLIGHT_REQUESTS",
+            64,
+            1,
+            512,
+            "must be a whole number between 1 and 512",
+        )? as usize;
+        let max_request_body_bytes = bounded_number(
+            &mut read,
+            "CUADB_MAX_REQUEST_BODY_BYTES",
+            65_536,
+            1_024,
+            1_048_576,
+            "must be a whole number between 1024 and 1048576",
+        )? as usize;
+
         let database_url = match read("CUADB_DATABASE_URL")? {
             Some(value) if value.is_empty() || value.len() > 8192 || value.trim() != value => {
                 return Err(ConfigError::invalid(
@@ -205,6 +224,8 @@ impl Config {
                 default_page_size,
                 max_page_size,
                 max_pool_connections,
+                max_in_flight_requests,
+                max_request_body_bytes,
             },
             database_url,
         })
@@ -249,6 +270,8 @@ mod tests {
         assert_eq!(config.limits.default_page_size, 25);
         assert_eq!(config.limits.max_page_size, 100);
         assert_eq!(config.limits.max_pool_connections, 4);
+        assert_eq!(config.limits.max_in_flight_requests, 64);
+        assert_eq!(config.limits.max_request_body_bytes, 65_536);
     }
 
     #[test]
@@ -289,6 +312,8 @@ mod tests {
             ("CUADB_MAX_PAGE_SIZE", "501"),
             ("CUADB_DEFAULT_PAGE_SIZE", "0"),
             ("CUADB_MAX_POOL_CONNECTIONS", "33"),
+            ("CUADB_MAX_IN_FLIGHT_REQUESTS", "0"),
+            ("CUADB_MAX_REQUEST_BODY_BYTES", "999999999"),
         ] {
             let error = Config::from_values(&[(key, value)]).unwrap_err();
             assert_eq!(error.name(), key);

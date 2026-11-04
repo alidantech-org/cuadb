@@ -40,7 +40,7 @@ function ensureFrontend(): void {
     !existsSync(path('node_modules/htmx.org/dist/htmx.min.js'))
   ) {
     console.log('Installing frontend tooling with Bun…');
-    run('bun', ['install']);
+    run('bun', ['install', '--frozen-lockfile']);
   }
 }
 
@@ -63,7 +63,7 @@ function buildAssets(release = false): void {
 function build(): void {
   ensureRust();
   buildAssets(true);
-  run('cargo', ['build', '--release']);
+  run('cargo', ['build', '--locked', '--release']);
 }
 
 function format(check: boolean): void {
@@ -77,17 +77,25 @@ function check(): void {
   ensureRust();
   ensureFrontend();
   run('cargo', ['fmt', '--all', '--', '--check']);
-  run('cargo', ['check', '--all-targets', '--all-features']);
-  run('cargo', ['clippy', '--all-targets', '--all-features', '--', '-D', 'warnings']);
+  run(bin('prettier'), ['--check', ...prettierFiles]);
+  run('cargo', ['check', '--locked', '--all-targets', '--all-features']);
+  run('cargo', ['clippy', '--locked', '--all-targets', '--all-features', '--', '-D', 'warnings']);
   run(bin('tsc'), ['--noEmit']);
 }
 
 function test(): void {
   ensureRust();
-  ensureFrontend();
-  run('cargo', ['test', '--all-targets']);
+  // The shell tests also exercise the CSS and JS served by Axum.
+  buildAssets();
+  run('cargo', ['test', '--locked', '--all-targets']);
   run('bun', ['test', 'scripts/roadmap/spec.test.ts']);
   run(bin('tsc'), ['--noEmit']);
+}
+
+/** Build and probe a running release process without requiring a database. */
+function smoke(): void {
+  build();
+  run('bun', ['test', 'scripts/smoke.test.ts']);
 }
 
 /** Enumerate directories for portable, non-recursive file watchers. */
@@ -125,7 +133,7 @@ function dev(): void {
     detached: process.platform !== 'win32',
   });
   const launchRust = () =>
-    spawn('cargo', ['run'], {
+    spawn('cargo', ['run', '--locked'], {
       cwd: root,
       stdio: 'inherit',
       detached: process.platform !== 'win32',
@@ -164,10 +172,9 @@ function dev(): void {
 }
 
 function start(): void {
-  ensureRust();
-  const executable = path('target/release/cuadb');
-  if (!existsSync(executable)) build();
-  run(executable, []);
+  // A previous release build may be stale after a source change.
+  build();
+  run(path('target/release/cuadb'), []);
 }
 
 function main(): void {
@@ -176,7 +183,7 @@ function main(): void {
     case 'setup':
       ensureRust();
       buildAssets();
-      run('cargo', ['fetch']);
+      run('cargo', ['fetch', '--locked']);
       console.log('Setup complete. Try: bun run dev');
       break;
     case 'dev':
@@ -200,11 +207,14 @@ function main(): void {
     case 'test':
       test();
       break;
+    case 'smoke':
+      smoke();
+      break;
     case 'assets':
       buildAssets(true);
       break;
     default:
-      console.error('Usage: bun run <setup|dev|check|build|start|format|format:check|test>');
+      console.error('Usage: bun run <setup|dev|check|build|start|format|format:check|test|smoke>');
       process.exit(1);
   }
 }
