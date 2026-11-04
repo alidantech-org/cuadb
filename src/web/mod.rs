@@ -59,17 +59,95 @@ struct ConnectionStatusTemplate {
     ready: bool,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StatusQuery {
+    profile: Option<String>,
+}
+
 /// Database status stays separate from /health and never renders credentials.
 /// Failed probes are cached briefly, so repeated HTMX requests are inexpensive.
-pub async fn connection_status(State(state): State<AppState>) -> Result<Response, AppError> {
-    let snapshot = state.connection_snapshot().await;
-    let detected_engine = state.detected_engine().await;
+pub async fn connection_status(
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<StatusQuery>,
+) -> Result<Response, AppError> {
+    let profile = crate::state::checked_profile(query.profile)?;
+    let profile = profile.as_deref();
+    // No profile named: the default profile, or "not configured" with no database.
+    let snapshot = match profile {
+        None => state.connection_snapshot().await,
+        Some(_) => state
+            .profile_snapshot(profile)
+            .await
+            .ok_or(AppError::new(crate::error::ErrorKind::UnknownProfile))?,
+    };
+    let detected_engine = state.profile_engine(profile).await;
     let view = ConnectionStatusTemplate {
         label: snapshot.label(),
         detail: snapshot.detail(detected_engine),
         ready: snapshot.is_ready(),
     };
     let mut response = html(view)?.into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+
+struct ProfileRow {
+    id: String,
+    label: String,
+    engine: &'static str,
+    state: &'static str,
+    ready: bool,
+    selected: bool,
+}
+
+#[derive(Template)]
+#[template(path = "components/profile_list.html")]
+struct ProfileListTemplate {
+    profiles: Vec<ProfileRow>,
+}
+
+/// Trusted profiles configured on the server: ids, labels, engine family and
+/// connection state. Never URLs, hosts, users or paths. The id is the only
+/// thing the browser may send back (`profile=<id>`).
+pub async fn connection_profiles(
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<StatusQuery>,
+) -> Result<Response, AppError> {
+    let chosen = crate::state::checked_profile(query.profile)?;
+    let infos = state.profiles();
+    if let Some(id) = chosen.as_deref()
+        && !infos.iter().any(|info| info.id == id)
+    {
+        return Err(AppError::new(crate::error::ErrorKind::UnknownProfile));
+    }
+    let mut probes = Vec::new();
+    for info in &infos {
+        let state = state.clone();
+        let id = info.id.clone();
+        probes.push(tokio::spawn(async move {
+            state.profile_snapshot(Some(&id)).await
+        }));
+    }
+    let mut profiles = Vec::new();
+    for (info, probe) in infos.into_iter().zip(probes) {
+        let snapshot = probe.await.ok().flatten();
+        let selected = match chosen.as_deref() {
+            Some(id) => id == info.id,
+            None => info.is_default,
+        };
+        profiles.push(ProfileRow {
+            id: info.id,
+            label: info.label,
+            engine: info.engine,
+            state: snapshot.map_or("Unavailable", |snapshot| snapshot.label()),
+            ready: snapshot.is_some_and(|snapshot| snapshot.is_ready()),
+            selected,
+        });
+    }
+    let mut response = html(ProfileListTemplate { profiles })?.into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

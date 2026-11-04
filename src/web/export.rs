@@ -44,6 +44,8 @@ pub struct ExportQuery {
     column: Vec<String>,
     /// Related-table ZIP only: foreign-key hops (0–2, default 1).
     depth: Option<u8>,
+    /// Trusted connection profile id; absent means the default profile.
+    profile: Option<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -72,6 +74,7 @@ impl ExportQuery {
                 "filter",
                 "column",
                 "depth",
+                "profile",
             ],
         )?;
         Ok(Self {
@@ -91,6 +94,7 @@ impl ExportQuery {
             direction: map.remove("direction"),
             filter: map.remove("filter"),
             column,
+            profile: map.remove("profile"),
             depth: map
                 .remove("depth")
                 .map(|v| v.parse().map_err(|_| invalid()))
@@ -341,9 +345,7 @@ pub async fn export(
             namespace: super::rows::name(&query.schema)?,
             name: super::rows::name(&query.relation)?,
         };
-        let catalog = state
-            .catalog()
-            .ok_or(AppError::new(ErrorKind::DatabaseUnavailable))?;
+        let catalog = state.adapter(crate::state::checked_profile(query.profile)?.as_deref())?;
         let (bytes, truncated) =
             related_zip(catalog.as_ref(), id.clone(), query.depth.unwrap_or(1)).await?;
         let mut response = bytes.into_response();
@@ -398,11 +400,10 @@ pub async fn export(
         filter: query.filter,
         spatial: None,
         pick: (!query.column.is_empty()).then(|| "1".into()),
+        profile: query.profile,
         column: query.column,
     })?;
-    let catalog = state
-        .catalog()
-        .ok_or(AppError::new(ErrorKind::DatabaseUnavailable))?;
+    let catalog = state.adapter(nav.profile.as_deref())?;
 
     let Collected {
         columns,

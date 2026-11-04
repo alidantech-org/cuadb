@@ -65,6 +65,15 @@ for caps, limitations, fixture tests and export policy.
 - **PostGIS:** geometry/geography columns show WKT/type; `spatial=geojson` is opt-in and returns bounded GeoJSON per cell (over ~1 KB is refused with a message), labels projected CRS (e.g. `EPSG:3857`), and keeps `POINT EMPTY` empty. No maps and no bulk conversion.
 - **Not verified:** a PostgreSQL instance *without* PostGIS (no such fixture available), invalid-geometry values, and deeply nested JSON beyond the preview bound.
 
+## Connection profiles (Group 11)
+
+Several trusted connections can be served by one CuaDB process. The browser only ever names a profile by its `id`; URLs, hosts, users and file paths stay on the server.
+
+- **Configure:** set `CUADB_PROFILES_FILE` to a JSON file (see `docs/profiles.example.json`) **or** keep the single `CUADB_DATABASE_URL` (it becomes the profile `default`). Setting both is a startup error. Limits: 1–8 profiles, 64 KiB file; ids are 1–32 chars of `a-z 0-9 - _`; labels are 1–48 printable characters; ids and labels must be unique; unknown JSON fields are rejected. Errors never echo URLs or passwords, and `Debug` output is redacted. The file is read once at startup; to remove or add a profile, edit it and restart (a removed id then answers `404 unknown_profile`).
+- **Use:** add `&profile=<id>` to `/catalog/*` and `/connection/status`; absent means the default profile. Links the server renders keep the profile when one was given. `GET /connection/profiles` lists id, label, engine family and state (`Connected`, `Unavailable`, ...) and marks the selected one. Unknown or malformed ids give `404 unknown_profile` / `400 invalid_input` with no connection details; repeated `profile` parameters and connection-like parameters (`url`, `host`) are rejected.
+- **Isolation:** each profile has its own adapter and pools (created lazily, closed when idle). The configured `CUADB_MAX_POOL_CONNECTIONS` is divided across profiles (at least one connection each), so many profiles cannot multiply open connections. An offline profile fails alone. Pagination cursors are issued per profile and are rejected on any other profile. The explorer must drop its selected relation, sort and cursor when the profile changes (Phase B UI).
+- **Not covered:** switching is stateless per request, so there is no server-side "current profile"; live reload of the file; profiles that differ only by credentials sharing a pool.
+
 ## Canonical frontend UI reference
 
 The committed [CuaDB UI demo](assets/cuadb-ui-demo.html) is the **mandatory visual and interaction reference** for implementation, not a loose example. The final Rust/Askama/HTMX frontend must faithfully reproduce the demo's compact sidebar, resizer, Simple/Advanced explorer, Data/Structure/Indexes switcher, dense grid, row inspector, bottom connection/settings controls, themes and export menus. Compare against the standalone HTML at matching desktop/mobile viewports before completing frontend tasks.

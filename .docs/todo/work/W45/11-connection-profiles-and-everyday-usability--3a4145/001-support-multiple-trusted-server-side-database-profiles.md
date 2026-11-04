@@ -16,11 +16,11 @@ This task belongs to **11 — Connection profiles and everyday usability**. The 
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Define a validated server-side profile configuration format with stable identifiers.
-- [ ] Maintain compatibility with the single PostgreSQL URL default.
-- [ ] Bound total active connection pools and close unused resources safely.
-- [ ] Expose safe profile labels, engine types and connection state to templates.
-- [ ] Test duplicate names, invalid URLs, profile removal and secret redaction.
+- [x] Define a validated server-side profile configuration format with stable identifiers.
+- [x] Maintain compatibility with the single PostgreSQL URL default.
+- [x] Bound total active connection pools and close unused resources safely.
+- [x] Expose safe profile labels, engine types and connection state to templates.
+- [x] Test duplicate names, invalid URLs, profile removal and secret redaction.
 
 ## Canonical UI fidelity
 
@@ -33,3 +33,9 @@ The committed `assets/cuadb-ui-demo.html` is the binding reference. Implement th
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T14:16:26.648Z · PETER IRUNGU
+
+BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING (items 1-5; 6-8 are the picker UI). src/profiles.rs + AppState registry: JSON file CUADB_PROFILES_FILE (<=8 profiles, stable ids, unique labels, unknown fields rejected), single CUADB_DATABASE_URL = profile 'default' (mutually exclusive with the file), redacted Debug and secret-free errors, pool budget divided across profiles with lazy pools and idle close. Evidence: 4 unit tests + tests/profiles_http.rs (7 pass; real SQLite profiles + an unreachable PostgreSQL profile). LIMITATIONS: file read once at startup (no live reload); 'bounded active pools' is a divided budget with lazy/idle pools, not an LRU eviction.

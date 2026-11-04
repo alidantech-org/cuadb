@@ -14,8 +14,8 @@
     </div>
     <div class="seg" aria-label="Table view">
       <button type="button" class="on" aria-current="page">Data</button>
-      <a class="view-link" href="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}" hx-get="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}" hx-target="#catalog-panel" hx-swap="outerHTML">Structure</a>
-      <a class="view-link" href="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}" hx-get="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}" hx-target="#catalog-panel" hx-swap="outerHTML">Indexes</a>
+      <a class="view-link" href="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-get="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-target="#catalog-panel" hx-swap="outerHTML">Structure</a>
+      <a class="view-link" href="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-get="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-target="#catalog-panel" hx-swap="outerHTML">Indexes</a>
     </div>
   </header>
   <div class="toolbar">
@@ -23,6 +23,7 @@
       <input type="hidden" name="schema" value="{{ schema }}">
       <input type="hidden" name="relation" value="{{ relation }}">
       <input type="hidden" name="size" value="{{ page_size }}">
+      {% if !profile.is_empty() %}<input type="hidden" name="profile" value="{{ profile }}">{% endif %}
       {% if geojson_active %}<input type="hidden" name="spatial" value="geojson">{% endif %}
       {% match sort %}{% when Some with (column) %}<input type="hidden" name="sort" value="{{ column }}"><input type="hidden" name="direction" value="{% match direction %}{% when Some with (value) %}{{ value }}{% when None %}{% endmatch %}">{% when None %}{% endmatch %}
       {% for column in selected_columns %}<input type="hidden" name="column" value="{{ column }}">{% endfor %}

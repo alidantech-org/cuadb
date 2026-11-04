@@ -39,6 +39,9 @@ struct DisplayRow {
 #[template(path = "components/data_page.html")]
 struct PageTemplate {
     title: String,
+    /// Selected profile id, or empty for the default profile.
+    profile: String,
+    profile_arg: String,
     filter: String,
     page_size: u32,
     has_spatial: bool,
@@ -160,6 +163,7 @@ pub(super) fn detail_value(cell: &crate::db::types::Cell, native_type: &str) -> 
 pub(super) struct Navigation {
     pub(super) id: RelationId,
     pub(super) options: RowOptions,
+    pub(super) profile: Option<String>,
 }
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -174,6 +178,7 @@ pub struct DataQuery {
     pub(super) filter: Option<String>,
     pub(super) spatial: Option<String>,
     pub(super) pick: Option<String>,
+    pub(super) profile: Option<String>,
     #[serde(default)]
     pub(super) column: Vec<String>,
 }
@@ -223,6 +228,7 @@ impl DataQuery {
                 "spatial",
                 "pick",
                 "column",
+                "profile",
             ],
         )?;
         let number = |value: Option<String>| {
@@ -241,6 +247,7 @@ impl DataQuery {
             filter: map.remove("filter"),
             spatial: map.remove("spatial"),
             pick: map.remove("pick"),
+            profile: map.remove("profile"),
             column,
         })
     }
@@ -311,6 +318,7 @@ pub(super) fn parse(query: DataQuery) -> Result<Navigation, AppError> {
         return Err(invalid());
     }
     Ok(Navigation {
+        profile: crate::state::checked_profile(query.profile)?,
         id: RelationId {
             namespace: name(&query.schema)?,
             name: name(&query.relation)?,
@@ -323,6 +331,9 @@ fn link(nav: &Navigation, page: u32, cursor: Option<&str>, sort: Option<SortSpec
     q.append_pair("schema", &nav.id.namespace);
     q.append_pair("relation", &nav.id.name);
     q.append_pair("size", &nav.options.limit.to_string());
+    if let Some(profile) = nav.profile.as_deref() {
+        q.append_pair("profile", profile);
+    }
     if let Some(sort) = sort {
         q.append_pair("sort", &sort.column);
         q.append_pair(
@@ -358,9 +369,7 @@ pub async fn data(
 ) -> Result<Response, AppError> {
     let query = DataQuery::from_raw(raw.as_deref())?;
     let nav = parse(query)?;
-    let catalog = state
-        .catalog()
-        .ok_or(AppError::new(ErrorKind::DatabaseUnavailable))?;
+    let catalog = state.adapter(nav.profile.as_deref())?;
     let page = catalog
         .fetch_rows(&nav.id, nav.options.clone())
         .await
@@ -500,6 +509,11 @@ pub async fn data(
     let geojson_url = link(&geojson_nav, 0, None, geojson_nav.options.sort.clone());
     let view = PageTemplate {
         title: format!("Data · {}.{}", nav.id.namespace, nav.id.name),
+        profile: nav.profile.clone().unwrap_or_default(),
+        profile_arg: nav
+            .profile
+            .as_deref()
+            .map_or(String::new(), |id| format!("&profile={id}")),
         filter: nav.options.filter.clone().unwrap_or_default(),
         page_size: nav.options.limit,
         has_spatial,

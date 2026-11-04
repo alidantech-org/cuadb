@@ -1,0 +1,8 @@
+{
+  "default": "local-postgres",
+  "profiles": [
+    { "id": "local-postgres", "label": "Local PostgreSQL", "url": "postgresql://viewer@127.0.0.1:5432/app" },
+    { "id": "reporting-mysql", "label": "Reporting (MySQL)", "url": "mysql://viewer:CHANGE_ME@127.0.0.1:3306/reporting" },
+    { "id": "snapshot", "label": "Nightly snapshot (SQLite)", "url": "sqlite:////data/snapshot.db" }
+  ]
+}

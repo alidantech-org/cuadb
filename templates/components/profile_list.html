@@ -1,0 +1,13 @@
+<ul class="profile-list" role="listbox" aria-label="Connections">
+  {% if profiles.is_empty() %}
+  <li class="catalog-note" role="status">No connection is configured on the server.</li>
+  {% else %}
+  {% for profile in profiles %}
+  <li role="option" data-profile="{{ profile.id }}" aria-selected="{% if profile.selected %}true{% else %}false{% endif %}">
+    <span class="profile-label">{{ profile.label }}</span>
+    <small class="profile-engine">{{ profile.engine }}</small>
+    <small class="profile-state{% if profile.ready %} ready{% endif %}">{{ profile.state }}</small>
+  </li>
+  {% endfor %}
+  {% endif %}
+</ul>

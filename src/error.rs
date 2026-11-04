@@ -14,6 +14,8 @@ use std::fmt;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ErrorKind {
     InvalidInput,
+    /// The named connection profile is not configured (or was removed).
+    UnknownProfile,
     Forbidden,
     DatabaseUnavailable,
     TimedOut,
@@ -27,6 +29,7 @@ impl ErrorKind {
     pub const fn status(self) -> StatusCode {
         match self {
             Self::InvalidInput => StatusCode::BAD_REQUEST,
+            Self::UnknownProfile => StatusCode::NOT_FOUND,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::DatabaseUnavailable | Self::Overloaded => StatusCode::SERVICE_UNAVAILABLE,
             Self::TimedOut => StatusCode::GATEWAY_TIMEOUT,
@@ -39,6 +42,7 @@ impl ErrorKind {
     pub const fn code(self) -> &'static str {
         match self {
             Self::InvalidInput => "invalid_input",
+            Self::UnknownProfile => "unknown_profile",
             Self::Forbidden => "access_denied",
             Self::DatabaseUnavailable => "database_unavailable",
             Self::TimedOut => "request_timeout",
@@ -53,6 +57,7 @@ impl ErrorKind {
     pub const fn message(self) -> &'static str {
         match self {
             Self::InvalidInput => "The request is not valid.",
+            Self::UnknownProfile => "That connection is not available.",
             Self::Forbidden => "You do not have access to this resource.",
             Self::DatabaseUnavailable => "The database is currently unavailable.",
             Self::TimedOut => "The request took too long. Please try again.",
@@ -119,6 +124,7 @@ mod tests {
     fn error_categories_have_stable_statuses() {
         for (kind, status) in [
             (ErrorKind::InvalidInput, 400),
+            (ErrorKind::UnknownProfile, 404),
             (ErrorKind::Forbidden, 403),
             (ErrorKind::DatabaseUnavailable, 503),
             (ErrorKind::TimedOut, 504),

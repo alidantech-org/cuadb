@@ -20,6 +20,10 @@ const DEFAULT_PORT: u64 = 4848;
 pub struct SecretUrl(String);
 
 impl SecretUrl {
+    pub fn new(value: String) -> Self {
+        Self(value)
+    }
+
     pub fn expose(&self) -> &str {
         &self.0
     }
@@ -54,6 +58,8 @@ pub struct Config {
     pub port: u16,
     pub limits: Limits,
     database_url: Option<SecretUrl>,
+    /// JSON file of trusted connection profiles (mutually exclusive with the single URL).
+    pub profiles_file: Option<std::path::PathBuf>,
     pub sqlite_root: std::path::PathBuf,
 }
 
@@ -105,6 +111,10 @@ impl Config {
     /// Retain the shell's previous convenience constructor.
     pub fn from_port(port: &str) -> Result<Self, ConfigError> {
         Self::from_values(&[("CUADB_PORT", port)])
+    }
+
+    pub fn profiles_file(&self) -> Option<&std::path::Path> {
+        self.profiles_file.as_deref()
     }
 
     pub fn database_url(&self) -> Option<&SecretUrl> {
@@ -219,6 +229,23 @@ impl Config {
             None => None,
         };
 
+        let profiles_file = match read("CUADB_PROFILES_FILE")? {
+            Some(value) if value.is_empty() || value.len() > 4096 || value.contains('\0') => {
+                return Err(ConfigError::invalid(
+                    "CUADB_PROFILES_FILE",
+                    "must be a nonempty path of at most 4096 bytes",
+                ));
+            }
+            Some(_) if database_url.is_some() => {
+                return Err(ConfigError::invalid(
+                    "CUADB_PROFILES_FILE",
+                    "cannot be combined with CUADB_DATABASE_URL; choose one",
+                ));
+            }
+            Some(value) => Some(std::path::PathBuf::from(value)),
+            None => None,
+        };
+
         Ok(Self {
             host,
             port,
@@ -233,6 +260,7 @@ impl Config {
                 max_request_body_bytes,
             },
             database_url,
+            profiles_file,
             sqlite_root,
         })
     }

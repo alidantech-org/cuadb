@@ -13,7 +13,7 @@ use crate::{
         PartitionLink, RelationId, RelationStats,
     },
     error::{AppError, ErrorKind},
-    state::AppState,
+    state::{AppState, Lookup, checked_profile},
 };
 
 #[derive(Clone)]
@@ -135,10 +135,13 @@ fn err(db: DbError) -> AppError {
 }
 fn catalog(
     state: &AppState,
+    profile: Option<&str>,
 ) -> Result<std::sync::Arc<dyn crate::db::adapter::DatabaseAdapter>, AppError> {
-    state
-        .catalog()
-        .ok_or(AppError::new(ErrorKind::DatabaseUnavailable))
+    state.adapter(profile)
+}
+/// `&profile=<id>` suffix keeping navigation on the selected profile.
+fn profile_arg(profile: Option<&str>) -> String {
+    profile.map_or(String::new(), |id| format!("&profile={}", url_arg(id)))
 }
 fn fragment(
     title: String,
@@ -164,11 +167,11 @@ fn fragment(
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
 }
-fn relation_links(id: &RelationId) -> RelationLinks {
+fn relation_links(id: &RelationId, profile: Option<&str>) -> RelationLinks {
     RelationLinks {
-        data: relation_url("data", id),
-        structure: relation_url("structure", id),
-        indexes: relation_url("indexes", id),
+        data: relation_url("data", id, profile),
+        structure: relation_url("structure", id, profile),
+        indexes: relation_url("indexes", id, profile),
     }
 }
 fn metadata_response<T: Template>(view: T) -> Result<Response, AppError> {
@@ -229,11 +232,12 @@ fn row(
 fn url_arg(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
-fn relation_url(route: &str, id: &RelationId) -> String {
+fn relation_url(route: &str, id: &RelationId, profile: Option<&str>) -> String {
     format!(
-        "/catalog/{route}?schema={}&relation={}",
+        "/catalog/{route}?schema={}&relation={}{}",
         url_arg(&id.namespace),
-        url_arg(&id.name)
+        url_arg(&id.name),
+        profile_arg(profile)
     )
 }
 fn availability<T: std::fmt::Display>(value: &Availability<T>) -> String {
@@ -370,6 +374,8 @@ pub struct SchemaQuery {
     schema: String,
     /// Optional literal, case-insensitive name filter (no wildcards).
     q: Option<String>,
+    /// Trusted connection profile id; absent means the default profile.
+    profile: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -377,6 +383,13 @@ pub struct SchemaQuery {
 pub struct RelationQuery {
     schema: String,
     relation: String,
+    profile: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileQuery {
+    profile: Option<String>,
 }
 
 fn checked_query_name(value: String) -> Result<String, AppError> {
@@ -391,13 +404,22 @@ where
     (items.items.into_iter().map(f).collect(), items.truncated)
 }
 
-pub async fn schemas(State(state): State<AppState>) -> Result<Response, AppError> {
-    let Some(c) = state.catalog() else {
-        return tree_response(SchemaTreeTemplate {
-            schemas: vec![],
-            note: "Not configured. Set CUADB_DATABASE_URL on the server to browse the catalog."
-                .into(),
-        });
+pub async fn schemas(
+    State(state): State<AppState>,
+    Query(query): Query<ProfileQuery>,
+) -> Result<Response, AppError> {
+    let profile = checked_profile(query.profile)?;
+    let profile = profile.as_deref();
+    let c = match state.catalog_for(profile) {
+        Lookup::Found(c) => c,
+        Lookup::Unknown => return Err(AppError::new(ErrorKind::UnknownProfile)),
+        Lookup::NotConfigured => {
+            return tree_response(SchemaTreeTemplate {
+                schemas: vec![],
+                note: "Not configured. Set CUADB_DATABASE_URL or CUADB_PROFILES_FILE on the server to browse the catalog."
+                    .into(),
+            });
+        }
     };
     let entries = match c.list_schemas().await {
         Ok(entries) => entries,
@@ -419,7 +441,11 @@ pub async fn schemas(State(state): State<AppState>) -> Result<Response, AppError
         .items
         .into_iter()
         .map(|schema| SchemaItem {
-            href: format!("/catalog/relations?schema={}", url_arg(&schema.name)),
+            href: format!(
+                "/catalog/relations?schema={}{}",
+                url_arg(&schema.name),
+                profile_arg(profile)
+            ),
             name: schema.name,
         })
         .collect();
@@ -437,6 +463,8 @@ pub async fn relations(
     Query(query): Query<SchemaQuery>,
 ) -> Result<Response, AppError> {
     let schema = checked_query_name(query.schema)?;
+    let profile = checked_profile(query.profile)?;
+    let profile = profile.as_deref();
     let needle = match query.q {
         Some(q) if q.is_empty() => None,
         Some(q) if q.chars().count() > 64 || q.chars().any(char::is_control) => {
@@ -445,7 +473,7 @@ pub async fn relations(
         Some(q) => Some(q.to_lowercase()),
         None => None,
     };
-    let entries = catalog(&state)?
+    let entries = catalog(&state, profile)?
         .list_relations(&schema)
         .await
         .map_err(err)?;
@@ -461,7 +489,7 @@ pub async fn relations(
         .map(|relation| RelationItem {
             name: relation.id.name.clone(),
             kind: format!("{:?}", relation.kind),
-            href: relation_url("data", &relation.id),
+            href: relation_url("data", &relation.id, profile),
         })
         .collect();
     tree_response(RelationTreeTemplate {
@@ -485,7 +513,9 @@ pub async fn structure(
         namespace: checked_query_name(query.schema)?,
         name: checked_query_name(query.relation)?,
     };
-    let c = catalog(&state)?;
+    let profile = checked_profile(query.profile)?;
+    let profile = profile.as_deref();
+    let c = catalog(&state, profile)?;
     let (cols, constraints, partitions) = tokio::try_join!(
         c.describe_columns(&id),
         c.list_constraints(&id),
@@ -512,7 +542,7 @@ pub async fn structure(
     metadata_response(StructureTemplate {
         active: "structure",
         title: format!("Structure · {}.{}", id.namespace, id.name),
-        links: relation_links(&id),
+        links: relation_links(&id, profile),
         columns,
         constraints,
         partitions,
@@ -527,7 +557,9 @@ pub async fn indexes(
         namespace: checked_query_name(query.schema)?,
         name: checked_query_name(query.relation)?,
     };
-    let c = catalog(&state)?;
+    let profile = checked_profile(query.profile)?;
+    let profile = profile.as_deref();
+    let c = catalog(&state, profile)?;
     let (entries, statistics) =
         tokio::try_join!(c.list_indexes(&id), c.relation_statistics(&id)).map_err(err)?;
     let truncated = entries.truncated;
@@ -535,7 +567,7 @@ pub async fn indexes(
     metadata_response(IndexesTemplate {
         active: "indexes",
         title: format!("Indexes · {}.{}", id.namespace, id.name),
-        links: relation_links(&id),
+        links: relation_links(&id, profile),
         indexes,
         statistics: statistic_views(&statistics),
         truncated,
@@ -549,14 +581,16 @@ pub async fn stats(
         namespace: checked_query_name(query.schema)?,
         name: checked_query_name(query.relation)?,
     };
-    let s = catalog(&state)?
+    let profile = checked_profile(query.profile)?;
+    let profile = profile.as_deref();
+    let s = catalog(&state, profile)?
         .relation_statistics(&id)
         .await
         .map_err(err)?;
     metadata_response(IndexesTemplate {
         active: "indexes",
         title: format!("Indexes and storage · {}.{}", id.namespace, id.name),
-        links: relation_links(&id),
+        links: relation_links(&id, profile),
         indexes: Vec::new(),
         statistics: statistic_views(&s),
         truncated: false,
@@ -567,7 +601,11 @@ pub async fn advanced(
     Query(query): Query<SchemaQuery>,
 ) -> Result<Response, AppError> {
     let schema = checked_query_name(query.schema)?;
-    let entries = catalog(&state)?.list_advanced(&schema).await.map_err(err)?;
+    let profile = checked_profile(query.profile)?;
+    let entries = catalog(&state, profile.as_deref())?
+        .list_advanced(&schema)
+        .await
+        .map_err(err)?;
     let (rows, truncated) = visible(entries, |o| {
         row(
             format!("{:?} · {}", o.kind, o.name),
@@ -585,8 +623,16 @@ pub async fn advanced(
         "Functions, procedures, sequences, types and triggers are metadata only; never executed.",
     )
 }
-pub async fn overview(State(state): State<AppState>) -> Result<Response, AppError> {
-    let o = catalog(&state)?.advanced_overview().await.map_err(err)?;
+pub async fn overview(
+    State(state): State<AppState>,
+    Query(query): Query<ProfileQuery>,
+) -> Result<Response, AppError> {
+    let profile = checked_profile(query.profile)?;
+    let profile = profile.as_deref();
+    let o = catalog(&state, profile)?
+        .advanced_overview()
+        .await
+        .map_err(err)?;
     let mut rows = vec![
         row("Visible schemas", o.visible_schema_count.to_string(), ""),
         row(
@@ -611,7 +657,7 @@ pub async fn overview(State(state): State<AppState>) -> Result<Response, AppErro
         row(
             format!("{}.{}", r.namespace, r.name),
             format!("Estimated bytes: {}", availability(&size)),
-            relation_url("structure", &r),
+            relation_url("structure", &r, profile),
         )
     }));
     fragment(
@@ -664,7 +710,7 @@ mod tests {
             name: "x/y?".into(),
         };
         assert_eq!(
-            relation_url("structure", &id),
+            relation_url("structure", &id, None),
             "/catalog/structure?schema=A+%26+B&relation=x%2Fy%3F"
         );
     }

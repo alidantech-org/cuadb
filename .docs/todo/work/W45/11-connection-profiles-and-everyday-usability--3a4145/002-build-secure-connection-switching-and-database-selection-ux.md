@@ -16,11 +16,11 @@ This task belongs to **11 — Connection profiles and everyday usability**. The 
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Render available trusted profile labels with clear connected and offline states.
+- [x] Render available trusted profile labels with clear connected and offline states.
 - [ ] Reset or scope table selection, sorting and cursors when a profile changes.
-- [ ] Reject unknown or removed profile identifiers without exposing connection details.
-- [ ] Test rapid switching and inaccessible databases for stale response leakage.
-- [ ] Document the connection selection behavior in the README.
+- [x] Reject unknown or removed profile identifiers without exposing connection details.
+- [x] Test rapid switching and inaccessible databases for stale response leakage.
+- [x] Document the connection selection behavior in the README.
 
 ## Canonical UI fidelity
 
@@ -33,3 +33,9 @@ The committed `assets/cuadb-ui-demo.html` is the binding reference. Implement th
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T14:16:26.776Z · PETER IRUNGU
+
+BACKEND PARTIAL - FRONTEND PENDING. Items 1,3,4,5 verified: GET /connection/profiles (id,label,engine,state, no URLs/paths), unknown/removed/malformed ids -> 404/400 without details, 40 concurrent mixed-profile requests never mix rows and an offline profile fails alone, README section. Pagination cursors are rejected across profiles (live PG, profiles_http.rs). Item 2 left open: server links keep the profile, but resetting selected relation/sort in the page on switch is client behavior (Phase B). Reference items 6-8 are UI.
