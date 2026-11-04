@@ -13,6 +13,7 @@ use std::{
 };
 use tokio::time::timeout;
 pub mod catalog;
+pub mod workspace;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SqliteUrlError {
     Scheme,
@@ -50,13 +51,14 @@ pub fn resolve_path(raw: &str, root: &Path) -> Result<PathBuf, SqliteUrlError> {
 #[derive(Clone)]
 pub struct SqliteManager {
     pool: SqlitePool,
+    path: PathBuf,
     limits: Limits,
 }
 impl SqliteManager {
     pub fn new(raw: &str, root: &Path, limits: &Limits) -> Result<Self, SqliteUrlError> {
         let path = resolve_path(raw, root)?;
         let options = SqliteConnectOptions::new()
-            .filename(path)
+            .filename(&path)
             .read_only(true)
             .create_if_missing(false)
             .busy_timeout(limits.connection_timeout);
@@ -76,9 +78,16 @@ impl SqliteManager {
             .connect_lazy_with(options);
         Ok(Self {
             pool,
+            path,
             limits: limits.clone(),
         })
     }
+    /// SQL workspace pools for this file. The writer opens the file read-write and is
+    /// created only for profiles explicitly marked `read-write`.
+    pub fn workspace(&self, writable: bool) -> workspace::SqliteWorkspace {
+        workspace::SqliteWorkspace::new(&self.path, writable, &self.limits)
+    }
+
     pub fn catalog(&self) -> catalog::SqliteCatalog {
         catalog::SqliteCatalog::new(
             self.pool.clone(),

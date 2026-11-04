@@ -69,6 +69,12 @@ pub struct Config {
     pub session_max_hours: u64,
     /// Add `Secure` to the session cookie (`auto`: only when not bound to loopback).
     pub cookie_secure: Option<bool>,
+    /// Opt-in SQL workspace and typed editing (`CUADB_SQL_WORKSPACE=enabled`). Off by default.
+    pub sql_workspace: bool,
+    pub sql_max_rows: usize,
+    pub tx_timeout_seconds: u64,
+    /// Access of the single `CUADB_DATABASE_URL` profile (`read-write` adds a writer pool).
+    pub database_writable: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -301,6 +307,43 @@ impl Config {
             }
         };
 
+        let sql_workspace = match read("CUADB_SQL_WORKSPACE")?.as_deref() {
+            None | Some("disabled") => false,
+            Some("enabled") => true,
+            Some(_) => {
+                return Err(ConfigError::invalid(
+                    "CUADB_SQL_WORKSPACE",
+                    "must be 'enabled' or 'disabled'",
+                ));
+            }
+        };
+        let sql_max_rows = bounded_number(
+            &mut read,
+            "CUADB_SQL_MAX_ROWS",
+            500,
+            1,
+            5_000,
+            "must be a whole number between 1 and 5000",
+        )? as usize;
+        let tx_timeout_seconds = bounded_number(
+            &mut read,
+            "CUADB_TX_TIMEOUT_SECONDS",
+            60,
+            5,
+            600,
+            "must be a whole number between 5 and 600",
+        )?;
+        let database_writable = match read("CUADB_DATABASE_ACCESS")?.as_deref() {
+            None | Some("read-only") => false,
+            Some("read-write") => true,
+            Some(_) => {
+                return Err(ConfigError::invalid(
+                    "CUADB_DATABASE_ACCESS",
+                    "must be 'read-only' or 'read-write'",
+                ));
+            }
+        };
+
         Ok(Self {
             host,
             port,
@@ -322,6 +365,10 @@ impl Config {
             session_idle_minutes,
             session_max_hours,
             cookie_secure,
+            sql_workspace,
+            sql_max_rows,
+            tx_timeout_seconds,
+            database_writable,
         })
     }
 }

@@ -11,7 +11,7 @@ askama = "0.16.1"
 async-trait = "0.1"
 axum = "0.8"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["raw_value"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
 tower-http = { version = "0.6", features = ["fs"] }
 # Pin the engine driver while the adapter contract is being established.
@@ -22,6 +22,7 @@ getrandom = "0.3"
 zip = { version = "=2.6.1", default-features = false }
 argon2 = "0.5"
 sha2 = "0.10"
+sqlparser = { version = "0.59", features = ["visitor"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

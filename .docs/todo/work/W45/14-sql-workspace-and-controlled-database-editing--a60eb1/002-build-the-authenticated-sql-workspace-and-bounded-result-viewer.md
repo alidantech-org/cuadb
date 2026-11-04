@@ -24,3 +24,9 @@ CuaDB is a local-first database workspace served by one Rust/Axum process. The c
 
 ## Verification and handoff
 Verify the expected result and realistic failure cases with the smallest relevant test set. Use disposable PostgreSQL and SQLite fixtures for the core milestone; do not add MySQL/MariaDB or other engines to routine verification. Run `bun run format:check`, `bun run check` and `bun run test` at meaningful group boundaries. Do not test against a personal or production database. Document unsupported capabilities honestly, record concise evidence in a Task comment, tick accepted items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T16:47:57.185Z · PETER IRUNGU
+
+NOT STARTED (by design): this is the frontend task. The backend contract it needs now exists (docs/sql-workspace.md: /sql/execute, /sql/cancel, /tx/*, /data/*). A UI demo for the new capabilities must be designed and approved before any implementation.

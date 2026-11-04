@@ -4,6 +4,7 @@ pub mod auth;
 pub mod catalog;
 pub mod export;
 pub mod rows;
+pub mod sql;
 
 use askama::Template;
 use axum::{

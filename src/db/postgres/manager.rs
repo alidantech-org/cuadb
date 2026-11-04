@@ -40,6 +40,13 @@ impl PgManager {
     /// Construct a pool without connecting. This keeps disconnected or failed
     /// databases from preventing the HTTP shell from starting.
     pub fn new(raw: &str, limits: &Limits) -> Result<Self, UrlError> {
+        Self::with_access(raw, limits, false)
+    }
+
+    /// `writable` omits the read-only session default. It is used only for the
+    /// separate writer pool of an explicitly `read-write` profile; the explorer
+    /// always uses a read-only manager.
+    pub fn with_access(raw: &str, limits: &Limits, writable: bool) -> Result<Self, UrlError> {
         let options = url::parse(raw)?.into_options();
         let milliseconds = limits.query_timeout.as_millis().to_string();
 
@@ -54,9 +61,11 @@ impl PgManager {
                 Box::pin(async move {
                     // This is a supplementary guard, not a substitute for a
                     // restricted SELECT-only database role.
-                    sqlx::query("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
-                        .execute(&mut *connection)
-                        .await?;
+                    if !writable {
+                        sqlx::query("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
+                            .execute(&mut *connection)
+                            .await?;
+                    }
                     sqlx::query("SELECT pg_catalog.set_config('statement_timeout', $1, false)")
                         .bind(milliseconds.as_str())
                         .execute(&mut *connection)
@@ -183,6 +192,11 @@ impl PgManager {
     }
 
     /// A small clone of the single shared pool for permission-scoped metadata.
+    /// The pool, for the SQL workspace (read-only manager) or its writer pool.
+    pub fn pool(&self) -> PgPool {
+        self.pool.clone()
+    }
+
     pub fn catalog(&self) -> super::catalog::PgCatalog {
         super::catalog::PgCatalog {
             pool: self.pool.clone(),
@@ -211,7 +225,7 @@ impl PgManager {
     }
 }
 
-pub(super) fn classify(error: sqlx::Error) -> DbError {
+pub(crate) fn classify(error: sqlx::Error) -> DbError {
     let kind = match &error {
         sqlx::Error::Database(db) => match db.code().as_deref() {
             Some("28P01" | "28000") => DbErrorKind::AuthenticationFailed,

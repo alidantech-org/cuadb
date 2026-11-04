@@ -161,6 +161,23 @@ impl<S: Send + Sync> FromRequestParts<S> for Auth {
 }
 
 impl Auth {
+    /// Like `authorize`, for grants that must cover the whole profile (SQL, transactions).
+    pub async fn authorize_wide(
+        &self,
+        state: &AppState,
+        action: Action,
+        profile: &str,
+    ) -> Result<(), AppError> {
+        if self.0.allows_wide(action, profile, None)
+            && (!self.0.is_open() || matches!(action, Action::View | Action::Export))
+        {
+            return Ok(());
+        }
+        self.denied(state, action, &format!("{profile} (profile-wide)"))
+            .await;
+        Err(AppError::new(ErrorKind::Forbidden))
+    }
+
     /// Deny by default. A denial is audited (once auth is enforced) and reported
     /// as a generic Forbidden so it reveals nothing about what exists.
     pub async fn authorize(
@@ -234,11 +251,22 @@ fn render<T: Template>(view: T) -> Result<Response, AppError> {
         .map_err(|_| AppError::template())
 }
 
-fn notice(kind: &'static str, message: &str) -> Result<Response, AppError> {
+pub(super) fn notice(kind: &'static str, message: &str) -> Result<Response, AppError> {
     render(NoticeTemplate {
         kind,
         message: message.to_string(),
     })
+}
+
+/// A notice fragment with an explicit status (policy refusals, conflicts).
+pub(super) fn notice_status(
+    status: StatusCode,
+    kind: &'static str,
+    message: &str,
+) -> Result<Response, AppError> {
+    let mut response = notice(kind, message)?;
+    *response.status_mut() = status;
+    Ok(response)
 }
 
 pub async fn login_form() -> Result<Response, AppError> {
@@ -301,6 +329,9 @@ fn rbac_max_password() -> usize {
 pub async fn logout(State(state): State<AppState>, auth: Auth) -> Result<Response, AppError> {
     if let Some(service) = state.auth().filter(|_| !auth.0.is_open()) {
         service.logout(&auth.0).await;
+        if let Some(id) = auth.0.user_id() {
+            state.txs().rollback_user(id).await;
+        }
         let mut response = Redirect::to("/login").into_response();
         if let Ok(value) =
             HeaderValue::from_str(&session::clear_cookie(service.policy().cookie_secure))
@@ -424,6 +455,9 @@ pub async fn admin_user_status(
         .set_user_active(&auth.0, form.user_id, form.active)
         .await
         .map_err(map_auth_error)?;
+    if !form.active {
+        state.txs().rollback_user(form.user_id).await;
+    }
     notice("ok", "User status updated.")
 }
 

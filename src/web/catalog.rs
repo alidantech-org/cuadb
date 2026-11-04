@@ -132,6 +132,9 @@ fn err(db: DbError) -> AppError {
             ErrorKind::DatabaseUnavailable
         }
         DbErrorKind::Unsupported => ErrorKind::InvalidInput,
+        DbErrorKind::Rejected => ErrorKind::Rejected,
+        DbErrorKind::Conflict => ErrorKind::Conflict,
+        DbErrorKind::Cancelled => ErrorKind::Cancelled,
         DbErrorKind::Internal => ErrorKind::Internal,
     })
 }

@@ -1,0 +1,5 @@
+<section id="sql-tx" aria-label="Transaction" data-tx="{{ tx }}">
+  <p>Transaction on profile <strong>{{ profile }}</strong> · {{ remaining_secs }} s left · {{ changes.len() }} pending change(s), {{ total_affected }} row(s) affected</p>
+  <ol>{% for change in changes %}<li>{{ change.summary }} — {{ change.affected }} row(s)</li>{% endfor %}</ol>
+  <p>Commit only after reviewing: send <code>expected_changes={{ changes.len() }}</code> with the commit request.</p>
+</section>

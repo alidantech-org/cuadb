@@ -1,5 +1,5 @@
 ---
-{id: TSK-92AB61E4D8C0,name: Record security events and administrator access changes,type: task,status: planned,priority: medium,created_at: 2026-11-04T16:14:15.204Z,updated_at: 2026-11-04T16:15:04.590Z,tags: [cuadb,auth],depends_on: [TSK-FF6C70D26908],order: 5120,links: [{type: blocks,task: TSK-CAE8F98AF33E}]}
+{id: TSK-92AB61E4D8C0,name: Record security events and administrator access changes,type: task,status: completed,priority: medium,created_at: 2026-11-04T16:14:15.204Z,updated_at: 2026-11-04T16:47:57.068Z,tags: [cuadb,auth],depends_on: [TSK-FF6C70D26908],order: 5120,links: [{type: blocks,task: TSK-CAE8F98AF33E}],extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T16:47:57.068Z}]}}
 ---
 
 # Record security events and administrator access changes
@@ -17,7 +17,7 @@ CuaDB is a local-first database workspace served by one Rust/Axum process. The c
 
 ## Acceptance checklist
 - [x] Record authentication outcomes, session revocations and permission changes.
-- [ ] Record profile access and later SQL/edit actions with user and resource identifiers.
+- [x] Record profile access and later SQL/edit actions with user and resource identifiers.
 - [x] Redact credentials, raw connection strings, query parameters and row contents.
 - [x] Restrict audit viewing to authorized administrators and bound retention/queries.
 - [x] Test audit coverage for denied access and successful privileged actions.
@@ -30,3 +30,7 @@ Verify the expected result and realistic failure cases with the smallest relevan
 ### 2026-11-04T16:33:01.190Z · PETER IRUNGU
 
 Items 1,3,4,5 verified: append-only audit_events (trigger blocks UPDATE and deleting rows <90 days old), closed event vocabulary, bounded/clean values, admin-only /admin/audit (limit<=200, before cursor), tests for denied access, failed/locked logins, grant/user changes, export, secrets absent from the view. Item 2 stays OPEN: profile access and exports are recorded, SQL/edit actions arrive with Group 14 (kinds sql_execute, data_change, tx_* are reserved).
+
+### 2026-11-04T16:47:55.881Z · PETER IRUNGU
+
+Item 2 now verified: profile access, exports, SQL execution, data changes and transaction outcomes are recorded. Task complete.

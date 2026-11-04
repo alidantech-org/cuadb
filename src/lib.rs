@@ -8,5 +8,6 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod profiles;
+pub mod sql;
 pub mod state;
 pub mod web;

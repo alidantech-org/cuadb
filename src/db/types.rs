@@ -276,6 +276,12 @@ pub enum DbErrorKind {
     ConnectionUnavailable,
     TimedOut,
     Unsupported,
+    /// The statement itself was refused by the database (syntax, missing column, ...).
+    Rejected,
+    /// A constraint or concurrent change prevented the operation.
+    Conflict,
+    /// The user cancelled a running statement.
+    Cancelled,
     Internal,
 }
 
@@ -297,6 +303,9 @@ impl DbError {
             DbErrorKind::ConnectionUnavailable => "connection_unavailable",
             DbErrorKind::TimedOut => "database_timeout",
             DbErrorKind::Unsupported => "unsupported_capability",
+            DbErrorKind::Rejected => "statement_rejected",
+            DbErrorKind::Conflict => "conflict",
+            DbErrorKind::Cancelled => "cancelled",
             DbErrorKind::Internal => "database_error",
         }
     }

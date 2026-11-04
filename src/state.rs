@@ -84,6 +84,7 @@ struct Entry {
     label: String,
     runtime: Option<Runtime>,
     catalog: Arc<dyn DatabaseAdapter>,
+    workspace: Option<Arc<dyn crate::sql::exec::Workspace>>,
 }
 
 /// Non-secret facts about a configured profile, safe for templates.
@@ -111,6 +112,56 @@ pub struct AppState {
     entries: Arc<Vec<Entry>>,
     default: usize,
     auth: Option<crate::auth::AuthService>,
+    sql: SqlSettings,
+    cancels: crate::sql::exec::CancelRegistry,
+    txs: crate::sql::exec::TxRegistry,
+}
+
+/// Operator settings for the SQL workspace; everything is off unless enabled.
+#[derive(Clone, Copy)]
+pub struct SqlSettings {
+    pub enabled: bool,
+    pub max_rows: usize,
+    pub query_timeout: std::time::Duration,
+    pub tx_ttl: std::time::Duration,
+}
+
+impl Default for SqlSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_rows: 500,
+            query_timeout: std::time::Duration::from_secs(15),
+            tx_ttl: std::time::Duration::from_secs(60),
+        }
+    }
+}
+
+fn build_workspace(
+    runtime: &Runtime,
+    profile: &crate::profiles::Profile,
+    limits: &Limits,
+) -> Result<Option<Arc<dyn crate::sql::exec::Workspace>>, StateError> {
+    Ok(match runtime {
+        Runtime::PostgreSql(read) => {
+            let write = if profile.writable {
+                Some(
+                    PgManager::with_access(profile.url.expose(), limits, true)
+                        .map_err(StateError::PostgreSql)?
+                        .pool(),
+                )
+            } else {
+                None
+            };
+            Some(Arc::new(crate::db::postgres::workspace::PgWorkspace::new(
+                read.pool(),
+                write,
+            )) as Arc<_>)
+        }
+        Runtime::Sqlite(manager) => Some(Arc::new(manager.workspace(profile.writable)) as Arc<_>),
+        // MySQL/MariaDB workspace execution is deferred until the engine phase.
+        Runtime::MySql(_) => None,
+    })
 }
 
 fn build_runtime(
@@ -143,7 +194,10 @@ impl AppState {
             })?;
             Some(ProfileSet::from_json(&text).map_err(|e| StateError::Profiles(e.to_string()))?)
         } else {
-            config.database_url().cloned().map(ProfileSet::single)
+            config
+                .database_url()
+                .cloned()
+                .map(|url| ProfileSet::single(url, config.database_writable))
         };
         let Some(set) = set else {
             return Ok(Self::disconnected());
@@ -155,17 +209,31 @@ impl AppState {
         let mut entries = Vec::new();
         for profile in &set.profiles {
             let runtime = build_runtime(profile.url.expose(), &config.sqlite_root, &limits)?;
+            let workspace = if config.sql_workspace {
+                build_workspace(&runtime, profile, &limits)?
+            } else {
+                None
+            };
             entries.push(Entry {
                 id: profile.id.clone(),
                 label: profile.label.clone(),
                 catalog: runtime.catalog(),
                 runtime: Some(runtime),
+                workspace,
             });
         }
         Ok(Self {
             entries: Arc::new(entries),
             default: set.default,
             auth: None,
+            sql: SqlSettings {
+                enabled: config.sql_workspace,
+                max_rows: config.sql_max_rows,
+                query_timeout: config.limits.query_timeout,
+                tx_ttl: std::time::Duration::from_secs(config.tx_timeout_seconds),
+            },
+            cancels: Default::default(),
+            txs: Default::default(),
         })
     }
 
@@ -174,6 +242,9 @@ impl AppState {
             entries: Arc::new(Vec::new()),
             default: 0,
             auth: None,
+            sql: SqlSettings::default(),
+            cancels: Default::default(),
+            txs: Default::default(),
         }
     }
 
@@ -186,9 +257,13 @@ impl AppState {
                 label: "Default connection".into(),
                 runtime: None,
                 catalog: adapter,
+                workspace: None,
             }]),
             default: 0,
             auth: None,
+            sql: SqlSettings::default(),
+            cancels: Default::default(),
+            txs: Default::default(),
         }
     }
 
@@ -203,12 +278,80 @@ impl AppState {
                         label: label.into(),
                         runtime: None,
                         catalog,
+                        workspace: None,
                     })
                     .collect(),
             ),
             default: 0,
             auth: None,
+            sql: SqlSettings::default(),
+            cancels: Default::default(),
+            txs: Default::default(),
         }
+    }
+
+    /// Roll back transactions that expired or whose session ended. Run periodically.
+    pub async fn sweep_transactions(&self) -> usize {
+        let mut alive = std::collections::HashSet::new();
+        if let Some(auth) = self.auth() {
+            for hash in self.txs.sessions().await {
+                if auth.session_alive(&hash).await {
+                    alive.insert(hash);
+                }
+            }
+        }
+        self.txs.sweep(|session| alive.contains(session)).await
+    }
+
+    pub fn sql_settings(&self) -> SqlSettings {
+        self.sql
+    }
+
+    pub fn with_sql_settings(mut self, settings: SqlSettings) -> Self {
+        self.sql = settings;
+        self
+    }
+
+    pub fn cancels(&self) -> &crate::sql::exec::CancelRegistry {
+        &self.cancels
+    }
+
+    pub fn txs(&self) -> &crate::sql::exec::TxRegistry {
+        &self.txs
+    }
+
+    /// Workspace of a profile (None when disabled, unsupported or unknown).
+    pub fn workspace_for(
+        &self,
+        profile: Option<&str>,
+    ) -> Option<Arc<dyn crate::sql::exec::Workspace>> {
+        self.entry(profile)
+            .and_then(|entry| entry.workspace.clone())
+    }
+
+    /// Test helper: attach a workspace to an existing profile id.
+    pub fn with_workspace(
+        mut self,
+        profile: &str,
+        workspace: Arc<dyn crate::sql::exec::Workspace>,
+    ) -> Self {
+        let mut entries = Arc::try_unwrap(self.entries).unwrap_or_else(|shared| {
+            shared
+                .iter()
+                .map(|e| Entry {
+                    id: e.id.clone(),
+                    label: e.label.clone(),
+                    runtime: e.runtime.clone(),
+                    catalog: e.catalog.clone(),
+                    workspace: e.workspace.clone(),
+                })
+                .collect()
+        });
+        if let Some(entry) = entries.iter_mut().find(|e| e.id == profile) {
+            entry.workspace = Some(workspace);
+        }
+        self.entries = Arc::new(entries);
+        self
     }
 
     /// Attach the auth service (tests and startup).

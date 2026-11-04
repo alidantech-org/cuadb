@@ -227,6 +227,18 @@ impl AuthService {
         self.principal_for(&user, &hash, row.csrf).await.ok()
     }
 
+    /// Is this stored session still valid (not revoked, not expired, user active)?
+    pub async fn session_alive(&self, hash: &[u8]) -> bool {
+        let Ok(Some(row)) = self.store.session(hash).await else {
+            return false;
+        };
+        let t = now();
+        if row.expires_at <= t || t - row.last_seen > self.policy.idle_secs {
+            return false;
+        }
+        matches!(self.store.user_by_id(row.user_id).await, Ok(Some(u)) if u.active)
+    }
+
     pub async fn logout(&self, principal: &Principal) {
         let _ = self.store.revoke_session(&principal.0.session_hash).await;
         self.record(

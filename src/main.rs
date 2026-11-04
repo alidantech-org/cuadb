@@ -20,6 +20,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let listener = tokio::net::TcpListener::bind((config.host, config.port)).await?;
     let router = app::router_with_state(&config.limits, state.clone());
     state.start_probe();
+    // Roll back expired or orphaned write transactions (their connections are released).
+    {
+        let sweeper = state.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(5));
+            loop {
+                tick.tick().await;
+                let _ = sweeper.sweep_transactions().await;
+            }
+        });
+    }
 
     println!(
         "CuaDB shell ready at http://{}:{}",

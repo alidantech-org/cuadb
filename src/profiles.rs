@@ -22,12 +22,16 @@ pub struct Profile {
     pub id: String,
     pub label: String,
     pub url: SecretUrl,
+    /// `read-write` adds a separate writer pool for the SQL workspace / editing.
+    /// The explorer itself always stays read-only.
+    pub writable: bool,
 }
 
 impl fmt::Debug for Profile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Profile")
             .field("id", &self.id)
+            .field("writable", &self.writable)
             .field("label", &self.label)
             .field("url", &"[REDACTED]")
             .finish()
@@ -72,6 +76,7 @@ struct FileProfile {
     id: String,
     label: String,
     url: String,
+    access: Option<String>,
 }
 
 /// Stable, URL-safe identifier: lowercase letters, digits, `-` and `_`, 1–32 bytes.
@@ -94,12 +99,13 @@ fn valid_label(label: &str) -> bool {
 
 impl ProfileSet {
     /// The classic single-URL configuration.
-    pub fn single(url: SecretUrl) -> Self {
+    pub fn single(url: SecretUrl, writable: bool) -> Self {
         Self {
             profiles: vec![Profile {
                 id: DEFAULT_PROFILE_ID.into(),
                 label: "Default connection".into(),
                 url,
+                writable,
             }],
             default: 0,
         }
@@ -144,10 +150,20 @@ impl ProfileSet {
                     "profile {position}: url must be nonempty, at most 8192 bytes, no outer whitespace"
                 )));
             }
+            let writable = match raw.access.as_deref() {
+                None | Some("read-only") => false,
+                Some("read-write") => true,
+                Some(_) => {
+                    return Err(ProfileError::new(format!(
+                        "profile {position}: access must be 'read-only' or 'read-write'"
+                    )));
+                }
+            };
             profiles.push(Profile {
                 id: raw.id,
                 label: raw.label,
                 url: SecretUrl::new(raw.url),
+                writable,
             });
         }
         let default = match document.default {
@@ -189,7 +205,7 @@ mod tests {
 
     #[test]
     fn single_url_becomes_the_default_profile() {
-        let set = ProfileSet::single(SecretUrl::new("postgresql://h/db".into()));
+        let set = ProfileSet::single(SecretUrl::new("postgresql://h/db".into()), false);
         assert_eq!(set.profiles[0].id, DEFAULT_PROFILE_ID);
     }
 
