@@ -225,6 +225,15 @@ fn map_auth_error(error: AuthError) -> AppError {
     })
 }
 
+/// Policy refusals carry a short, static, user-correctable sentence ("password is too
+/// simple"); show it instead of a generic failure. Everything else stays generic.
+fn refused(error: AuthError) -> Result<Response, AppError> {
+    match error {
+        AuthError::Invalid(why) => notice_status(StatusCode::BAD_REQUEST, "refused", why),
+        other => Err(map_auth_error(other)),
+    }
+}
+
 fn no_store(mut response: Response) -> Response {
     response
         .headers_mut()
@@ -254,10 +263,17 @@ fn render<T: Template>(view: T) -> Result<Response, AppError> {
 }
 
 pub(super) fn notice(kind: &'static str, message: &str) -> Result<Response, AppError> {
-    render(NoticeTemplate {
+    let mut response = render(NoticeTemplate {
         kind,
         message: message.to_string(),
-    })
+    })?;
+    if kind == "ok" {
+        // Lets the page refresh the list that the change just altered (see app.js).
+        response
+            .headers_mut()
+            .insert("hx-trigger", HeaderValue::from_static("cuadb:changed"));
+    }
+    Ok(response)
 }
 
 /// A notice fragment with an explicit status (policy refusals, conflicts).
@@ -393,7 +409,7 @@ pub struct UserView {
 #[template(path = "auth/users.html")]
 struct UsersTemplate {
     users: Vec<UserView>,
-    csrf: String,
+    me: i64,
 }
 
 pub async fn admin_users(State(state): State<AppState>, auth: Auth) -> Result<Response, AppError> {
@@ -414,7 +430,7 @@ pub async fn admin_users(State(state): State<AppState>, auth: Auth) -> Result<Re
         .collect();
     render(UsersTemplate {
         users,
-        csrf: auth.0.csrf().to_string(),
+        me: auth.0.user_id().unwrap_or(0),
     })
 }
 
@@ -436,11 +452,13 @@ pub async fn admin_create_user(
     auth.require_admin(&state, "/admin/users").await?;
     let _ = &form.csrf;
     let role = Role::parse(&form.role).map_err(map_auth_error)?;
-    service(&state)?
+    match service(&state)?
         .create_user(&auth.0, &form.login, &form.password, role)
         .await
-        .map_err(map_auth_error)?;
-    notice("ok", "User created.")
+    {
+        Ok(_) => notice("ok", "Member created. Grant access under Permissions."),
+        Err(error) => refused(error),
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -485,11 +503,13 @@ pub async fn admin_user_password(
 ) -> Result<Response, AppError> {
     auth.require_admin(&state, "/admin/users/password").await?;
     let _ = &form.csrf;
-    service(&state)?
+    match service(&state)?
         .change_password(&auth.0, form.user_id, None, &form.new_password)
         .await
-        .map_err(map_auth_error)?;
-    notice("ok", "Password reset. The user was signed out everywhere.")
+    {
+        Ok(()) => notice("ok", "Password reset. The user was signed out everywhere."),
+        Err(error) => refused(error),
+    }
 }
 
 pub struct GrantView {
@@ -504,7 +524,14 @@ pub struct GrantView {
 #[template(path = "auth/grants.html")]
 struct GrantsTemplate {
     user_id: i64,
+    users: Vec<UserOption>,
+    profiles: Vec<(String, String)>,
     grants: Vec<GrantView>,
+}
+
+pub struct UserOption {
+    id: i64,
+    login: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -523,8 +550,26 @@ pub async fn admin_grants(
         .grants(query.user)
         .await
         .map_err(map_auth_error)?;
+    let users = service(&state)?
+        .store
+        .list_users()
+        .await
+        .map_err(map_auth_error)?
+        .into_iter()
+        .map(|u| UserOption {
+            id: u.id,
+            login: u.login,
+        })
+        .collect();
+    let profiles = state
+        .profiles()
+        .into_iter()
+        .map(|p| (p.id, p.label))
+        .collect();
     render(GrantsTemplate {
         user_id: query.user,
+        users,
+        profiles,
         grants: grants
             .into_iter()
             .map(|g| GrantView {
@@ -564,7 +609,7 @@ pub async fn admin_grant_add(
     if !state.profiles().iter().any(|p| p.id == form.profile) && !state.profiles().is_empty() {
         return Err(AppError::new(ErrorKind::UnknownProfile));
     }
-    service(&state)?
+    match service(&state)?
         .add_grant(
             &auth.0,
             form.user_id,
@@ -574,8 +619,10 @@ pub async fn admin_grant_add(
             actions,
         )
         .await
-        .map_err(map_auth_error)?;
-    notice("ok", "Grant saved.")
+    {
+        Ok(_) => notice("ok", "Grant saved."),
+        Err(error) => refused(error),
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -631,5 +678,47 @@ pub async fn admin_audit(
     render(AuditTemplate {
         events,
         next_before,
+    })
+}
+
+#[derive(Template)]
+#[template(path = "auth/admin.html")]
+struct AdminTemplate;
+
+/// The Administration panel (tabs load their own fragments).
+pub async fn admin_view(State(state): State<AppState>, auth: Auth) -> Result<Response, AppError> {
+    auth.require_admin(&state, "/admin").await?;
+    render(AdminTemplate)
+}
+
+#[derive(Template)]
+#[template(path = "auth/security.html")]
+struct SecurityTemplate {
+    mode: &'static str,
+    idle_minutes: i64,
+    max_hours: i64,
+    secure_cookie: bool,
+    sql_workspace: bool,
+    profiles: usize,
+}
+
+/// Read-only operator configuration. Nothing here can be changed from the browser.
+pub async fn admin_security(
+    State(state): State<AppState>,
+    auth: Auth,
+) -> Result<Response, AppError> {
+    auth.require_admin(&state, "/admin/security").await?;
+    let policy = service(&state)?.policy();
+    render(SecurityTemplate {
+        mode: if auth.0.is_open() {
+            "Trusted local"
+        } else {
+            "Authenticated"
+        },
+        idle_minutes: policy.idle_secs / 60,
+        max_hours: policy.max_secs / 3600,
+        secure_cookie: policy.cookie_secure,
+        sql_workspace: state.sql_settings().enabled,
+        profiles: state.profiles().len(),
     })
 }

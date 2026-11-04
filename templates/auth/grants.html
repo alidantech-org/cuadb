@@ -1,7 +1,38 @@
-<section id="admin-grants" aria-label="Grants">
-  <h1>Grants for user {{ user_id }}</h1>
-  <table>
-    <thead><tr><th>Id</th><th>Profile</th><th>Schema</th><th>Relation</th><th>Actions</th></tr></thead>
-    <tbody>{% for grant in grants %}<tr><td>{{ grant.id }}</td><td>{{ grant.profile }}</td><td>{{ grant.schema }}</td><td>{{ grant.relation }}</td><td>{{ grant.actions }}</td></tr>{% endfor %}</tbody>
+<div class="adm" data-tab="permissions" data-src="/admin/grants?user={{ user_id }}">
+  <div class="adm-head"><h4>Permissions</h4>
+    <label class="adm-pick">Member
+      <select class="inp" name="user" hx-get="/admin/grants" hx-target="#admin-body" hx-swap="innerHTML" aria-label="Member">
+        <option value="0" {% if user_id == 0 %}selected{% endif %}>Choose a member…</option>
+        {% for u in users %}<option value="{{ u.id }}" {% if u.id == user_id %}selected{% endif %}>{{ u.login }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <div id="adm-msg" class="adm-msg" role="status" aria-live="polite"></div>
+  {% if user_id == 0 %}
+    <p class="hint">Pick a member to see and change what they may do. Access is denied unless a grant allows it.</p>
+  {% else %}
+  <table class="w">
+    <thead><tr><th>Connection</th><th>Schema</th><th>Relation</th><th>Allowed</th><th></th></tr></thead>
+    <tbody>
+      {% for grant in grants %}<tr><td>{{ grant.profile }}</td><td>{% if grant.schema.is_empty() %}<span class="mu">any</span>{% else %}{{ grant.schema }}{% endif %}</td><td>{% if grant.relation.is_empty() %}<span class="mu">any</span>{% else %}{{ grant.relation }}{% endif %}</td><td><code>{{ grant.actions }}</code></td>
+        <td class="acts"><button class="btn dg" type="button" hx-post="/admin/grants/remove" hx-vals='{"grant_id": {{ grant.id }}}' hx-target="#adm-msg" hx-swap="innerHTML">Remove</button></td></tr>{% endfor %}
+      {% if grants.is_empty() %}<tr><td colspan="5" class="empty-row">No grants: this member can see nothing.</td></tr>{% endif %}
+    </tbody>
   </table>
-</section>
+  <form class="adm-form" hx-post="/admin/grants" hx-target="#adm-msg" hx-swap="innerHTML" autocomplete="off">
+    <input type="hidden" name="user_id" value="{{ user_id }}">
+    <h4>Add a grant</h4>
+    <label class="fl"><span>Connection</span><select class="inp" name="profile" required>{% for p in profiles %}<option value="{{ p.0 }}">{{ p.1 }}</option>{% endfor %}</select></label>
+    <div class="adm-row"><label class="fl"><span>Schema (blank = any)</span><input class="inp" name="schema" maxlength="63"></label>
+    <label class="fl"><span>Relation (blank = any)</span><input class="inp" name="relation" maxlength="63"></label></div>
+    <label class="fl"><span>Access level</span><select class="inp" name="actions">
+      <option value="view">Read — view rows and structure</option>
+      <option value="view,export">Read + export</option>
+      <option value="view,export,edit">Write — also insert, update and delete rows</option>
+      <option value="view,export,edit,sql">Full — also run SQL</option>
+    </select></label>
+    <p class="hint">A member's role caps what a grant can allow. Whole-connection grants are needed for SQL and transactions.</p>
+    <div class="acts"><button class="btn on" type="submit">Save grant</button></div>
+  </form>
+  {% endif %}
+</div>

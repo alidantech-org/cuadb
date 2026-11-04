@@ -1,0 +1,14 @@
+<div class="adm" data-tab="security" data-src="/admin/security">
+  <div class="adm-head"><h4>Security</h4></div>
+  <table class="w">
+    <tbody>
+      <tr><td>Deployment mode</td><td><b>{{ mode }}</b></td><td class="mu">Set by the operator through configuration; it cannot be changed from the browser.</td></tr>
+      <tr><td>Idle session timeout</td><td>{{ idle_minutes }} min</td><td class="mu">CUADB_SESSION_IDLE_MINUTES</td></tr>
+      <tr><td>Maximum session length</td><td>{{ max_hours }} h</td><td class="mu">CUADB_SESSION_MAX_HOURS</td></tr>
+      <tr><td>Secure cookie</td><td>{% if secure_cookie %}on{% else %}off{% endif %}</td><td class="mu">CUADB_COOKIE_SECURE (turn on behind HTTPS)</td></tr>
+      <tr><td>SQL workspace</td><td>{% if sql_workspace %}enabled{% else %}disabled{% endif %}</td><td class="mu">CUADB_SQL_WORKSPACE</td></tr>
+      <tr><td>Connections</td><td>{{ profiles }}</td><td class="mu">Defined on the server; passwords are never sent to the browser.</td></tr>
+    </tbody>
+  </table>
+  <p class="hint">Changing any of these means editing the server configuration and restarting CuaDB.</p>
+</div>

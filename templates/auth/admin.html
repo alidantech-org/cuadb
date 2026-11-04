@@ -1,0 +1,13 @@
+<section id="catalog-panel" class="panel" aria-label="Administration" hx-history="false" data-panel="admin">
+  <header class="bar">
+    <h1><i class="ic-slot" data-ic="shield" aria-hidden="true"></i>Administration</h1>
+    <span class="sp"></span>
+    <nav class="seg" id="adm-seg" aria-label="Administration sections">
+      <button type="button" data-tab="members" hx-get="/admin/users" hx-target="#admin-body" hx-swap="innerHTML">Members</button>
+      <button type="button" data-tab="permissions" hx-get="/admin/grants?user=0" hx-target="#admin-body" hx-swap="innerHTML">Permissions</button>
+      <button type="button" data-tab="audit" hx-get="/admin/audit" hx-target="#admin-body" hx-swap="innerHTML">Audit log</button>
+      <button type="button" data-tab="security" hx-get="/admin/security" hx-target="#admin-body" hx-swap="innerHTML">Security</button>
+    </nav>
+  </header>
+  <div class="wrap"><div class="gw st" id="admin-body" hx-get="/admin/users" hx-trigger="load" hx-swap="innerHTML"><div class="note" role="status">Loading…</div></div></div>
+</section>

@@ -1,9 +1,9 @@
 <section id="sql-result" aria-label="SQL result" data-statement="{{ kind }}">
-  <p class="sql-meta">{{ summary }}{% if let Some(n) = affected %} · {{ n }} row(s) affected{% endif %} · {{ elapsed_ms }} ms{% if truncated %} · result truncated at the row/byte limit{% endif %}</p>
+  <p class="sqlh">{{ summary }}{% if let Some(n) = affected %} · {{ n }} row(s) affected{% endif %} · {{ elapsed_ms }} ms{% if truncated %} · result truncated at the row/byte limit{% endif %}</p>
   {% if !columns.is_empty() %}
-  <table>
-    <thead><tr>{% for column in columns %}<th scope="col">{{ column }}</th>{% endfor %}</tr></thead>
-    <tbody>{% for row in rows %}<tr>{% for cell in row %}<td{% if cell.is_null %} data-null="true"{% endif %}>{% if cell.is_null %}NULL{% else %}{{ cell.text }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
-  </table>
+  <div class="gw"><table class="grid">
+    <thead><tr><th class="rn" scope="col">#</th>{% for column in columns %}<th scope="col">{{ column }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for row in rows %}<tr><td class="rn">{{ loop.index }}</td>{% for cell in row %}<td>{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{{ cell.text }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+  </table></div>
   {% endif %}
 </section>

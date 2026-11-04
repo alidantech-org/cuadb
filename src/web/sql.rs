@@ -854,3 +854,54 @@ pub async fn tx_rollback(
     .await;
     notice("ok", "Transaction rolled back.")
 }
+
+// ---- GET /sql: the workspace panel
+
+#[derive(Template)]
+#[template(path = "sql/workspace.html")]
+struct WorkspaceTemplate {
+    profile_label: String,
+    can_write: bool,
+    max_rows: usize,
+    timeout_secs: u64,
+}
+
+/// The editor page. It only renders controls; every statement is still classified and
+/// authorized by `/sql/execute`.
+pub async fn workspace_page(
+    State(state): State<AppState>,
+    auth: Auth,
+    Query(query): Query<crate::web::catalog::ProfileQuery>,
+) -> Result<Response, AppError> {
+    enabled(&state)?;
+    if auth.0.is_open() {
+        // Trusted local mode has no identity to attribute statements to.
+        return Err(AppError::new(ErrorKind::Forbidden));
+    }
+    let profile = checked_profile(query.profile)?;
+    let pid = state.effective_profile(profile.as_deref());
+    auth.authorize_wide(&state, Action::Sql, &pid).await?;
+    let workspace = state
+        .workspace_for(profile.as_deref())
+        .ok_or(AppError::new(ErrorKind::FeatureDisabled))?;
+    let label = state
+        .profiles()
+        .into_iter()
+        .find(|p| p.id == pid)
+        .map_or(pid.clone(), |p| p.label);
+    let settings = state.sql_settings();
+    let body = WorkspaceTemplate {
+        profile_label: label,
+        can_write: workspace.writable() && auth.0.allows_wide(Action::Edit, &pid, None),
+        max_rows: settings.max_rows,
+        timeout_secs: settings.query_timeout.as_secs(),
+    }
+    .render()
+    .map_err(|_| AppError::template())?;
+    let mut response = Html(body).into_response();
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store"),
+    );
+    Ok(response)
+}

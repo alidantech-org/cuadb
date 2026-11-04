@@ -1,5 +1,8 @@
-<section id="sql-tx" aria-label="Transaction" data-tx="{{ tx }}">
-  <p>Transaction on profile <strong>{{ profile }}</strong> · {{ remaining_secs }} s left · {{ changes.len() }} pending change(s), {{ total_affected }} row(s) affected</p>
-  <ol>{% for change in changes %}<li>{{ change.summary }} — {{ change.affected }} row(s)</li>{% endfor %}</ol>
-  <p>Commit only after reviewing: send <code>expected_changes={{ changes.len() }}</code> with the commit request.</p>
-</section>
+<div class="txbar" data-tx="{{ tx }}">
+  <div class="txhead"><b>Transaction</b><span>on {{ profile }} · {{ remaining_secs }} s left · {{ changes.len() }} pending change(s), {{ total_affected }} row(s) affected</span></div>
+  {% if !changes.is_empty() %}<ol class="txl">{% for change in changes %}<li>{{ change.summary }} <span class="mu">— {{ change.affected }} row(s)</span></li>{% endfor %}</ol>{% endif %}
+  <div class="acts">
+    <form hx-post="/tx/commit" hx-target="#sql-tx" hx-swap="innerHTML"><input type="hidden" name="tx" value="{{ tx }}"><input type="hidden" name="expected_changes" value="{{ changes.len() }}"><button class="btn on" type="submit"{% if changes.is_empty() %} disabled{% endif %}>Commit {{ changes.len() }} change(s)</button></form>
+    <form hx-post="/tx/rollback" hx-target="#sql-tx" hx-swap="innerHTML"><input type="hidden" name="tx" value="{{ tx }}"><button class="btn dg" type="submit">Roll back</button></form>
+  </div>
+</div>

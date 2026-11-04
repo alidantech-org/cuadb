@@ -1651,3 +1651,133 @@ td.mono-value {
     padding: 6px 10px 6px 44px;
   }
 }
+
+/* ---- administration, SQL workspace, notices ---- */
+.adm {
+  padding: 0;
+}
+.adm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 6px;
+}
+.adm-head h4 {
+  margin: 0;
+  flex: 1;
+}
+.adm-msg:empty {
+  display: none;
+}
+.notice {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--bd);
+  border-radius: var(--rad);
+  background: var(--bg);
+  max-width: 620px;
+}
+.notice p {
+  margin: 0;
+}
+.notice.ok {
+  color: var(--ok);
+}
+.notice.denied,
+.notice.refused,
+.notice.missing,
+.notice.error {
+  color: #d0505f;
+}
+.adm-form {
+  border: 1px solid var(--bd);
+  border-radius: var(--rad);
+  padding: 10px 12px;
+  margin: 8px 0 12px;
+  max-width: 560px;
+  background: var(--bg);
+}
+.adm-form h4 {
+  margin: 0 0 8px;
+}
+.adm-form .acts {
+  justify-content: flex-end;
+}
+.adm-row {
+  display: flex;
+  gap: 8px;
+}
+.adm-row .fl {
+  flex: 1;
+}
+.adm-inline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.adm-inline .inp {
+  max-width: 280px;
+}
+.adm-pick {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--mu);
+}
+.adm-pick select {
+  min-width: 160px;
+}
+.st td small.mu {
+  display: inline;
+}
+.txbar {
+  border-bottom: 1px solid var(--bd);
+  background: var(--sf2);
+  padding: 8px 12px;
+}
+.txhead {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.txl {
+  margin: 6px 0 8px 18px;
+  padding: 0;
+}
+.txbar .acts {
+  justify-content: flex-start;
+  margin-top: 6px;
+}
+.txbar form {
+  margin: 0;
+}
+#sqlform {
+  display: flex;
+  flex-direction: column;
+}
+#sql {
+  width: 100%;
+}
+.sqlw {
+  overflow: auto;
+}
+#sqlout .gw {
+  max-height: 60vh;
+}
+@media (max-width: 760px) {
+  .adm-row {
+    flex-direction: column;
+  }
+}
+td.acts {
+  display: table-cell;
+  text-align: right;
+  white-space: nowrap;
+}
+td.acts .btn {
+  margin-left: 4px;
+}
+#sql-tx:empty {
+  display: none;
+}

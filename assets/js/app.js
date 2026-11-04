@@ -40,16 +40,40 @@ async function copyText(/** @type {string} */ text, /** @type {string} */ done) 
 }
 
 /* ------------------------------------------------------------ CSRF for HTMX */
+/** Set a request parameter whether htmx hands us an object or a FormData-like proxy. */
+function setParam(
+  /** @type {Any} */ params,
+  /** @type {string} */ name,
+  /** @type {string} */ value,
+) {
+  if (typeof params.set === 'function') params.set(name, value);
+  else params[name] = value;
+}
 document.addEventListener('htmx:configRequest', (event) => {
   const detail = /** @type {CustomEvent} */ (event).detail;
   const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
   if (token && detail.verb !== 'get') detail.headers['x-csrf-token'] = token;
+  const path = String(detail.path ?? '');
+  if (/^\/(sql\/(execute|cancel)|tx\/begin)/.test(path) && win.cuadbProfile) {
+    setParam(detail.parameters, 'profile', win.cuadbProfile);
+  }
+  if (path.startsWith('/sql/execute')) {
+    win.cuadbSid = crypto.randomUUID().replaceAll('-', '');
+    setParam(detail.parameters, 'statement_id', win.cuadbSid);
+    if (win.cuadbTx) setParam(detail.parameters, 'tx', win.cuadbTx);
+  }
+  if (path.startsWith('/sql/cancel') && win.cuadbSid)
+    setParam(detail.parameters, 'statement_id', win.cuadbSid);
 });
 
 // Server error fragments (4xx/5xx with our error markup) are shown in place.
 document.addEventListener('htmx:beforeSwap', (event) => {
   const detail = /** @type {CustomEvent} */ (event).detail;
-  if (detail.xhr.status >= 400 && detail.xhr.responseText.includes('class="cuadb-error"')) {
+  const text = detail.xhr.responseText;
+  if (
+    detail.xhr.status >= 400 &&
+    (text.includes('class="cuadb-error"') || text.includes('class="notice'))
+  ) {
     detail.shouldSwap = true;
     detail.isError = false;
     detail.swapOverride = 'innerHTML';
@@ -370,6 +394,25 @@ document.addEventListener('click', (event) => {
     return;
   }
 
+  const viewBtn = target.closest('[data-view]');
+  if (viewBtn instanceof HTMLElement && viewBtn.dataset.view) {
+    const view = viewBtn.dataset.view;
+    closePops();
+    closeInspector();
+    markActiveRow(null);
+    if (innerWidth < 761) setDrawer(false);
+    const profile = win.cuadbProfile ? `?profile=${encodeURIComponent(win.cuadbProfile)}` : '';
+    fetchInto(view === 'admin' ? '/admin' : `/sql${profile}`, '#mainbody', 'innerHTML');
+    return;
+  }
+  const admToggle = target.closest('[data-adm-toggle]');
+  if (admToggle instanceof HTMLElement) {
+    const el = document.getElementById(admToggle.dataset.admToggle ?? '');
+    if (el) el.hidden = !el.hidden;
+    el?.querySelector('input,select')?.dispatchEvent(new Event('focus'));
+    return;
+  }
+
   /* settings */
   const st = target.closest('[data-st]');
   if (st instanceof HTMLElement && st.dataset.st) {
@@ -469,6 +512,17 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (
+    (event.metaKey || event.ctrlKey) &&
+    event.key === 'Enter' &&
+    event.target instanceof HTMLTextAreaElement &&
+    event.target.id === 'sql'
+  ) {
+    event.preventDefault();
+    document.getElementById('sqlform') instanceof HTMLFormElement &&
+      /** @type {HTMLFormElement} */ (document.getElementById('sqlform')).requestSubmit();
+    return;
+  }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault();
     setDrawer(true);
@@ -510,6 +564,61 @@ document.addEventListener('htmx:afterSwap', (event) => {
     if (event.target.matches('.sub')) filterTree();
   }
   closeInspector();
+});
+
+/** Show server timestamps in the viewer's locale. */
+function formatTimes(/** @type {ParentNode} */ root) {
+  root.querySelectorAll('time[data-ts]').forEach((node) => {
+    const el = /** @type {HTMLElement} */ (node);
+    const seconds = Number(el.dataset.ts);
+    if (!Number.isFinite(seconds) || seconds <= 0) return;
+    const when = new Date(seconds * 1000);
+    el.setAttribute('datetime', when.toISOString());
+    el.textContent = when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  });
+}
+function syncAdminTabs() {
+  const tab = document.querySelector('#admin-body [data-tab]')?.getAttribute('data-tab');
+  document.querySelectorAll('#adm-seg [data-tab]').forEach((btn) => {
+    btn.classList.toggle('on', btn.getAttribute('data-tab') === tab);
+  });
+}
+document.addEventListener('htmx:afterSwap', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.id === 'admin-body') {
+    formatTimes(target);
+    syncAdminTabs();
+  }
+  if (target.id === 'sql-tx') {
+    const open = target.querySelector('[data-tx]');
+    win.cuadbTx = open instanceof HTMLElement ? (open.dataset.tx ?? '') : '';
+  }
+});
+document.addEventListener('htmx:afterRequest', (event) => {
+  const detail = /** @type {Any} */ (event).detail;
+  const path = String(detail.pathInfo?.requestPath ?? '');
+  const cancel = document.getElementById('sql-cancel');
+  if (path.startsWith('/sql/execute')) {
+    if (cancel) cancel.hidden = true;
+    if (win.cuadbTx)
+      fetchInto(`/tx/status?tx=${encodeURIComponent(win.cuadbTx)}`, '#sql-tx', 'innerHTML');
+  }
+  if (path.startsWith('/tx/commit') || path.startsWith('/tx/rollback')) {
+    win.cuadbTx = '';
+  }
+});
+document.addEventListener('htmx:beforeRequest', (event) => {
+  const path = String(/** @type {Any} */ (event).detail.pathInfo?.requestPath ?? '');
+  if (path.startsWith('/sql/execute'))
+    document.getElementById('sql-cancel')?.removeAttribute('hidden');
+});
+// A successful admin change: say so, then refresh the list it altered.
+document.addEventListener('cuadb:changed', () => {
+  const message = document.querySelector('#adm-msg')?.textContent?.trim();
+  if (message) toast(message);
+  const src = document.querySelector('#admin-body [data-src]')?.getAttribute('data-src');
+  if (src) fetchInto(src, '#admin-body', 'innerHTML');
 });
 
 document.addEventListener('htmx:afterSettle', (event) => {

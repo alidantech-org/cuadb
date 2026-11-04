@@ -1,14 +1,40 @@
-<section id="admin-users" aria-label="Users">
-  <h1>Users</h1>
-  <table>
-    <thead><tr><th>Id</th><th>Login</th><th>Role</th><th>Status</th></tr></thead>
-    <tbody>{% for user in users %}<tr><td>{{ user.id }}</td><td>{{ user.login }}</td><td>{{ user.role }}</td><td>{{ user.status }}</td></tr>{% endfor %}</tbody>
-  </table>
-  <form method="post" action="/admin/users">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <input name="login" placeholder="login" required>
-    <input name="password" type="password" placeholder="password" required>
-    <select name="role"><option>viewer</option><option>editor</option><option>admin</option></select>
-    <button type="submit">Create user</button>
+<div class="adm" data-tab="members" data-src="/admin/users">
+  <div class="adm-head"><h4>Members</h4><button class="btn on" type="button" data-adm-toggle="adm-add">+ Add member</button></div>
+  <div id="adm-msg" class="adm-msg" role="status" aria-live="polite"></div>
+  <form id="adm-add" class="adm-form" hidden hx-post="/admin/users" hx-target="#adm-msg" hx-swap="innerHTML" autocomplete="off">
+    <label class="fl"><span>Username</span><input class="inp" name="login" required maxlength="64" pattern="[a-z0-9._-]{3,}" title="3 or more of a–z, 0–9, dot, dash, underscore" autocomplete="off"></label>
+    <label class="fl"><span>Temporary password</span><input class="inp" name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password"></label>
+    <label class="fl"><span>Role</span><select class="inp" name="role"><option value="viewer">Viewer — view and export</option><option value="editor">Editor — may be granted edit and SQL</option><option value="admin">Administrator</option></select></label>
+    <p class="hint">Roles only cap what grants can allow. Nobody can do anything until you grant it in Permissions.</p>
+    <div class="acts"><button class="btn on" type="submit">Create member</button></div>
   </form>
-</section>
+  <table class="w">
+    <thead><tr><th>Member</th><th>Role</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td class="who"><b>{{ user.login }}</b>{% if user.id == me %}<small>you</small>{% endif %}</td>
+        <td>{{ user.role }}</td>
+        <td><span class="tag {% if user.status == "active" %}ro{% endif %}">{{ user.status }}</span></td>
+        <td class="acts">
+          <button class="btn" type="button" hx-get="/admin/grants?user={{ user.id }}" hx-target="#admin-body" hx-swap="innerHTML">Permissions</button>
+          {% if user.id != me %}
+          <button class="btn" type="button" hx-post="/admin/users/status" hx-vals='{"user_id": {{ user.id }}, "active": {% if user.status == "active" %}false{% else %}true{% endif %}}' hx-target="#adm-msg" hx-swap="innerHTML">{% if user.status == "active" %}Disable{% else %}Enable{% endif %}</button>
+          <button class="btn" type="button" data-adm-toggle="adm-pw-{{ user.id }}">Reset password</button>
+          {% endif %}
+        </td>
+      </tr>
+      {% if user.id != me %}
+      <tr id="adm-pw-{{ user.id }}" hidden><td colspan="4">
+        <form class="adm-inline" hx-post="/admin/users/password" hx-vals='{"user_id": {{ user.id }}}' hx-target="#adm-msg" hx-swap="innerHTML" autocomplete="off">
+          <input class="inp" name="new_password" type="password" required minlength="12" maxlength="256" placeholder="New temporary password" aria-label="New password for {{ user.login }}" autocomplete="new-password">
+          <button class="btn on" type="submit">Set password</button>
+          <span class="hint">They are signed out everywhere.</span>
+        </form>
+      </td></tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="hint">Changing a role or deleting a member is not available yet.</p>
+</div>

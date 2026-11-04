@@ -41,7 +41,11 @@ impl Shell {
             },
             local,
             admin: principal.is_admin(),
-            sql: state.sql_settings().enabled && !local,
+            sql: state.sql_settings().enabled
+                && !local
+                && state.profiles().iter().any(|profile| {
+                    principal.allows_wide(crate::auth::Action::Sql, &profile.id, None)
+                }),
         }
     }
 }

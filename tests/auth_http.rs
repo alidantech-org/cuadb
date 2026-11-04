@@ -1024,3 +1024,91 @@ async fn data_and_catalog_fragments_stay_free_of_inline_style_and_script() {
         assert_csp_clean(&r.body, path);
     }
 }
+
+#[tokio::test]
+async fn the_administration_view_is_admin_only_and_free_of_inline_code() {
+    let w = world(true).await;
+    let login = post(
+        &w.router,
+        "/login",
+        None,
+        None,
+        &format!("login=admin&password={}", PW.replace(' ', "+")),
+    )
+    .await;
+    let cookie = cookie_of(&login);
+    for (path, needle) in [
+        ("/admin", r#"id="admin-body""#),
+        ("/admin/users", "Add member"),
+        ("/admin/grants?user=0", "Pick a member"),
+        ("/admin/audit", "Audit log"),
+        ("/admin/security", "Deployment mode"),
+    ] {
+        let r = get(&w.router, path, Some(&cookie)).await;
+        assert_eq!(r.status, StatusCode::OK, "{path}");
+        assert!(r.body.contains(needle), "{path} lacks {needle}");
+        assert_csp_clean(&r.body, path);
+    }
+    // The signed-in admin cannot disable or reset themself from the list.
+    let users = get(&w.router, "/admin/users", Some(&cookie)).await;
+    assert!(users.body.contains(">you<") && !users.body.contains("Disable"));
+    // Audit rows carry a machine timestamp the browser localizes.
+    assert!(
+        get(&w.router, "/admin/audit", Some(&cookie))
+            .await
+            .body
+            .contains("<time data-ts=")
+    );
+    // A successful change tells the page to refresh the list it altered.
+    // The token of *this* session, exactly as the page hands it to the browser.
+    let shell = get(&w.router, "/", Some(&cookie)).await.body;
+    let csrf = shell
+        .split(r#"name="csrf-token" content=""#)
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .unwrap()
+        .to_string();
+    let created = post(
+        &w.router,
+        "/admin/users",
+        Some(&cookie),
+        Some(&csrf),
+        "login=zed&password=another+long+passphrase&role=viewer",
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::OK);
+    assert_eq!(created.headers.get("hx-trigger").unwrap(), "cuadb:changed");
+    // The new member now appears with actions, and the permissions picker lists them.
+    let users = get(&w.router, "/admin/users", Some(&cookie)).await;
+    assert!(users.body.contains("zed") && users.body.contains("Disable"));
+    let picker = get(&w.router, "/admin/grants?user=0", Some(&cookie)).await;
+    assert!(picker.body.contains("zed"));
+}
+
+#[tokio::test]
+async fn non_admins_and_anonymous_visitors_never_get_the_administration_view() {
+    let w = world(true).await;
+    for path in ["/admin", "/admin/security", "/admin/users"] {
+        let anon = get(&w.router, path, None).await;
+        assert_eq!(anon.status, StatusCode::SEE_OTHER, "{path} anonymous");
+    }
+    let viewer = w
+        .svc
+        .create_user(&w.admin, "vic", "a long enough passphrase!", Role::Viewer)
+        .await
+        .unwrap();
+    let _ = viewer;
+    let session = w
+        .svc
+        .login("vic", "a long enough passphrase!")
+        .await
+        .unwrap();
+    let cookie = format!("cuadb_session={}", session.token);
+    for path in ["/admin", "/admin/security", "/admin/users", "/admin/audit"] {
+        assert_eq!(
+            get(&w.router, path, Some(&cookie)).await.status,
+            StatusCode::FORBIDDEN,
+            "{path}"
+        );
+    }
+}

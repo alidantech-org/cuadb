@@ -394,7 +394,7 @@ pub struct RelationQuery {
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProfileQuery {
-    profile: Option<String>,
+    pub(crate) profile: Option<String>,
 }
 
 fn checked_query_name(value: String) -> Result<String, AppError> {

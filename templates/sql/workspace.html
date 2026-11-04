@@ -1,0 +1,20 @@
+<section id="catalog-panel" class="panel" aria-label="SQL workspace" hx-history="false" data-panel="sql">
+  <header class="bar">
+    <h1><i class="ic-slot" data-ic="bolt" aria-hidden="true"></i><span>sql.</span>{{ profile_label }}</h1>
+    <span class="tag {% if can_write %}m-write{% else %}m-read{% endif %}">{% if can_write %}can write{% else %}read only{% endif %}</span>
+    <span class="sp"></span>
+    {% if can_write %}<button class="btn" type="button" id="sql-begin" hx-post="/tx/begin" hx-target="#sql-tx" hx-swap="innerHTML">Begin transaction</button>{% endif %}
+    <button class="btn" type="button" id="sql-cancel" hx-post="/sql/cancel" hx-target="#sql-note" hx-swap="innerHTML" hidden>Cancel</button>
+    <button class="btn on" type="submit" form="sqlform" id="sqlrun" title="Run (Ctrl/⌘ Enter)">Run ⌘↵</button>
+  </header>
+  <div class="sqlw">
+    <form id="sqlform" hx-post="/sql/execute" hx-target="#sqlout" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#sqlform">
+      <input type="hidden" name="statement_id" id="sql-sid" value="">
+      <textarea id="sql" name="sql" spellcheck="false" autocomplete="off" aria-label="SQL statement" placeholder="SELECT * FROM … LIMIT 100" required maxlength="65536"></textarea>
+    </form>
+    <div class="sqlh">One statement at a time · {{ max_rows }}-row cap · {{ timeout_secs }} s timeout · reads run in a read-only transaction{% if !can_write %} · this connection or your access does not allow changes{% endif %}</div>
+    <div id="sql-note" class="adm-msg" role="status" aria-live="polite"></div>
+    <section id="sql-tx" aria-label="Transaction" aria-live="polite"></section>
+    <div id="sqlout" aria-live="polite"><div class="sqle mu">Results appear here.</div></div>
+  </div>
+</section>

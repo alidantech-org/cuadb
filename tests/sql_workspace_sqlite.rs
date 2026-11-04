@@ -1418,3 +1418,55 @@ async fn a_failing_commit_changes_nothing_and_reports_a_conflict() {
         StatusCode::OK
     );
 }
+
+#[tokio::test]
+async fn the_workspace_page_reflects_access_and_stays_free_of_inline_code() {
+    let w = world("page", "read-write", true).await;
+    let (status, html) = get(&w.router, &w.admin, "/sql").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains(r#"id="sqlform""#) && html.contains(r#"hx-post="/sql/execute""#));
+    assert!(html.contains("can write") && html.contains("Begin transaction"));
+    for needle in [" style=", "<script", " onclick="] {
+        assert!(!html.contains(needle), "inline `{needle}`");
+    }
+    // A reader sees the editor but no way to start a transaction, and is told why.
+    let reader = user(&w, "rita", Role::Editor, &[("default", "", "", 9)]).await;
+    let (status, html) = get(&w.router, &reader, "/sql").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("read only") && !html.contains("Begin transaction"));
+    // Without a profile-wide SQL grant the page is refused like the endpoint.
+    let nosql = user(&w, "nils", Role::Viewer, &[("default", "", "", 3)]).await;
+    assert_eq!(
+        get(&w.router, &nosql, "/sql").await.0,
+        StatusCode::FORBIDDEN
+    );
+    // The transaction fragment carries what the commit form needs, and nothing inline.
+    let (_, started) = post(&w.router, &w.admin, "/tx/begin", "").await;
+    assert!(started.contains(r#"class="txbar""#) && started.contains(r#"data-tx=""#));
+    assert!(started.contains(r#"name="expected_changes" value="0""#));
+    assert!(!started.contains(" style="));
+}
+
+#[tokio::test]
+async fn the_workspace_page_is_not_available_when_the_operator_left_it_off() {
+    let w = world("pageoff", "read-write", false).await;
+    let (status, html) = get(&w.router, &w.admin, "/sql").await;
+    assert_ne!(status, StatusCode::OK);
+    assert!(!html.contains("sqlform"));
+}
+
+#[tokio::test]
+async fn the_sidebar_entry_appears_only_for_users_who_may_run_sql() {
+    let w = world("entry", "read-write", true).await;
+    let (_, admin_shell) = get(&w.router, &w.admin, "/").await;
+    assert!(admin_shell.contains(r#"id="sqlb""#));
+    let reader = user(&w, "rae", Role::Editor, &[("default", "", "", 1)]).await;
+    let (_, reader_shell) = get(&w.router, &reader, "/").await;
+    assert!(
+        !reader_shell.contains(r#"id="sqlb""#),
+        "no SQL grant, no entry"
+    );
+    let off = world("entryoff", "read-write", false).await;
+    let (_, off_shell) = get(&off.router, &off.admin, "/").await;
+    assert!(!off_shell.contains(r#"id="sqlb""#), "operator switch off");
+}

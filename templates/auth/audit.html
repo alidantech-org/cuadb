@@ -1,8 +1,11 @@
-<section id="admin-audit" aria-label="Audit log">
-  <h1>Audit log</h1>
-  <table>
-    <thead><tr><th>Id</th><th>Time</th><th>Actor</th><th>Event</th><th>Profile</th><th>Resource</th><th>Outcome</th><th>Detail</th></tr></thead>
-    <tbody>{% for event in events %}<tr><td>{{ event.id }}</td><td>{{ event.ts }}</td><td>{{ event.actor }}</td><td>{{ event.kind }}</td><td>{{ event.profile }}</td><td>{{ event.resource }}</td><td>{{ event.outcome }}</td><td>{{ event.detail }}</td></tr>{% endfor %}</tbody>
+<div class="adm" data-tab="audit" data-src="/admin/audit">
+  <div class="adm-head"><h4>Audit log</h4><span class="hint">Newest first. Values are never recorded.</span></div>
+  <table class="w">
+    <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Connection</th><th>Outcome</th></tr></thead>
+    <tbody>
+      {% for event in events %}<tr><td><time data-ts="{{ event.ts }}">{{ event.ts }}</time></td><td>{{ event.actor }}</td><td>{{ event.kind }}</td><td>{{ event.resource }}{% if !event.detail.is_empty() %}<small class="mu"> · {{ event.detail }}</small>{% endif %}</td><td>{{ event.profile }}</td><td><span class="tag {% if event.outcome == "ok" %}ro{% endif %}">{{ event.outcome }}</span></td></tr>{% endfor %}
+      {% if events.is_empty() %}<tr><td colspan="6" class="empty-row">No events yet.</td></tr>{% endif %}
+    </tbody>
   </table>
-  {% if let Some(next) = next_before %}<a href="/admin/audit?before={{ next }}">Older</a>{% endif %}
-</section>
+  {% if let Some(next) = next_before %}<p><button class="btn" type="button" hx-get="/admin/audit?before={{ next }}" hx-target="#admin-body" hx-swap="innerHTML">Older events</button></p>{% endif %}
+</div>
