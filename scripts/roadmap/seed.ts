@@ -125,11 +125,7 @@ function taskCommand(): string {
   return command;
 }
 
-function taskRun(
-  executable: string,
-  args: string[],
-  env: NodeJS.ProcessEnv = process.env,
-): string {
+function taskRun(executable: string, args: string[], env: NodeJS.ProcessEnv = process.env): string {
   const processResult = spawnSync(executable, args, {
     cwd: root,
     env,
@@ -229,11 +225,11 @@ function repairExistingGroupGoals(executable: string): number {
     // No in-place frontmatter edits: use the Task document editor operation.
     const editorPath = resolve(root, 'scripts/roadmap/repair-goal-editor.ts');
     const editorCommand = `bun "${editorPath.replaceAll('"', '\\"')}"`;
-    taskRun(
-      executable,
-      ['docs', 'open', `GOAL-${existing.id}`],
-      { ...process.env, EDITOR: editorCommand, CUADB_REPAIR_GROUP: group.key },
-    );
+    taskRun(executable, ['docs', 'open', `GOAL-${existing.id}`], {
+      ...process.env,
+      EDITOR: editorCommand,
+      CUADB_REPAIR_GROUP: group.key,
+    });
 
     if (readFileSync(goalPath, 'utf8').includes(LEGACY_GOAL_PARAGRAPH)) {
       throw new Error(`Task CLI did not persist repaired goal for ${existing.id}`);

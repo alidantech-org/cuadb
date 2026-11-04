@@ -116,7 +116,9 @@ function dev(): void {
   ensureRust();
   buildAssets();
 
-  console.log(`Starting CuaDB at http://${process.env.CUADB_HOST ?? '127.0.0.1'}:${process.env.CUADB_PORT ?? '4848'}`);
+  console.log(
+    `Starting CuaDB at http://${process.env.CUADB_HOST ?? '127.0.0.1'}:${process.env.CUADB_PORT ?? '4848'}`,
+  );
   const css = spawn(bin('tailwindcss'), [...tailwindArgs, '--watch'], {
     cwd: root,
     stdio: 'inherit',

@@ -1,5 +1,5 @@
 ---
-{id: TSK-BDEAE8F3E238,name: Harden server configuration and startup lifecycle,type: task,status: planned,priority: high,created_at: 2026-11-04T07:32:04.183Z,updated_at: 2026-11-04T07:32:04.183Z,tags: [cuadb,foundation],order: 1024}
+{id: TSK-BDEAE8F3E238,name: Harden server configuration and startup lifecycle,type: task,status: in-progress,priority: high,created_at: 2026-11-04T07:32:04.183Z,updated_at: 2026-11-04T08:26:24.265Z,tags: [cuadb,foundation],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T08:26:24.265Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-BDEAE8F3E238/1793780784278-start,started_at: 2026-11-04T08:26:24.294Z}]}}}
 ---
 
 # Harden server configuration and startup lifecycle

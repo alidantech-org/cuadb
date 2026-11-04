@@ -48,7 +48,8 @@ describe('CuaDB Task roadmap definition', () => {
   });
 
   test('renders meaningful group-specific goals that satisfy Task quality markers', () => {
-    const placeholderMarker = /\b(?:TODO|TBD|FIXME)\b|\b(?:lorem ipsum|to be (?:written|defined|determined)|describe here|fill (?:this|me) in)\b/i;
+    const placeholderMarker =
+      /\b(?:TODO|TBD|FIXME)\b|\b(?:lorem ipsum|to be (?:written|defined|determined)|describe here|fill (?:this|me) in)\b/i;
     for (const group of groups) {
       const goal = groupGoal(group);
       expect(goal).toContain(group.goal);
