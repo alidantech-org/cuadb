@@ -1,27 +1,23 @@
-# Compile CSS and vendor HTMX using Bun; Bun is not included at runtime.
+# Bun builds local CSS/JS assets; it is absent from the final container.
 FROM oven/bun:1 AS assets
 WORKDIR /app
-COPY package.json ./
+COPY . .
 RUN bun install
-COPY scripts/ ./scripts/
-COPY assets/ ./assets/
-COPY templates/ ./templates/
 RUN bun run assets:build
 
-# Build the Rust HTTP server and compile Askama templates.
+# Build Rust and compile Askama templates. Existing Cargo.lock is respected.
 FROM rust:1-bookworm AS builder
 WORKDIR /app
-COPY Cargo.toml rust-toolchain.toml rustfmt.toml ./
-COPY src/ ./src/
-COPY templates/ ./templates/
+COPY . .
 RUN cargo build --release
 
-# One small runtime container; no Node, Bun, nginx or database is bundled.
+# One runtime container, one HTTP port: no Node, Bun, Nginx or database.
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 COPY --from=builder /app/target/release/cuadb ./cuadb
 COPY --from=assets /app/public/ ./public/
-ENV CUADB_PORT=4848\nENV CUADB_HOST=0.0.0.0
+ENV CUADB_PORT=4848
+ENV CUADB_HOST=0.0.0.0
 EXPOSE 4848
 USER 10001:10001
 CMD ["/app/cuadb"]
