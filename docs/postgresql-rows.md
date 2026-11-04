@@ -38,9 +38,10 @@ become a raw SQL statement or a new connection target.
 Numbered pages use a maximum of 10,000 OFFSET rows. A non-partial,
 single-column unique NOT NULL key provides stable tie-breaking.
 Integer keys additionally permit next/previous indexed keyset navigation.
-Server-issued cursors expire after five minutes and are validated against
-the exact relation, column selection, sort and page size. A bounded in-memory
-registry holds up to 1024 tokens; restarting the server invalidates tokens.
+Server-issued 256-bit random cursors expire after five minutes and are
+validated against the exact relation, column selection, sort and page size.
+A bounded in-memory registry holds up to 1024 tokens; restarting the server
+invalidates tokens. Cursor values contain no database keys or cell values.
 
 Other sorts use bounded OFFSET. NULLS LAST is explicit. Sorting JSON,
 geometry, arrays and other unsupported types is rejected. Without a usable
@@ -79,3 +80,8 @@ values, large Unicode, numerics and bytea. Normal unit and smoke tests
 never require PostgreSQL. To verify the HTML fragment locally, run the
 server with a reader URL and open a permitted relation using
 `/catalog/data?schema=cuadb_fixture&relation=paging`.
+
+The implementation was verified locally against PostgreSQL 18.6 with a
+dedicated non-superuser reader. The same disposable database was also tested
+with PostGIS enabled. Permission-denied catalog access, cursor tampering and
+live HTTP next-page navigation were exercised separately.

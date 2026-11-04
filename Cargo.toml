@@ -15,6 +15,7 @@ tower-http = { version = "0.6", features = ["fs"] }
 # No SQL migrations, macro compiler database access, or extra engines.
 sqlx = { version = "=0.8.6", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki"] }
 url = "=2.5.8"
+getrandom = "0.3"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

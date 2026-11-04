@@ -191,10 +191,16 @@ pub enum Cell {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SortDirection { Asc, Desc }
+pub enum SortDirection {
+    Asc,
+    Desc,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SortSpec { pub column: String, pub direction: SortDirection }
+pub struct SortSpec {
+    pub column: String,
+    pub direction: SortDirection,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RowOptions {
@@ -206,7 +212,13 @@ pub struct RowOptions {
 }
 impl Default for RowOptions {
     fn default() -> Self {
-        Self { limit: 25, page: 0, selected_columns: vec![], sort: None, cursor: None }
+        Self {
+            limit: 25,
+            page: 0,
+            selected_columns: vec![],
+            sort: None,
+            cursor: None,
+        }
     }
 }
 

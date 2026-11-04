@@ -1,5 +1,5 @@
 ---
-{id: TSK-23B4836BB3AE,name: Fetch bounded PostgreSQL row pages with deterministic ordering,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:05.334Z,updated_at: 2026-11-04T07:32:05.334Z,tags: [cuadb,postgres-rows],depends_on: [TSK-EC8CC62AD5CD,TSK-5CCB4090CF43],order: 2048}
+{id: TSK-23B4836BB3AE,name: Fetch bounded PostgreSQL row pages with deterministic ordering,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.334Z,updated_at: 2026-11-04T11:13:52.263Z,tags: [cuadb,postgres-rows],depends_on: [TSK-EC8CC62AD5CD,TSK-5CCB4090CF43],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:13:52.263Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-23B4836BB3AE/1793790832265-start,started_at: 2026-11-04T11:13:52.282Z}]}}}
 ---
 
 # Fetch bounded PostgreSQL row pages with deterministic ordering
@@ -16,11 +16,11 @@ This task belongs to **04 — Safe data retrieval, sorting and pagination**. The
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Fetch only requested columns and a bounded number of rows using stable ordering where possible.
-- [ ] Apply statement timeouts and max page size before submitting SQL to PostgreSQL.
-- [ ] Represent empty tables, permission errors and unsupported types without crashes.
-- [ ] Add tests for 0, 1, 50 and more than 50 rows with deterministic order assertions.
-- [ ] Record safe slow-query diagnostics without logging cell values or secrets.
+- [x] Fetch only requested columns and a bounded number of rows using stable ordering where possible.
+- [x] Apply statement timeouts and max page size before submitting SQL to PostgreSQL.
+- [x] Represent empty tables, permission errors and unsupported types without crashes.
+- [x] Add tests for 0, 1, 50 and more than 50 rows with deterministic order assertions.
+- [x] Record safe slow-query diagnostics without logging cell values or secrets.
 
 ## UI-demo backend support
 
@@ -32,3 +32,9 @@ The real frontend must match the canonical committed `assets/cuadb-ui-demo.html`
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T11:13:53.143Z · PETER IRUNGU
+
+Verified bounded 0/1/50/120-row pages, stable integer-key order, timeout configuration, permission-safe failures, and value-free slow-query diagnostics against PostgreSQL 18.6. Acceptance items 6-7 remain open: src/db/exports.rs defines caps only; there are still no streaming current-view/whole-table CSV, JSON, or related ZIP endpoints. Task intentionally remains in progress.

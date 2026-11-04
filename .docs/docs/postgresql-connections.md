@@ -1,3 +1,7 @@
+---
+{id: DOC-POSTGRESQL-CONNECTIONS,name: PostgreSQL connection security,type: documentation}
+---
+
 # PostgreSQL connection and read-only security
 
 CuaDB is a **read-only browser explorer**, not a SQL console. The connection

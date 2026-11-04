@@ -1,3 +1,7 @@
+---
+{id: DOC-POSTGRESQL-CATALOG,name: PostgreSQL catalog discovery,type: documentation}
+---
+
 # PostgreSQL catalog discovery (Group 03)
 
 CuaDB uses **fixed, read-only pg_catalog queries** over the single

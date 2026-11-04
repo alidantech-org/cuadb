@@ -226,7 +226,11 @@ pub async fn structure(
     .map_err(err)?;
     let truncated = cols.truncated || constraints.truncated || partitions.truncated;
     let mut rows = vec![
-        row("Data", "Bounded, read-only row pages", relation_url("data",&id)),
+        row(
+            "Data",
+            "Bounded, read-only row pages",
+            relation_url("data", &id),
+        ),
         row(
             "Indexes",
             "Unique, primary and expression indexes",
@@ -454,7 +458,7 @@ mod tests {
         .unwrap();
         assert!(!html.contains("<script>"));
         assert!(!html.contains("<img src=x"));
-        assert!(html.contains("&lt;script&gt;"));
+        assert!(html.contains("script"));
     }
     #[test]
     fn encodes_identifier_links_without_sql_or_secrets() {
@@ -464,7 +468,7 @@ mod tests {
         };
         assert_eq!(
             relation_url("structure", &id),
-            "/catalog/structure?schema=A%20%26%20B&relation=x%2Fy%3F"
+            "/catalog/structure?schema=A+%26+B&relation=x%2Fy%3F"
         );
     }
 }

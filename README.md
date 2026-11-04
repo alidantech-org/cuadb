@@ -2,7 +2,7 @@
 
 **CuaDB** is a fast, local-first, **read-only database explorer** for the browser. The goal is to connect to a database, browse schemas and tables, and inspect paginated records, column types, indexes and storage details—without a SQL runner or a bulky administration UI.
 
-> **Current status: safe PostgreSQL row paging (Group 04).** The Axum/Askama/HTMX server now includes bounded row pages, optional catalog-validated column selection, sorting and indexed keyset navigation for eligible integer keys. **Whole-table exports and full canonical grid UI are not enabled yet.** Real row pages require the operator-configured PostgreSQL connection and a SELECT-only role. Fedora compilation and disposable fixture verification remain outstanding.
+> **Current status: safe PostgreSQL row paging (Group 04).** The Axum/Askama/HTMX server includes bounded row pages, optional catalog-validated column selection, sorting and indexed keyset navigation for eligible integer keys. **Whole-table exports and full canonical grid UI are not enabled yet.** Real row pages require the operator-configured PostgreSQL connection and a SELECT-only role. The catalog and row paths are compiled and verified against disposable PostgreSQL 18.6 and PostGIS fixtures.
 
 ## Catalog inspection (Group 03)
 

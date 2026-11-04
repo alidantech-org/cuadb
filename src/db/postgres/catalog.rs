@@ -334,8 +334,8 @@ impl PgCatalog {
                       pg_catalog.pg_get_indexdef(i.indexrelid) AS definition,
                       pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS predicate,
                       ARRAY(SELECT pg_catalog.pg_get_indexdef(i.indexrelid,k.pos,true)
-                            FROM generate_series(1,i.indnkeyatts::int) AS k
-                            ORDER BY k) AS columns
+                            FROM generate_series(1,i.indnkeyatts::int) AS k(pos)
+                            ORDER BY k.pos) AS columns
                 FROM pg_catalog.pg_index i
                 JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid
                 WHERE i.indrelid::bigint=$1
@@ -700,10 +700,16 @@ impl DatabaseAdapter for PgCatalog {
     async fn overview(&self) -> Result<Overview, DbError> {
         self.advanced_overview().await
     }
-    async fn page(&self,id:&RelationId,opts:crate::db::types::RowOptions)
-        -> Result<RowPage,DbError> { self.fetch_rows(id,opts).await }
-    async fn rows(&self,id:&RelationId,opts:PageRequest)
-        -> Result<RowPage,DbError> { self.offset_page(id,opts).await }
+    async fn page(
+        &self,
+        id: &RelationId,
+        opts: crate::db::types::RowOptions,
+    ) -> Result<RowPage, DbError> {
+        self.fetch_rows(id, opts).await
+    }
+    async fn rows(&self, id: &RelationId, opts: PageRequest) -> Result<RowPage, DbError> {
+        self.offset_page(id, opts).await
+    }
 }
 
 #[cfg(test)]

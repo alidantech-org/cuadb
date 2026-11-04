@@ -61,8 +61,11 @@ pub trait DatabaseAdapter: Send + Sync {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
     /// Extended paging, optional on other database engines.
-    fn page(&self, _: &RelationId, _: RowOptions)
-        -> impl Future<Output = Result<RowPage, DbError>> + Send {
+    fn page(
+        &self,
+        _: &RelationId,
+        _: RowOptions,
+    ) -> impl Future<Output = Result<RowPage, DbError>> + Send {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
     fn rows(

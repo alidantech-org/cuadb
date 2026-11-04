@@ -1,5 +1,5 @@
 ---
-{id: TSK-8DB2E738839F,name: Normalize PostgreSQL cell types and bound large values,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:05.546Z,updated_at: 2026-11-04T07:32:05.546Z,tags: [cuadb,postgres-rows],depends_on: [TSK-23B4836BB3AE],order: 5120}
+{id: TSK-8DB2E738839F,name: Normalize PostgreSQL cell types and bound large values,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.546Z,updated_at: 2026-11-04T11:14:06.820Z,tags: [cuadb,postgres-rows],depends_on: [TSK-23B4836BB3AE],order: 5120,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:14:06.352Z},{from: in-progress,to: completed,at: 2026-11-04T11:14:06.820Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-8DB2E738839F/1793790846354-start,started_at: 2026-11-04T11:14:06.367Z,end_ref: refs/tracking/TSK-8DB2E738839F/1793790846823-end,ended_at: 2026-11-04T11:14:06.821Z,summary: {files: 0,insertions: 0,deletions: 0}}]}}}
 ---
 
 # Normalize PostgreSQL cell types and bound large values
@@ -16,11 +16,17 @@ This task belongs to **04 — Safe data retrieval, sorting and pagination**. The
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Decode common PostgreSQL scalar types and NULL distinctly from empty strings.
-- [ ] Cap rendered bytes per cell, total response size and expanded-value retrieval.
-- [ ] Preserve precise raw representations for timestamps, numbers and UUID values.
-- [ ] Handle unsupported or extension types with a safe textual fallback and type indicator.
-- [ ] Test UTF-8 escaping, very large values, binary data and malformed conversions.
+- [x] Decode common PostgreSQL scalar types and NULL distinctly from empty strings.
+- [x] Cap rendered bytes per cell, total response size and expanded-value retrieval.
+- [x] Preserve precise raw representations for timestamps, numbers and UUID values.
+- [x] Handle unsupported or extension types with a safe textual fallback and type indicator.
+- [x] Test UTF-8 escaping, very large values, binary data and malformed conversions.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T11:14:06.636Z · PETER IRUNGU
+
+Verified NULL versus empty text, integers, arbitrary-precision numeric text, booleans, timestamps, UUID, JSON/arrays/extension textual fallback, bytea decoding, malformed integer fallback, UTF-8 byte caps, explicit truncation markers, and bounded page response size.

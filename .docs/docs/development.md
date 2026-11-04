@@ -1,3 +1,7 @@
+---
+{id: DOC-CUADB-DEVELOPMENT,name: CuaDB developer workflow,type: documentation}
+---
+
 # CuaDB developer workflow
 
 CuaDB is a **single-binary, read-only database explorer**. Bun builds local
