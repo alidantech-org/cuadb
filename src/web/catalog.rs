@@ -112,6 +112,8 @@ struct RelationTreeTemplate {
     schema: String,
     relations: Vec<RelationItem>,
     note: String,
+    /// The bounded catalog list was cut off; tell the user even when rows exist.
+    truncated: bool,
 }
 struct RelationItem {
     name: String,
@@ -366,6 +368,8 @@ fn relation(raw: Option<String>) -> Result<RelationId, AppError> {
 #[serde(deny_unknown_fields)]
 pub struct SchemaQuery {
     schema: String,
+    /// Optional literal, case-insensitive name filter (no wildcards).
+    q: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -433,6 +437,14 @@ pub async fn relations(
     Query(query): Query<SchemaQuery>,
 ) -> Result<Response, AppError> {
     let schema = checked_query_name(query.schema)?;
+    let needle = match query.q {
+        Some(q) if q.is_empty() => None,
+        Some(q) if q.chars().count() > 64 || q.chars().any(char::is_control) => {
+            return Err(AppError::new(ErrorKind::InvalidInput));
+        }
+        Some(q) => Some(q.to_lowercase()),
+        None => None,
+    };
     let entries = catalog(&state)?
         .list_relations(&schema)
         .await
@@ -441,6 +453,11 @@ pub async fn relations(
     let relations = entries
         .items
         .into_iter()
+        .filter(|relation| {
+            needle
+                .as_ref()
+                .is_none_or(|n| relation.id.name.to_lowercase().contains(n))
+        })
         .map(|relation| RelationItem {
             name: relation.id.name.clone(),
             kind: format!("{:?}", relation.kind),
@@ -450,8 +467,11 @@ pub async fn relations(
     tree_response(RelationTreeTemplate {
         schema,
         relations,
+        truncated,
         note: if truncated {
-            "Only SELECT-visible relations are listed; the bounded list is incomplete.".into()
+            "Only SELECT-visible relations are listed; the bounded list (and any search over it) is incomplete.".into()
+        } else if needle.is_some() {
+            "Filtered by name among SELECT-visible relations.".into()
         } else {
             "Only relations with SELECT privilege are listed.".into()
         },

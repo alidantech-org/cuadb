@@ -9,5 +9,6 @@
       </a>
     </li>
     {% endfor %}
+    {% if truncated %}<li class="catalog-note" role="status">{{ note }}</li>{% endif %}
   {% endif %}
 </ul>

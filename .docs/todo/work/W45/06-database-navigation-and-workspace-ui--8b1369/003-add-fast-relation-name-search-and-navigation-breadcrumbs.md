@@ -20,7 +20,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Preserve navigation context and selection when clearing or changing the search.
 - [ ] Provide keyboard navigation and clear empty-results messaging.
 - [ ] Test special characters, case sensitivity and large table lists.
-- [ ] Keep search requests bounded and debounce remote requests when used.
+- [x] Keep search requests bounded and debounce remote requests when used.
 
 ## Canonical UI fidelity
 
@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T11:29:34.666Z · PETER IRUNGU
 
 Added immediate case-insensitive relation-name filtering on server-rendered catalog entries; filtering inspects names only and does not query cell data. Breadcrumbs and large-catalog server fallback remain open.
+
+### 2026-11-04T13:51:44.854Z · PETER IRUNGU
+
+BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Added literal, case-insensitive, 64-char-bounded name filter 'q' on /catalog/relations (no SQL wildcards; control chars rejected). Tests: router_fake_adapter (special chars %_ <b>, case, long/control input, 500-item truncated list) and catalog_live_http (live PG: Unicode/mixed-case names, empty result). LIMITATION: the filter runs over the adapter's bounded list (500 relations), so on truncated lists the result is flagged incomplete rather than searched server-side; search is per-schema only. Item 4 debounce and items 1-3,6-8 are UI (Ctrl+K, keyboard nav, placement).

@@ -52,13 +52,16 @@ impl DatabaseAdapter for Fake {
     }
     async fn relations(&self, _: &str) -> Result<Vec<Relation>, DbError> {
         match self.0 {
-            Mode::Healthy => Ok(vec![Relation {
-                id: RelationId {
-                    namespace: "main".into(),
-                    name: "users".into(),
-                },
-                kind: RelationKind::Table,
-            }]),
+            Mode::Healthy => Ok(["users", "Users_Archive", "50%_off", "<b>x</b>", "orders"]
+                .into_iter()
+                .map(|name| Relation {
+                    id: RelationId {
+                        namespace: "main".into(),
+                        name: name.into(),
+                    },
+                    kind: RelationKind::Table,
+                })
+                .collect()),
             _ => Err(DbError::new(DbErrorKind::PermissionDenied)),
         }
     }
@@ -102,6 +105,26 @@ impl DatabaseAdapter for Fake {
             page: options.page,
             offset: start as u64,
             truncated_columns: false,
+        })
+    }
+    async fn list_relations(&self, namespace: &str) -> Result<CatalogList<Relation>, DbError> {
+        if namespace != "big" {
+            return Ok(CatalogList {
+                items: self.relations(namespace).await?,
+                truncated: false,
+            });
+        }
+        Ok(CatalogList {
+            items: (0..500)
+                .map(|i| Relation {
+                    id: RelationId {
+                        namespace: "big".into(),
+                        name: format!("table_{i:03}"),
+                    },
+                    kind: RelationKind::Table,
+                })
+                .collect(),
+            truncated: true,
         })
     }
     async fn constraints(&self, id: &RelationId) -> Result<CatalogList<Constraint>, DbError> {
@@ -390,4 +413,48 @@ async fn related_zip_manifest_lists_relationships_and_enforces_bounds() {
     )
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn relation_search_is_literal_case_insensitive_bounded_and_escaped() {
+    let base = "/catalog/relations?schema=main";
+    let (_, body) = get(Mode::Healthy, &format!("{base}&q=USERS"), 2000).await;
+    assert!(body.contains("users") && body.contains("Users_Archive") && !body.contains("orders"));
+    // % and _ are literal characters, never SQL wildcards.
+    let (_, body) = get(Mode::Healthy, &format!("{base}&q=%25_"), 2000).await;
+    assert!(body.contains("50%_off") && !body.contains("orders") && !body.contains("users"));
+    let (_, body) = get(Mode::Healthy, &format!("{base}&q=%3Cb%3E"), 2000).await;
+    assert!(
+        !body.contains("<b>x</b>") && (body.contains("&lt;b&gt;") || body.contains("&#60;b&#62;"))
+    );
+    let (_, body) = get(Mode::Healthy, &format!("{base}&q=zzz"), 2000).await;
+    assert!(!body.contains("users"));
+    let (_, body) = get(Mode::Healthy, &format!("{base}&q="), 2000).await;
+    assert!(body.contains("orders") && body.contains("users"));
+    for bad in [
+        format!("{base}&q={}", "a".repeat(65)),
+        format!("{base}&q=a%0Ab"),
+    ] {
+        let (status, _) = get(Mode::Healthy, &bad, 2000).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{bad}");
+    }
+}
+
+#[tokio::test]
+async fn many_relations_render_a_bounded_tree_and_search_reports_incompleteness() {
+    let (status, body) = get(Mode::Healthy, "/catalog/relations?schema=big", 5000).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body.matches("table_").count() >= 500, true);
+    assert!(body.contains("incomplete"));
+    let (_, body) = get(
+        Mode::Healthy,
+        "/catalog/relations?schema=big&q=TABLE_49",
+        5000,
+    )
+    .await;
+    assert!(body.contains("table_499") && !body.contains("table_300"));
+    assert!(
+        body.contains("incomplete"),
+        "search over a truncated list must say so"
+    );
 }

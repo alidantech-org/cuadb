@@ -18,9 +18,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 ## Acceptance checklist
 - [x] Load available schema nodes and relation lists through real adapter-backed routes.
 - [ ] Support expand/collapse and distinguish tables, views and partition parents.
-- [ ] Implement empty schema and permission-denied states without broken tree nodes.
+- [x] Implement empty schema and permission-denied states without broken tree nodes.
 - [ ] Preserve selected relation and active tab across HTMX navigation.
-- [ ] Test tree behavior with many relations and unusual names.
+- [x] Test tree behavior with many relations and unusual names.
 
 ## Canonical UI fidelity
 
@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T11:29:34.362Z · PETER IRUNGU
 
 Schema fragment is loaded through HTMX from actual PostgreSQL adapter routes. Relation names carry safe navigation URLs and are filtered client-side without reading row data. Collapsible grouped schema tree and keyboard selection behavior remain incomplete.
+
+### 2026-11-04T13:51:44.968Z · PETER IRUNGU
+
+Items 3,5 verified: permission-denied and empty states at route level, unusual/Unicode names live, 500-relation truncated tree. Fixed defect: truncation note was only rendered for empty lists (templates/components/relation_tree.html) - now shown whenever the list is cut off. Items 2,4,6,7,8 UI/expansion state: pending Phase B.
