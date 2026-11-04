@@ -2,7 +2,31 @@
 
 **CuaDB** is a fast, local-first, **read-only database explorer** for the browser. The goal is to connect to a database, browse schemas and tables, and inspect paginated records, column types, indexes and storage details—without a SQL runner or a bulky administration UI.
 
-> **Current status: database connection foundation (Group 02).** The single-binary Rust/Askama/HTMX application now accepts a trusted server-side PostgreSQL URL, initializes a bounded read-only SQLx pool, and displays safe connection status. **Schema discovery, table grids, and actual database row queries are not implemented yet.** The data grid is still a placeholder.
+> **Current status: PostgreSQL catalog foundation (Group 03).** The Rust/Askama/HTMX server supports read-only schema, relation, column, key, index, partition, advanced-object and statistics inspection through a bounded SQLx PostgreSQL pool. **Actual data rows, sorting, export and the final canonical explorer UI are not implemented yet.** The data grid remains a placeholder. Catalog endpoints require an operator-configured database.
+
+## Catalog inspection (Group 03)
+
+With a configured read-only PostgreSQL URL, open the explorer and inspect the
+live **Catalog** panel. It lists accessible schemas and relations; selecting a
+relation displays structure, constraints, partitions, indexes and storage
+details. Direct read-only endpoints also provide an advanced object tree and
+bounded overview:
+
+```text
+/catalog/schemas
+/catalog/relations?schema=public
+/catalog/structure?schema=public&relation=example
+/catalog/indexes?schema=public&relation=example
+/catalog/stats?schema=public&relation=example
+/catalog/advanced?schema=public
+/catalog/overview
+```
+
+No endpoint accepts arbitrary SQL or a connection URL. System schemas are
+not navigable, source identifiers are parameter-bound, catalog sizes are
+bounded and truncation is visible. Row retrieval is deliberately unsupported
+in this wave. Full SQL/permissions/fixture details: [PostgreSQL catalog
+discovery](docs/postgresql-catalog.md).
 
 ## Canonical frontend UI reference
 
@@ -47,7 +71,7 @@ bun run dev
 
 Open **http://localhost:4848**. On the first invocation the Bun dispatcher installs missing JS tooling automatically, builds CSS, copies HTMX and the local JS into `public/`, and launches Rust. Subsequent code changes under `src/` or `templates/` restart the Rust process; Tailwind watches styles. Reload the browser after changes. Restart `bun run dev` if you create a *new nested directory*, change environment variables, or add dependencies.
 
-On a fresh clone, the first Rust compilation downloads crates from crates.io. Bun uses its committed lockfile. **After pulling the new SQLx dependencies for Group 02, run `bun run deps:sync` once on Fedora to refresh Cargo.lock, then commit that lockfile.** Subsequent commands enforce locked builds. Do not run a release build before the new lockfile is generated.
+On a fresh clone, the first Rust compilation downloads crates from crates.io. Bun uses its committed lockfile. The committed Cargo.lock includes SQLx. Subsequent commands enforce locked builds. Use `bun run deps:sync` only after intentionally editing Cargo.toml.
 
 ## Root commands
 

@@ -36,6 +36,11 @@ impl AppState {
         }
     }
 
+    /// The only catalog query target is the operator-configured shared pool.
+    pub fn catalog(&self) -> Option<crate::db::postgres::PgCatalog> {
+        self.postgres.as_ref().map(|manager| manager.catalog())
+    }
+
     /// Optional startup probe: errors change status, never crash the UI.
     pub fn start_probe(&self) {
         if let Some(manager) = &self.postgres {

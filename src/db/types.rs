@@ -27,6 +27,11 @@ pub enum Capability {
     StorageSizes,
     SpatialTypes,
     StableCursorPaging,
+    Routines,
+    Sequences,
+    UserTypes,
+    Triggers,
+    PartitionHierarchy,
 }
 
 /// Explicit presence information: do not use zero as a stand-in for unavailable.
@@ -45,6 +50,7 @@ pub struct RelationId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RelationKind {
     Table,
+    PartitionedTable,
     View,
     MaterializedView,
     Partition,
@@ -73,9 +79,103 @@ pub struct Column {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelationStats {
+    /// Approximate from pg_class.reltuples, not SELECT COUNT(*).
     pub estimated_rows: Availability<i64>,
     pub table_bytes: Availability<u64>,
     pub index_bytes: Availability<u64>,
+    pub total_bytes: Availability<u64>,
+}
+
+/// A bounded list never silently implies completeness.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogList<T> {
+    pub items: Vec<T>,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColumnDetail {
+    pub column: Column,
+    pub position: i16,
+    pub unique_key: bool,
+    pub identity: Option<String>,
+    pub generated: Option<String>,
+    pub domain: Option<String>,
+    pub enum_values: Availability<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintKind {
+    Primary,
+    Unique,
+    ForeignKey,
+    Check,
+    Exclusion,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Constraint {
+    pub name: String,
+    pub kind: ConstraintKind,
+    pub columns: Vec<String>,
+    /// Only populated when the referenced relation is visible to the reader.
+    pub references: Option<RelationId>,
+    pub referenced_columns: Vec<String>,
+    pub definition: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Index {
+    pub name: String,
+    pub columns_or_expressions: Vec<String>,
+    pub unique: bool,
+    pub primary: bool,
+    pub valid: bool,
+    pub predicate: Option<String>,
+    pub definition: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PartitionLink {
+    pub parent: RelationId,
+    pub child: RelationId,
+    pub bound: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogObjectKind {
+    Function,
+    Procedure,
+    Sequence,
+    UserType,
+    Trigger,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogObject {
+    pub kind: CatalogObjectKind,
+    pub namespace: String,
+    pub name: String,
+    /// Server-rendered inspector text; never callable through HTTP.
+    pub definition: Availability<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchemaSize {
+    pub namespace: String,
+    /// Derived from relpages, not an exact aggregated on-disk measurement.
+    pub estimated_bytes: Availability<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Overview {
+    pub extensions: Vec<String>,
+    pub schema_sizes: CatalogList<SchemaSize>,
+    pub largest_relations: CatalogList<(RelationId, Availability<u64>)>,
+    /// Counts are bounded to visible objects and may be incomplete.
+    pub visible_relation_count: usize,
+    pub visible_schema_count: usize,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

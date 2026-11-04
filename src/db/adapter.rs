@@ -4,8 +4,9 @@
 //! an explicit adapter enum can provide dispatch once multiple engines exist.
 
 use super::types::{
-    Capability, Column, DbError, Engine, Namespace, PageRequest, Relation, RelationId,
-    RelationStats, RowPage,
+    Capability, CatalogList, CatalogObject, Column, ColumnDetail, Constraint, DbError, Engine,
+    Index, Namespace, Overview, PageRequest, PartitionLink, Relation, RelationId, RelationStats,
+    RowPage,
 };
 use std::future::Future;
 
@@ -25,6 +26,31 @@ pub trait DatabaseAdapter: Send + Sync {
         &self,
         relation: &RelationId,
     ) -> impl Future<Output = Result<RelationStats, DbError>> + Send;
+    /// Optional extended metadata. Other engines explicitly return Unsupported.
+    fn column_details(&self, _: &RelationId)
+        -> impl Future<Output = Result<CatalogList<ColumnDetail>, DbError>> + Send {
+        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    }
+    fn constraints(&self, _: &RelationId)
+        -> impl Future<Output = Result<CatalogList<Constraint>, DbError>> + Send {
+        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    }
+    fn indexes(&self, _: &RelationId)
+        -> impl Future<Output = Result<CatalogList<Index>, DbError>> + Send {
+        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    }
+    fn partitions(&self, _: &RelationId)
+        -> impl Future<Output = Result<CatalogList<PartitionLink>, DbError>> + Send {
+        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    }
+    fn advanced_objects(&self, _: &str)
+        -> impl Future<Output = Result<CatalogList<CatalogObject>, DbError>> + Send {
+        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    }
+    fn overview(&self)
+        -> impl Future<Output = Result<Overview, DbError>> + Send {
+        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    }
     fn rows(
         &self,
         relation: &RelationId,
@@ -62,6 +88,7 @@ mod tests {
                 estimated_rows: Availability::Unavailable,
                 table_bytes: Availability::Unavailable,
                 index_bytes: Availability::Unavailable,
+                total_bytes: Availability::Unavailable,
             })
         }
         async fn rows(&self, _: &RelationId, _: PageRequest) -> Result<RowPage, DbError> {

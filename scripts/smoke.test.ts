@@ -92,6 +92,11 @@ test('serves the page, fragment and pure liveness endpoint', async () => {
   expect(connection.status).toBe(200);
   expect(connection.headers.get('cache-control')).toBe('no-store');
   expect(await connection.text()).toContain('Not configured');
+
+  // Catalog routes exist but must not access an unconfigured database.
+  const catalog = await fetch(`${address}/catalog/schemas`);
+  expect(catalog.status).toBe(200);
+  expect(await catalog.text()).toContain('Not configured.');
 });
 
 test('serves locally compiled CSS, HTMX and browser JavaScript', async () => {

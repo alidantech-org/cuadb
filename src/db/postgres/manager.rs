@@ -178,6 +178,14 @@ impl PgManager {
         self.pool.close().await;
     }
 
+    /// A small clone of the single shared pool for permission-scoped metadata.
+    pub fn catalog(&self) -> super::catalog::PgCatalog {
+        super::catalog::PgCatalog {
+            pool: self.pool.clone(),
+            deadline: self.limits.query_timeout,
+        }
+    }
+
     /// Report whether pooled sessions enforce both current and default
     /// transaction read-only settings. Only constant SELECT queries are used.
     pub async fn read_only_session_verified(&self) -> Result<bool, DbError> {
@@ -197,7 +205,7 @@ impl PgManager {
     }
 }
 
-fn classify(error: sqlx::Error) -> DbError {
+pub(super) fn classify(error: sqlx::Error) -> DbError {
     let kind = match &error {
         sqlx::Error::Database(db) => match db.code().as_deref() {
             Some("28P01" | "28000") => DbErrorKind::AuthenticationFailed,

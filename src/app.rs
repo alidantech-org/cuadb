@@ -63,6 +63,13 @@ pub fn router_with_limits(limits: &Limits) -> Router {
         .route("/health", get(web::health))
         .route("/fragments/status", get(web::status))
         .route("/connection/status", get(web::connection_status))
+        .route("/catalog/schemas", get(web::catalog::schemas))
+        .route("/catalog/relations", get(web::catalog::relations))
+        .route("/catalog/structure", get(web::catalog::structure))
+        .route("/catalog/indexes", get(web::catalog::indexes))
+        .route("/catalog/stats", get(web::catalog::stats))
+        .route("/catalog/advanced", get(web::catalog::advanced))
+        .route("/catalog/overview", get(web::catalog::overview))
         .nest_service("/static", ServeDir::new("public"));
 
     apply_policy(
@@ -78,6 +85,13 @@ pub fn router_with_state(limits: &Limits, state: crate::state::AppState) -> Rout
         .route("/health", get(web::health))
         .route("/fragments/status", get(web::status))
         .route("/connection/status", get(web::connection_status))
+        .route("/catalog/schemas", get(web::catalog::schemas))
+        .route("/catalog/relations", get(web::catalog::relations))
+        .route("/catalog/structure", get(web::catalog::structure))
+        .route("/catalog/indexes", get(web::catalog::indexes))
+        .route("/catalog/stats", get(web::catalog::stats))
+        .route("/catalog/advanced", get(web::catalog::advanced))
+        .route("/catalog/overview", get(web::catalog::overview))
         .nest_service("/static", ServeDir::new("public"))
         .with_state(state);
     apply_policy(routes, RequestPolicy::from_limits(limits))

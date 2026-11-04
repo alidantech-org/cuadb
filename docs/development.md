@@ -147,3 +147,18 @@ starts a disconnected server to remain fast and deterministic.
 Full role setup, PostgreSQL URL/TLS requirements, opt-in fixture tests and
 PostGIS container networking are documented in
 [PostgreSQL connections](postgresql-connections.md).
+
+## PostgreSQL catalog inspection
+
+Group 03 adds only read-only PostgreSQL metadata endpoints; it does not
+implement row scanning, table export, query editing, or a second web process.
+The explorer's catalog panel loads accessible schemas via HTMX and shows
+relation structure, indexes and exact storage bytes with approximate row
+estimates. Advanced objects (routine/sequence/type/trigger metadata) and a
+bounded overview are also exposed; data grids remain a later milestone.
+
+See [PostgreSQL catalog discovery](postgresql-catalog.md) for the API surface,
+privilege policies, visibility limits, and explicit **disposable PostgreSQL 18
+and PostGIS** fixtures. Do not run those fixture scripts against any existing
+database. Ordinary tests remain DB-independent; live catalog tests are opt-in
+and never execute writes.

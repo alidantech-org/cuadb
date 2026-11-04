@@ -1,5 +1,7 @@
 //! HTML endpoints: full pages and reusable fragments rendered by Askama.
 
+pub mod catalog;
+
 use askama::Template;
 use axum::{
     extract::State,
@@ -38,7 +40,7 @@ pub async fn explorer() -> Result<Html<String>, AppError> {
 pub async fn status() -> Result<Html<String>, AppError> {
     html(StatusTemplate {
         heading: "App shell ready",
-        detail: "The server is responding. Database connections are not implemented yet.",
+        detail: "The server is responding. Read-only catalog inspection is available when connected.",
     })
 }
 
