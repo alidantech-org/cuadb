@@ -55,6 +55,16 @@ for caps, limitations, fixture tests and export policy.
 - Retry is manual: re-click the control or reload the relation. Nothing polls; the connection badge is refreshed only when requested. Sorting and filtering are validated server-side per request, so a rejected request never changes server state.
 - Not covered by automated tests: actual browser abort behavior (needs Phase B browser validation).
 
+## Rich values, structure and spatial data (Group 08)
+
+- **Cell limits:** the grid shows a bounded preview per cell (truncated cells carry a `truncated` marker); the inspector detail is bounded too, so 20,000-element JSON/array/bytea and 100 KB text values keep the page small. Raw bytes render as `\x…` hex, arrays as PostgreSQL array text, JSON pretty-printed when small.
+- **Exactness:** numerics are shown as the database's exact text (no float rounding); NULL is distinct from empty text; `timestamptz` keeps microseconds and is rendered in the connection session's time zone (UTC), not the zone it was typed in.
+- **Untrusted text:** values are HTML-escaped by Askama; control characters and bidirectional overrides (U+202A–202E, U+2066–2069, U+200E/F, U+061C) are shown as visible `\u{XXXX}` escapes. Newline and tab are preserved.
+- **Structure:** columns (position, type, nullability, key, identity `ALWAYS`/`BY DEFAULT`, generated `STORED`/`VIRTUAL`, defaults, enum/domain info), constraints with foreign-key targets, partitions. Views show no constraints. Relations the role cannot read return an error, never partial metadata.
+- **Storage numbers** are engine estimates (`reltuples`, relation sizes), never `COUNT(*)`; partitioned parents report `Unavailable`.
+- **PostGIS:** geometry/geography columns show WKT/type; `spatial=geojson` is opt-in and returns bounded GeoJSON per cell (over ~1 KB is refused with a message), labels projected CRS (e.g. `EPSG:3857`), and keeps `POINT EMPTY` empty. No maps and no bulk conversion.
+- **Not verified:** a PostgreSQL instance *without* PostGIS (no such fixture available), invalid-geometry values, and deeply nested JSON beyond the preview bound.
+
 ## Canonical frontend UI reference
 
 The committed [CuaDB UI demo](assets/cuadb-ui-demo.html) is the **mandatory visual and interaction reference** for implementation, not a loose example. The final Rust/Askama/HTMX frontend must faithfully reproduce the demo's compact sidebar, resizer, Simple/Advanced explorer, Data/Structure/Indexes switcher, dense grid, row inspector, bottom connection/settings controls, themes and export menus. Compare against the standalone HTML at matching desktop/mobile viewports before completing frontend tasks.

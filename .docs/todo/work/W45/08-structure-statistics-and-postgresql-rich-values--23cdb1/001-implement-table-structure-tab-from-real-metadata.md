@@ -16,10 +16,10 @@ This task belongs to **08 — Structure, statistics and PostgreSQL rich values**
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Render ordered columns and native data type names with correct key indicators.
+- [x] Render ordered columns and native data type names with correct key indicators.
 - [ ] Expose indexes, constraints and foreign-key targets with safe relation links.
-- [ ] Handle views, partition parents and inaccessible related objects gracefully.
-- [ ] Test Structure tab with a complex fixture containing composite keys and defaults.
+- [x] Handle views, partition parents and inaccessible related objects gracefully.
+- [x] Test Structure tab with a complex fixture containing composite keys and defaults.
 - [ ] Keep the tab responsive through HTMX fragment updates without page reloads.
 
 ## Canonical UI fidelity
@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T12:22:43.140Z · PETER IRUNGU
 
 Implemented initial structure and indexes/statistics table fragments backed by shared adapter metadata. A live MariaDB fixture verified columns, keys, generated values and rough row statistics. Canonical UI comparison and engine-specific feature details remain to validate.
+
+### 2026-11-04T14:00:06.046Z · PETER IRUNGU
+
+BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Live PG18 (tests/rich_live_http.rs): composite PK, identity, generated, defaults, enum/domain, FK targets, views (no constraints), partition parents, inaccessible catalog relation -> 4xx. Defect fixed: identity/generated showed raw catalog codes ('a','s'); now ALWAYS/BY DEFAULT and STORED/VIRTUAL. Item 2 left open: FK targets render as text, not safe relation links. Items 5-8 are UI/HTMX visual (Phase B).

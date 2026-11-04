@@ -196,8 +196,8 @@ impl PgCatalog {
                       EXISTS (SELECT 1 FROM pg_catalog.pg_constraint con
                               WHERE con.conrelid = a.attrelid AND con.contype='u'
                                 AND a.attnum = ANY(con.conkey)) AS unique_key,
-                      NULLIF(a.attidentity::text,'') AS identity,
-                      NULLIF(a.attgenerated::text,'') AS generated,
+                      CASE a.attidentity::text WHEN 'a' THEN 'ALWAYS' WHEN 'd' THEN 'BY DEFAULT' ELSE NULL END AS identity,
+                      CASE a.attgenerated::text WHEN 's' THEN 'STORED' WHEN 'v' THEN 'VIRTUAL' ELSE NULL END AS generated,
                       CASE WHEN ty.typtype='d' THEN
                           pg_catalog.format_type(ty.oid, NULL) ELSE NULL END AS domain,
                       CASE WHEN ty.typtype='e' THEN ARRAY(

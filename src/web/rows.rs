@@ -93,6 +93,22 @@ pub(super) fn name(value: &str) -> Result<String, AppError> {
         Ok(value.to_string())
     }
 }
+/// Database text is untrusted: make control characters and bidirectional
+/// overrides visible instead of letting them reorder or hide surrounding text.
+/// Newline and tab are kept for readable multi-line values.
+pub(super) fn visible_text(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for c in input.chars() {
+        let hidden = (c.is_control() && c != '\n' && c != '\t')
+            || matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' | '\u{200E}' | '\u{200F}' | '\u{061C}');
+        if hidden {
+            out.push_str(&format!("\\u{{{:04X}}}", c as u32));
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
 fn value_class(native_type: &str) -> &'static str {
     let native = native_type.to_ascii_lowercase();
     if native.contains("json") {
@@ -458,12 +474,12 @@ pub async fn data(
                     detail.push_str(spatial);
                 }
                 Value {
-                    text: preview.text,
+                    text: visible_text(&preview.text),
                     class: value_class(&preview.type_name),
                     native_type: preview.type_name,
                     truncated: preview.truncated,
                     is_null: matches!(cell, crate::db::types::Cell::Null),
-                    detail,
+                    detail: visible_text(&detail),
                 }
             })
             .collect();
@@ -552,5 +568,26 @@ mod tests {
             r#"\x00ff"#
         );
         assert_eq!(detail_value(&Cell::Null, "text"), "NULL");
+    }
+}
+
+#[cfg(test)]
+mod visible_text_tests {
+    use super::visible_text;
+
+    #[test]
+    fn controls_and_bidi_overrides_become_visible_escapes() {
+        assert_eq!(visible_text("a\u{7}b"), "a\\u{0007}b");
+        assert_eq!(visible_text("x\u{202E}y"), "x\\u{202E}y");
+        assert_eq!(visible_text("\u{2066}z"), "\\u{2066}z");
+        assert_eq!(visible_text("\u{0}"), "\\u{0000}");
+    }
+
+    #[test]
+    fn ordinary_text_newlines_tabs_and_unicode_are_unchanged() {
+        assert_eq!(
+            visible_text("line1\n\tline2 Ünï 日本 😀"),
+            "line1\n\tline2 Ünï 日本 😀"
+        );
     }
 }
