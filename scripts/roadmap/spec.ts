@@ -14,4 +14,10 @@ const uiGroups = frontendGroups.filter((group) => group.key !== 'http');
 
 // Phase order is deliberate: PostgreSQL + SQLite backend and HTTP contracts
 // precede UI implementation; MySQL/MariaDB follow the frontend milestone.
-export const groups = [...backendGroups, ...httpGroups, ...sqliteGroups, ...uiGroups, ...expansionGroups];
+export const groups = [
+  ...backendGroups,
+  ...httpGroups,
+  ...sqliteGroups,
+  ...uiGroups,
+  ...expansionGroups,
+];

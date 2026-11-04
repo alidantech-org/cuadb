@@ -54,7 +54,7 @@ export const frontendGroups: GroupSpec[] = [
           'Verify that unsafe origins or methods cannot trigger unauthorized future state changes.',
           'Add response security regression tests and document local-only deployment assumptions.',
         ],
-        dependsOn: ['http-views', 'http-errors', 'sqlite-info'],
+        dependsOn: ['http-views'],
       },
       {
         key: 'http-errors',
@@ -95,7 +95,7 @@ export const frontendGroups: GroupSpec[] = [
           'Add visible focus and dark/light theme primitives with adequate contrast.',
           'Verify final build uses only bundled CSS and JS assets.',
         ],
-        dependsOn: ['http-views'],
+        dependsOn: ['http-views', 'http-errors', 'sqlite-info'],
       },
       {
         key: 'explorer-tree',
