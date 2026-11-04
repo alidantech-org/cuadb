@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@source "../../templates";
+
+@layer components {
+  /* Sidebar collapse uses a tiny local JS handler, not a frontend framework. */
+  .sidebar.is-collapsed {
+    display: none;
+  }
+
+  /* Keep wide tabular data scrollable without shrinking every cell. */
+  .data-scroll {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+}

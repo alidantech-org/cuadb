@@ -1,251 +1,151 @@
 # CuaDB
 
-**CuaDB** is a planned, lightweight, read-only database explorer for the browser. Its purpose is simple: connect to a database, navigate its structure, and view records quickly without the complexity of a full database administration tool.
+**CuaDB** is a fast, local-first, **read-only database explorer** for the browser. The goal is to connect to a database, browse schemas and tables, and inspect paginated records, column types, indexes and storage details—without a SQL runner or a bulky administration UI.
 
-> **Project status: planning / README only.** This repository does not yet contain an application, a Docker image, or a working release. The setup and file tree below describe the intended implementation, not commands or files that currently work.
+> **Current status: runnable application shell (milestone 0).** The Rust HTTP server, Askama page, Tailwind styling, HTMX fragment and Bun commands are scaffolded. **No database connection, table discovery or row queries are implemented yet.** The UI's preview is intentionally a placeholder.
 
-## Principles
+## Stack
 
-- **Browsing first.** Navigate connections → schemas/namespaces → tables and views → rows.
-- **Minimal interface.** Fast, readable tables and straightforward controls; no dashboard clutter.
-- **One container, one web port.** The Rust server serves HTML and static assets directly.
-- **No frontend framework.** Server-rendered HTML, HTMX for partial updates, and small CSS.
-- **Database-agnostic design.** Database-specific operations stay behind adapters.
-- **Read-only by design.** No SQL console, row editing, migrations, or administration features.
-- **Local-first.** Intended to be published on localhost, not exposed publicly by default.
+- **Rust + Axum**: HTTP server (one port).
+- **Askama**: compiled, escaped server-rendered HTML templates.
+- **HTMX 2**: HTML-fragment updates without React or Next.js.
+- **Tailwind CSS 4 + small custom CSS**: minimal interface and future data grid.
+- **Vanilla JavaScript**: browser-only interactions such as sidebar toggling.
+- **Bun**: root task runner and frontend build tooling. Bun is **not** the production server.
+- **Docker**: a single multi-stage image and **one** runtime container.
 
-## Planned database support
+## Prerequisites
 
-A database connection URL is the primary configuration format. **PostgreSQL is the default and first implementation target.** Support for other engines will be added through adapters; *planned* does not mean already implemented.
+For native development, install **Bun 1.x** and **Rust stable** with Cargo, rustfmt and Clippy. The included `rust-toolchain.toml` requests stable Rust with formatting and lint components. Docker is optional for native development, but needed for Docker commands.
 
-| Engine | Planned priority | Connection URL example | Notes |
-| --- | --- | --- | --- |
-| PostgreSQL | First / MVP | `postgresql://viewer:password@db:5432/app` | Also accept the `postgres://` scheme. |
-| MySQL | Next | `mysql://viewer:password@db:3306/app` | Share common driver code with MariaDB when practical. |
-| MariaDB | Next | `mysql://viewer:password@db:3306/app` | Handle engine/version differences in metadata. |
-| SQLite | Next | `sqlite:///data/app.sqlite` | Mount a database file into the container; prefer read-only access. |
-| Microsoft SQL Server | Later, after core engines | To be specified | Requires a separate driver/adapter and metadata implementation. |
-
-Other compatible engines (such as PostgreSQL-wire-compatible servers) may be evaluated individually. Compatibility is not assumed merely because a URL resembles a supported engine.
-
-The application should detect the engine from the URL scheme, with PostgreSQL as the default engine in the connection form. It must **not** assume all databases share PostgreSQL's catalog tables or SQL syntax.
-
-A PostgreSQL URL identifies one database. Schemas and tables are discovered inside that database; switching to another PostgreSQL database requires another connection. MySQL/MariaDB databases, and SQLite namespaces, will be presented through the same navigation UI where meaningful.
-
-## User experience
-
-The intended layout is a collapsible sidebar alongside a wide data grid.
-
-```text
-CuaDB                                Connected: local-postgres
-┌─────────────────────────┬──────────────────────────────────────────┐
-│ Connections             │ public / users                           │
-│  └─ local-postgres      │ [Data] [Structure] [Info]                │
-│     ├─ public           ├──────────────────────────────────────────┤
-│     │  ├─ users         │ id  ↑ │ email         │ created_at       │
-│     │  ├─ orders        │ 1      │ a@example.com │ …                │
-│     │  └─ products      │ 2      │ b@example.com │ …                │
-│     └─ analytics        │ …      │ …             │ …                │
-│        └─ events        ├──────────────────────────────────────────┤
-│                         │ 50 rows/page       [Previous] [Next]    │
-└─────────────────────────┴──────────────────────────────────────────┘
-```
-
-### Data tab
-
-- Paginated, **server-side** row retrieval (default 50; selectable 25/50/100).
-- Click a column header to sort ascending or descending.
-- Preserve sorting and the current table when moving between pages.
-- Horizontal scrolling for wide tables, with clear headers and NULL indicators.
-- Human-readable dates, booleans, numbers, bytes, and JSON where possible.
-- Expand long text, JSON, and binary-value metadata without overwhelming cells.
-- Refresh the current result set on demand.
-- Show an **estimated** row count when available; do not run expensive exact counts automatically.
-
-Use stable ordering with a unique key where available. Prefer keyset/cursor pagination for very large tables when a suitable index/order exists; use bounded offset pagination as a practical fallback. Explain when pagination cannot guarantee a stable ordering.
-
-### Structure tab
-
-Show each column's name, type, nullable status, default, key/constraint status, and index relationships. Display primary keys, foreign keys, unique constraints, and indexes where supported by the engine.
-
-### Info tab
-
-Show the table or view type, estimated row count, and available size statistics. Examples include table data size, index size, total size, and approximate column widths. **Statistics differ by database engine** and might be estimates or unavailable. Unsupported metrics should be labeled accordingly, not fabricated.
-
-### Navigation
-
-- Connection → schema/namespace → table or view.
-- Search/filter table names in the sidebar.
-- Distinguish tables from views and other supported object types.
-- Keep navigation and paging responsive by returning only the necessary HTML fragment.
-
-## Deliberately out of scope
-
-CuaDB is **not** intended to replace a database administrator's tool:
-
-- No SQL editor or arbitrary query runner.
-- No create/insert/update/delete operations on data.
-- No schema migrations, triggers/functions editor, or user/role administration.
-- No terminal/CLI inside the web UI.
-- No mandatory account system or separate settings database.
-- No SSR JavaScript framework, Node.js server, or additional web proxy.
-
-Internally generated, parameterized read queries are still required to display data and metadata. “No SQL runner” refers to the user-facing product, not to the implementation.
-
-## Technology and deployment design
-
-| Concern | Planned choice |
-| --- | --- |
-| Server | Rust + Axum |
-| Database connections | SQLx for PostgreSQL, MySQL/MariaDB, SQLite |
-| Additional engines | Separate driver behind the same adapter interface |
-| HTML templates | Askama |
-| Partial page updates | HTMX, bundled locally |
-| Styling | Small, accessible custom CSS |
-| Application state | In-process state; no CuaDB database required |
-| Packaging | Multi-stage Docker build → one runtime container |
-| Browser address | `http://localhost:4848` |
-| Published ports | One HTTP port: `4848` |
-
-Rust will produce the full pages and the HTML fragments used for table rows, pagination, sidebar expansion, and metadata tabs. CSS and HTMX should be served by the same binary, without a CDN dependency or second frontend process.
-
-**The database itself does not have to run inside the CuaDB container.** It may run on the host, in another container, or on a remote server. Only the CuaDB web port needs to be *published* to the host; the container still needs an outbound network connection to the selected database.
-
-## Planned local Docker usage
-
-> These commands document the **target workflow after implementation**. No `cuadb:local` image exists yet.
-
-Prepare a local environment file that is not committed to Git:
-
-```dotenv
-CUADB_DATABASE_URL=postgresql://viewer:YOUR_PASSWORD@host.docker.internal:5432/appdb
-CUADB_PORT=4848
-```
-
-Then start the eventual Docker image:
+On Fedora, install Rust via [rustup](https://rustup.rs/) and Bun via the [official installer](https://bun.com/docs/installation). Then verify:
 
 ```bash
-docker run --rm --name cuadb \
-  --publish 127.0.0.1:4848:4848 \
-  --add-host=host.docker.internal:host-gateway \
-  --env-file .env \
-  cuadb:local
+bun --version
+cargo --version
+cargo fmt --version
+cargo clippy --version
 ```
 
-Open **http://localhost:4848**. Inside the container, the server listens on `0.0.0.0:4848` so Docker can forward requests; publishing to host `127.0.0.1` keeps the web interface local.
+**No PostgreSQL credentials are needed to start or test the app shell.** A working browser page is the acceptance criterion for this milestone.
 
-For PostgreSQL on the **Linux host**, `host.docker.internal` requires the host-gateway mapping shown above. PostgreSQL must accept connections from the Docker network and permit the intended user; a server listening only on host `127.0.0.1` will usually not be reachable over Docker's bridge. For databases in another container, use a shared Docker network and the database container/service hostname instead.
+## Quick start (from the repository root)
 
-For SQLite, mount the file or directory into the container, ideally read-only. For remote PostgreSQL, use its real host name and appropriate TLS settings.
+```bash
+git clone https://github.com/alidantech-org/cuadb.git
+cd cuadb
 
-**Connection configuration:** Initially accept one `CUADB_DATABASE_URL` and infer the database engine from it. A later lightweight connection-picker may support multiple profiles without adding a persistence service. Do not store passwords in browser local storage or commit real URLs with credentials. URL-encode special characters in passwords.
+bun run dev
+```
 
-## Security requirements
+Open **http://localhost:4848**. On the first invocation the Bun dispatcher installs missing JS tooling automatically, builds CSS, copies HTMX and the local JS into `public/`, and launches Rust. Subsequent code changes under `src/` or `templates/` restart the Rust process; Tailwind watches styles. Reload the browser after changes. Restart `bun run dev` if you create a *new nested directory*, change environment variables, or add dependencies.
 
-1. Bind the published Docker port to localhost by default; do not treat CuaDB as an internet-facing service.
-2. Prefer a **database user with SELECT and only necessary metadata permissions**. The app should also enforce read-only behavior where the driver/engine allows it.
-3. Use parameter binding for values, strict allowlists and correct engine-specific identifier quoting for schema/table/column names. Never concatenate user-provided identifiers unchecked.
-4. Set sensible query timeouts, connection-pool limits, row limits, and maximum rendered cell sizes.
-5. Escape rendered HTML and prevent database cell contents from becoming executable markup.
-6. Avoid logging credentials or complete database URLs; keep secrets out of repository files and browser state.
-7. Make remote access an explicit deployment choice, with authentication, TLS, and network protections required before exposing the viewer beyond localhost.
+The first Rust compilation downloads crates from crates.io and can take longer than later incremental builds. Generated `bun.lock` and `Cargo.lock` should be **committed after the first successful install** for reproducible future builds. Both lockfiles are intentionally not fabricated in this initial scaffold.
 
-## Proposed repository structure
+## Root commands
 
-**This is a plan, not an existing directory tree.** Add files incrementally as their features are implemented.
+| Command | Behavior |
+| --- | --- |
+| `bun run setup` | Install frontend tooling, generate web assets and fetch Rust crates. |
+| `bun run dev` | Build assets and launch Rust + Tailwind watches; restart Rust on source/template changes. |
+| `bun run check` | Rust formatting check, type/compile check, strict Clippy, and TypeScript/JavaScript type check. |
+| `bun run build` | Build minified assets and a release Rust binary. |
+| `bun run start` | Start `target/release/cuadb`; build it first if missing. |
+| `bun run format` | Apply rustfmt and Prettier to Rust, scripts and CSS/JS. |
+| `bun run format:check` | Verify formatting without writing changes. |
+| `bun run test` | Run Rust unit/integration tests and frontend script type checks. |
+| `bun run docker:build` | Build the single-image Docker deployment (`cuadb:local`). |
+| `bun run docker:run` | Start the Docker container publishing only `127.0.0.1:4848`. |
+
+The task runner gives actionable errors if Rust is missing, and installs missing Bun dependencies on first use. It **does not silently install system-wide compilers**.
+
+### Verify the shell
+
+With `bun run dev` or `bun run start` active in another terminal:
+
+```bash
+curl -i http://localhost:4848/health
+# HTTP/1.1 200 OK, body: ok
+
+curl -I http://localhost:4848/
+# HTTP/1.1 200 OK (HEAD is supported for GET routes by Axum)
+
+curl -i http://localhost:4848/fragments/status
+# HTML fragment containing "App shell ready"
+
+bun run check
+bun run test
+```
+
+The browser home page should show a **CuaDB** sidebar, a **Not connected** label, a disabled table preview, and a **Check status** button. That button exercises an HTMX request and replaces only the status fragment. The **Sidebar** button is handled locally in vanilla JS.
+
+The `/health` endpoint tests the HTTP server, **not a database connection**.
+
+## Docker: one container and one frontend port
+
+```bash
+bun run docker:build
+bun run docker:run
+```
+
+Open **http://localhost:4848**. The Dockerfile uses Bun only for asset compilation and Rust only for compilation, then copies the executable and assets into a minimal Debian runtime container. Neither Bun, Node.js, Nginx, Redis nor PostgreSQL is required **inside the CuaDB runtime container**.
+
+The browser port is published on the host loopback interface by default. The native server binds to `127.0.0.1:4848` by default, while the Docker image sets `CUADB_HOST=0.0.0.0` inside the container so port forwarding works.
+
+For a future PostgreSQL connection, your existing `postgis` container can share a user-defined Docker network with CuaDB and use a URL like `postgresql://viewer:password@postgis:5432/mydb`. **The app does not consume `CUADB_DATABASE_URL` yet**. Do not supply real credentials until the read-only adapter exists.
+
+For an alternate host port, use `docker run --rm -p 127.0.0.1:PORT:4848 cuadb:local`, keeping `CUADB_PORT=4848` inside the container.
+
+## Current repository structure
 
 ```text
 cuadb/
-├── README.md                      # Overview, requirements, roadmap (exists now)
-├── Cargo.toml                     # Rust dependencies and build configuration
-├── Cargo.lock                     # Locked application dependencies
-├── Dockerfile                     # Multi-stage build; one runtime container
-├── .dockerignore                  # Keep unnecessary files out of Docker context
-├── .gitignore                     # Ignore secrets, build products, local DB files
-├── .env.example                   # Safe, credential-free configuration example
+├── Cargo.toml                 # Rust package and dependencies
+├── rust-toolchain.toml        # stable + rustfmt + clippy
+├── rustfmt.toml
+├── package.json               # Bun scripts and frontend dev dependencies
+├── tsconfig.json              # Strict TS + browser JS type checking
+├── Dockerfile
+├── .env.example              # Host and port defaults
 ├── src/
-│   ├── main.rs                    # Startup, config, server binding
-│   ├── config.rs                  # Environment settings and connection URL parsing
-│   ├── state.rs                   # Shared app state and connection pools
-│   ├── http/
-│   │   ├── mod.rs
-│   │   ├── routes.rs              # Page/HTMX routes
-│   │   └── handlers/
-│   │       ├── navigation.rs      # Connections, schemas, tables
-│   │       ├── data.rs            # Data grid, sorting, pagination
-│   │       └── metadata.rs        # Structure and size/statistics views
+│   ├── lib.rs                 # Testable library entry points
+│   ├── main.rs                # HTTP listener
+│   ├── app.rs                 # Router and static assets
+│   ├── config.rs              # Server configuration + unit tests
 │   ├── db/
-│   │   ├── mod.rs
-│   │   ├── adapter.rs             # Shared database capabilities/interface
-│   │   ├── models.rs              # Common schema/table/column/row structures
-│   │   └── adapters/
-│   │       ├── postgres.rs        # First engine implementation
-│   │       ├── mysql.rs           # MySQL and MariaDB
-│   │       └── sqlite.rs          # SQLite
-│   └── web.rs                     # Template rendering/static asset delivery
+│   │   ├── mod.rs             # Database integration boundary (empty)
+│   │   └── postgres/mod.rs    # PostgreSQL adapter placeholder (empty)
+│   └── web/mod.rs             # Askama pages and HTML-fragment handlers
 ├── templates/
-│   ├── layout.html                # Shared page layout
-│   ├── index.html                 # Main explorer page
-│   └── partials/
-│       ├── sidebar.html           # Navigable object tree
-│       ├── table_data.html        # Grid + paging controls
-│       ├── table_structure.html   # Column/key/index information
-│       └── table_info.html        # Size and statistics
+│   ├── base.html
+│   ├── pages/explorer.html
+│   └── components/status.html
 ├── assets/
-│   ├── css/app.css                # Minimal styles
-│   └── js/htmx.min.js             # Locally bundled HTMX
-└── tests/
-    ├── pagination.rs              # Sorting and pagination behavior
-    ├── adapters.rs                # Capability/metadata contracts
-    └── security.rs                # Escaping and safe query construction
+│   ├── css/app.css            # Tailwind source + specialized CSS
+│   └── js/app.js              # Local browser interactions
+├── public/                    # Generated, not committed
+├── scripts/tasks.ts           # Single typed Bun command dispatcher
+└── tests/shell.rs             # HTTP smoke tests without database
 ```
 
-### Responsibility boundaries
+**Ownership rules:** HTTP and templates must not contain engine-specific SQL. Future `src/db/<engine>/` adapters will implement metadata discovery and paginated data retrieval. Askama templates contain presentation, and `assets/js/` is limited to browser-only actions. Add files when needed instead of creating empty framework layers.
 
-- `http/` handles requests and responses, not database-specific SQL.
-- `db/adapter.rs` defines a small common contract: list namespaces, list objects, describe an object, fetch a page, and retrieve available statistics.
-- `db/adapters/` contains each engine's catalog queries, identifier quoting, pagination strategy, and feature detection.
-- `db/models.rs` exposes neutral data types to the UI, including capability/availability flags instead of fake cross-engine uniformity.
-- `templates/` and `assets/` contain presentation only; HTMX requests reuse the same server-side templates.
-- `tests/` verifies correctness and read-only behavior, especially across differing database engines.
+## Product plan (after shell verification)
 
-Keep this structure pragmatic: avoid creating abstractions or directories before they are needed.
+1. **PostgreSQL MVP:** parse a PostgreSQL URL (default driver), connect read-only, discover schemas/tables/views, browse paginated and sortable rows, show columns, indexes and table sizes.
+2. **PostgreSQL value rendering:** JSON/JSONB, arrays, nullable values, and PostGIS geometry inspection.
+3. **Database adapters:** MySQL/MariaDB and SQLite with engine-specific metadata/capability handling; evaluate SQL Server later.
+4. **Usability:** multiple saved connection profiles (no password storage in browser), polished grids, safe large-cell inspection, and optimized keyset pagination where possible.
 
-## Implementation plan
+CuaDB is intentionally **not** a SQL console, migration system, editor or full database administrator. Every database adapter should use constrained, read-only access and safe SQL identifier handling; metadata not supported by an engine must be indicated as unavailable.
 
-### Phase 1 — PostgreSQL MVP
+## Security and project conventions
 
-- [ ] Bootstrap the Rust/Axum project and a single-container, multi-stage Docker build.
-- [ ] Connect with a PostgreSQL URL via `CUADB_DATABASE_URL`.
-- [ ] Render an HTML/HTMX explorer with schema and table navigation.
-- [ ] Implement server-side data pagination, column sorting, and refresh.
-- [ ] Add Structure and Info tabs with PostgreSQL metadata/size functions.
-- [ ] Bundle local static assets and provide accessible loading/error states.
-- [ ] Enforce read-only querying, safe identifier handling, and bounded requests.
-- [ ] Add tests and validate Docker-to-host / Docker-network connectivity.
+- Keep secrets out of Git and browser storage; `.env.example` is illustrative only.
+- Default to local-only Docker port publishing; add authentication/TLS before any external deployment.
+- Use strict `cargo clippy -- -D warnings` and TypeScript `strict` validation.
+- Run `bun run format`, `bun run check`, and `bun run test` before merging code.
+- There is no external CSS/JS CDN dependency: generated CSS and HTMX are served by Rust.
+- UI placeholders must never pretend a real database query succeeded.
 
-### Phase 2 — Common relational databases
-
-- [ ] Introduce or finalize the shared adapter/capability interface.
-- [ ] Add MySQL and MariaDB browsing, sorting, and metadata handling.
-- [ ] Add SQLite browsing using mounted database files.
-- [ ] Clearly identify unavailable engine-specific statistics.
-- [ ] Add engine-specific integration tests and fixtures.
-
-### Phase 3 — Usability and compatibility
-
-- [ ] Add optional local connection profiles and a simple connection picker.
-- [ ] Improve large-table pagination, wide-grid rendering, and JSON viewing.
-- [ ] Evaluate Microsoft SQL Server and other requested engines individually.
-- [ ] Document supported database versions and connection/TLS configurations.
-- [ ] Optimize image size and release reproducible Docker builds.
-
-No phase adds a user-facing SQL console or write operations unless the product requirements explicitly change.
-
-## Acceptance criteria for the first usable release
-
-A user should be able to start **one Docker container**, open `http://localhost:4848`, connect to an existing PostgreSQL database via its URL, expand a schema, click a table, and immediately see a page of rows. The user can sort a column, navigate pages, inspect columns and table sizes, and do all of this **without a SQL editor, a second container, or a JavaScript application framework**.
-
----
-
-CuaDB intentionally optimizes for one job: **open a database and understand its contents quickly.**
+**Next milestone:** Implement the real PostgreSQL adapter only after confirming the shell launches and the root scripts work on a fresh clone.

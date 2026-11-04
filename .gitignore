@@ -1,0 +1,19 @@
+# Generated Rust output
+/target/
+
+# Bun dependencies and generated web assets
+/node_modules/
+/public/*
+!/public/.gitkeep
+
+# Local credentials and environment
+.env
+.env.*
+!.env.example
+
+# Editor and operating system files
+.DS_Store
+.idea/
+.vscode/
+
+# Commit Cargo.lock and bun.lock after first install for repeatable builds.

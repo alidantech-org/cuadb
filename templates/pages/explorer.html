@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex min-h-screen">
+  <aside id="sidebar" class="sidebar flex w-64 shrink-0 flex-col border-r border-slate-800 bg-slate-900/70">
+    <div class="flex h-16 items-center gap-3 border-b border-slate-800 px-5">
+      <div class="flex size-9 items-center justify-center rounded-xl bg-indigo-500/15 font-bold text-indigo-300">C</div>
+      <div>
+        <p class="text-base font-semibold tracking-tight">CuaDB</p>
+        <p class="text-xs text-slate-400">Database explorer</p>
+      </div>
+    </div>
+    <nav aria-label="Database navigation" class="flex-1 p-4">
+      <div class="mb-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <span>Connections</span>
+        <span class="rounded bg-slate-800 px-2 py-1 font-normal normal-case text-slate-400">Soon</span>
+      </div>
+      <div class="rounded-lg border border-dashed border-slate-700 p-4 text-sm leading-relaxed text-slate-400">
+        Your databases, schemas and tables will appear here.
+      </div>
+    </nav>
+    <div class="border-t border-slate-800 px-5 py-4 text-xs text-slate-500">v0.1.0 · Shell milestone</div>
+  </aside>
+
+  <main class="min-w-0 flex-1">
+    <header class="flex h-16 items-center gap-3 border-b border-slate-800 px-5 md:px-8">
+      <button type="button" data-toggle-sidebar aria-controls="sidebar" aria-expanded="true"
+        class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800">
+        Sidebar
+      </button>
+      <span class="text-sm text-slate-400">Workspace / Overview</span>
+      <span class="ml-auto rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200">
+        Not connected
+      </span>
+    </header>
+
+    <div class="mx-auto max-w-6xl space-y-7 p-5 md:p-8">
+      <div>
+        <p class="mb-2 text-xs font-semibold uppercase tracking-widest text-indigo-300">Milestone 0</p>
+        <h1 class="text-3xl font-semibold tracking-tight">Your database workspace</h1>
+        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
+          The Rust, Askama, Tailwind and HTMX shell is ready. Real database browsing comes next.
+        </p>
+      </div>
+
+      <section aria-label="Application health" class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-sm font-semibold">Application status</h2>
+          <button type="button" hx-get="/fragments/status" hx-target="#status-panel" hx-swap="innerHTML"
+            class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400">
+            Check status
+          </button>
+        </div>
+        <div id="status-panel" class="mt-4 rounded-lg bg-slate-950 p-4 text-sm text-slate-400" aria-live="polite"
+          hx-get="/fragments/status" hx-trigger="load" hx-swap="innerHTML">
+          Loading server status…
+        </div>
+      </section>
+
+      <section aria-label="Planned data viewer" class="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+        <div class="flex items-center justify-between gap-3 border-b border-slate-800 px-5 py-4">
+          <h2 class="text-sm font-semibold">Data preview</h2>
+          <span class="text-xs text-slate-500">Placeholder · no database queries</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[560px] border-collapse text-left text-sm">
+            <thead class="bg-slate-800/60 text-xs uppercase tracking-wide text-slate-400">
+              <tr><th class="px-5 py-3 font-medium">Column</th><th class="px-5 py-3 font-medium">Type</th><th class="px-5 py-3 font-medium">Value</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 text-slate-500">
+              <tr><td class="px-5 py-4">—</td><td class="px-5 py-4">—</td><td class="px-5 py-4">Connect a database in the next milestone</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex justify-end gap-2 border-t border-slate-800 px-5 py-3">
+          <button disabled class="cursor-not-allowed rounded border border-slate-800 px-3 py-1.5 text-xs text-slate-600">Previous</button>
+          <button disabled class="cursor-not-allowed rounded border border-slate-800 px-3 py-1.5 text-xs text-slate-600">Next</button>
+        </div>
+      </section>
+      <p class="text-xs text-slate-500">Local-first · Read-only by design · One HTTP port</p>
+    </div>
+  </main>
+</div>
+{% endblock %}
