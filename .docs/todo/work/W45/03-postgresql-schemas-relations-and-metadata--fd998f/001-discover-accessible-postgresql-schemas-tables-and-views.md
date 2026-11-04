@@ -1,5 +1,5 @@
 ---
-{id: TSK-5FC58B7B6E27,name: "Discover accessible PostgreSQL schemas, tables and views",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:04.875Z,updated_at: 2026-11-04T07:32:04.875Z,tags: [cuadb,postgres-catalog],depends_on: [TSK-55D20E7D39E9],order: 1024}
+{id: TSK-5FC58B7B6E27,name: "Discover accessible PostgreSQL schemas, tables and views",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:04.875Z,updated_at: 2026-11-04T09:49:34.759Z,tags: [cuadb,postgres-catalog],depends_on: [TSK-55D20E7D39E9],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T09:49:34.759Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-5FC58B7B6E27/1793785774763-start,started_at: 2026-11-04T09:49:34.790Z}]}}}
 ---
 
 # Discover accessible PostgreSQL schemas, tables and views
