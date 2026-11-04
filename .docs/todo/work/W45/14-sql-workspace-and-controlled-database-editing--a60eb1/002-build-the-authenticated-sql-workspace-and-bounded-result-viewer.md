@@ -8,7 +8,7 @@
 Provide a separate SQL workspace for authorized users with a clear editor, execution controls, status feedback and a bounded result grid. Keep the existing database explorer intact and make it obvious which connection profile is selected and which permissions apply.
 
 ## Context
-This is a later frontend feature, not part of the initial canonical explorer milestone. Reuse the approved visual system and keep SQL execution server-side. Do not store credentials or sensitive result sets in browser history, local storage or long-lived client caches.
+This is frontend work for Phase 2 and its demo is now approved. Reuse the approved visual system and keep SQL execution server-side. Do not store credentials or sensitive result sets in browser history, local storage or long-lived client caches.
 
 This task belongs to **14 — SQL workspace and controlled database editing**. The group outcome is: Add a separate, explicitly authorized workspace for SQL execution and normal table data editing. Preserve the safe read-only explorer as the default experience. Every mutating action must be authenticated, permission-checked, bounded, attributable and auditable.
 
@@ -24,6 +24,14 @@ CuaDB is a local-first database workspace served by one Rust/Axum process. The c
 
 ## Verification and handoff
 Verify the expected result and realistic failure cases with the smallest relevant test set. Use disposable PostgreSQL and SQLite fixtures for the core milestone; do not add MySQL/MariaDB or other engines to routine verification. Run `bun run format:check`, `bun run check` and `bun run test` at meaningful group boundaries. Do not test against a personal or production database. Document unsupported capabilities honestly, record concise evidence in a Task comment, tick accepted items with `task check` and only then mark the task completed.
+
+## Updated demo amendment (2026-11-05)
+The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
+
+### Amendment acceptance
+- [ ] Build the SQL workspace from the updated demo: bottom-bar editor with Run (Ctrl/Cmd+Enter), cancel, hint line, bounded result grid with row count and elapsed time, and a visible access tag.
+- [ ] Show the pending-change bar from `/tx/status` with commit and rollback, and surface policy rejections and permission denials exactly as the server reports them; never classify statements in the browser.
+- [ ] Keep the workspace disabled and hidden unless `CUADB_SQL_WORKSPACE=enabled` and the principal is signed in, and keep results out of browser storage.
 
 ## Comments
 

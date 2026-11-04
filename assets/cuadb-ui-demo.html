@@ -161,17 +161,40 @@ a.fk{color:var(--ac);text-decoration:underline dotted;cursor:pointer}
 .sfoot .cbtn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .gear{width:28px;height:26px;display:grid;place-items:center;flex:none;color:var(--mu);border-radius:var(--rad)}.gear:hover{color:var(--tx);background:var(--sf2)}
 #cpop,#spop{bottom:44px}
+#login{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;align-items:center;justify-content:center}#login.show{display:flex}
+.lc{width:340px;background:var(--sf);border:1px solid var(--bd);border-radius:calc(var(--rad) + 6px);padding:22px;box-shadow:var(--sh)}
+.lc h2{margin:0 0 2px;font-size:17px}.lc p{margin:0 0 14px;color:var(--mu)}.lc .btn{width:100%;height:32px;justify-content:center}
+.lc .chips{display:flex;gap:6px;margin-top:14px;align-items:center;flex-wrap:wrap;color:var(--mu);font-size:11px}.lc .chips .btn{width:auto;height:22px;padding:0 8px}
+.fl{display:block;margin-bottom:10px}.fl>span{display:block;color:var(--mu);font-size:11px;margin-bottom:3px}.fl .inp{width:100%;height:30px}
+.fl .row2{display:flex;gap:6px;align-items:center}.fl .nlt{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--mu);font-size:10.5px}
+textarea.inp{height:auto;padding:6px 8px;font:11.5px/1.45 ui-monospace,monospace;resize:vertical}select.inp{padding:0 6px}
+.err,.err2{color:#d0505f}
+#modal{position:fixed;inset:0;z-index:90;background:rgba(10,14,13,.45);display:none;align-items:center;justify-content:center}#modal.show{display:flex}
+.mc{width:420px;max-width:92vw;max-height:88vh;overflow:auto;background:var(--sf);border:1px solid var(--bd);border-radius:calc(var(--rad) + 6px);box-shadow:var(--sh)}
+.mc h3{margin:0;padding:14px 16px 4px;font-size:14px}.mb{padding:8px 16px}.mf{display:flex;justify-content:flex-end;gap:6px;padding:10px 16px;border-top:1px solid var(--bd)}
+.btn.dg{color:#d0505f;border-color:color-mix(in srgb,#d0505f 45%,var(--bd))}.btn.dg.on{background:#d0505f;color:#fff;border-color:#d0505f}
+.m-read{color:var(--ok)}.m-write{color:var(--wr)}.m-destructive{color:#d0505f}.m-none{color:var(--mu)}
+.ia{display:flex;gap:6px;align-items:center}#insp h3 .ia .btn{height:22px;padding:0 8px}
+.ed{padding:8px 12px}.ef{position:sticky;bottom:0;background:var(--sf);border-top:1px solid var(--bd);padding:8px 12px;display:flex;gap:6px;justify-content:flex-end;align-items:center}.ef .err{margin-right:auto;font-size:11px}
+.sqlw{flex:1;display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--bd);background:var(--sf)}
+#sql{height:150px;border:0;border-bottom:1px solid var(--bd);padding:10px 12px;background:var(--sf);outline:none;resize:vertical;font:12px/1.5 ui-monospace,monospace;color:var(--tx)}
+.sqlh{padding:4px 12px;color:var(--mu);font-size:11px;border-bottom:1px solid var(--bd)}#sqlout{flex:1;overflow:auto}.sqle{padding:14px}
+.who small{display:block;color:var(--mu)}.acts{display:flex;gap:4px;justify-content:flex-end}.acts .btn{height:22px;padding:0 7px}
+.st table.w{width:100%;max-width:920px}.hint{color:var(--mu);max-width:620px}
+#dpop{width:240px}#dbtn{flex:.8}
 </style>
 </head>
 <body>
 <div class="app">
   <aside id="side">
-    <div class="sf"><input class="inp" id="f" placeholder="Search tables…" autocomplete="off"><button class="btn ico" id="selb" title="Select tables to export" aria-label="Select tables">☑</button></div>
+    <div class="sf"><input class="inp" id="f" placeholder="Search tables…" autocomplete="off"><button class="btn ico" id="sqlb" title="SQL workspace" aria-label="SQL workspace">&gt;_</button><button class="btn ico" id="selb" title="Select tables to export" aria-label="Select tables">☑</button></div>
     <div id="tree"></div><div id="selbar"></div>
     <div class="sfoot">
       <button class="cbtn" id="cbtn" aria-haspopup="listbox"><b id="cname">local-postgres</b><span class="ch" style="transform:rotate(-90deg)"></span></button>
+      <button class="cbtn" id="dbtn" aria-haspopup="listbox"><b id="dname">app_db</b><span class="ch" style="transform:rotate(-90deg)"></span></button>
       <button class="gear" id="sbtn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></button>
       <div class="pop" id="cpop" role="listbox"></div>
+      <div class="pop" id="dpop" role="listbox"></div>
       <div class="pop" id="spop"></div>
     </div>
   </aside>
@@ -181,6 +204,12 @@ a.fk{color:var(--ac);text-decoration:underline dotted;cursor:pointer}
   </main>
 </div>
 <button class="btn ico hm" id="menu" aria-label="Toggle sidebar" style="position:fixed;left:8px;bottom:8px;z-index:25">☰</button>
+<div id="login"><div class="lc"><h2>Sign in to CuaDB</h2><p>Authenticated public deployment</p>
+<label class="fl"><span>Username</span><input class="inp" id="lu" autocomplete="username" value="admin"></label>
+<label class="fl"><span>Password</span><input class="inp" id="lp" type="password" autocomplete="current-password" placeholder="Any password works in this demo"></label>
+<div class="err2" id="lerr" style="min-height:16px;margin-bottom:6px"></div><button class="btn on" id="lbtn">Sign in</button>
+<div class="chips">Demo accounts: <button class="btn" data-demo="admin">admin</button><button class="btn" data-demo="analyst">analyst</button><button class="btn" data-demo="viewer">viewer</button></div></div></div>
+<div id="modal"></div>
 <div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),esc=v=>String(v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -213,7 +242,7 @@ const DB={
   sessions:{c:cols('id:uuid*,user_id:uuid,ip:inet,user_agent:text,expires_at:timestamptz'),b:6082560,ib:2097152,fk:{user_id:'public.users'},
    ix:[['sessions_pkey','btree (id)',1]],
    r:mk(80,()=>[uid(),pick(U),[10,int(0,200),int(0,255),int(1,254)].join('.'),pick(['Firefox/131','Chrome/130','Safari/18']),dt(-30)])}}};
-const CONNS=[['local-postgres','shop_prod','localhost:5432',1],['staging','shop_staging','pg-stg.internal:5432',1],['analytics-replica','warehouse','10.0.4.12:5432',1],['sqlite · notes.db','notes','file',0]];
+const CONNS=[{id:'pg-production',name:'PG Production',eng:'postgres',host:'pg.internal:5432',user:'viewer_ro',dbs:['app_db','reporting','postgres']},{id:'pg-staging',name:'PG Staging',eng:'postgres',host:'pg-stg.internal:5432',user:'viewer_ro',dbs:['app_db','scratch']},{id:'sqlite-notes',name:'SQLite notes',eng:'sqlite',host:'/data/notes.db',user:'—',dbs:['main']}];
 /* ---------- preferences (saved in localStorage when available) ---------- */
 const ld=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
 const DEF={mode:'explore',theme:'system',pal:'mist',accent:'',rad:'6',fs:'12.5',ff:'sans',dmono:false,dens:'compact',lines:'rows',rn:true,ty:true,zb:false,wrap:false,nulls:'NULL',sep:false,icons:'color',side:'rows',unit:'auto',remember:true};
@@ -230,7 +259,7 @@ function apply(){const r=document.documentElement,b=document.body,dk=S.theme==='
  if(S.mode==='explore'){if(selMode){selMode=false;sel.clear();selbar()}if(cur&&(cur==='__overview'||cur.includes(':')))cur='public.users'}}
 function tsave(){if(S.remember&&cur){TP[cur]={h:[...(hid[cur]||[])],s:sort};sv()}}
 /* ---------- state ---------- */
-let tabs=[],cur=null,view='data',sort=null,page=0,PS=25,q='',hid={},openS={public:1,analytics:1,auth:1},openT={},selRow=null,conn=0,selMode=false,sel=new Set(),incl=true,LK=new Set(),openG={};
+let tabs=[],cur=null,view='data',sort=null,page=0,PS=25,q='',hid={},openS={public:1,analytics:1,auth:1},openT={},selRow=null,conn=0,selMode=false,sel=new Set(),incl=true,LK=new Set(),openG={},editing=null,user=null,adb='app_db',admTab='users',permU='analyst',sqlRes=null,sqlText='SELECT id, email\nFROM public.users\nORDER BY id\nLIMIT 50;';
 const T=k=>{const[s,...t]=k.split('.');return DB[s][t.join('.')]},K=(s,t)=>s+'.'+t,numT=t=>['numeric','integer','bigint'].includes(t);
 /* ---------- sidebar ---------- */
 const F=(s,k,n,p,src)=>({s,k,n,p,src}),SYS=14680064;
@@ -269,7 +298,7 @@ function links(set){const o=new Set();set.forEach(k=>{Object.values(T(k).fk||{})
 function trow(x){const k=esc(x.k),d=x.d;return`<div class="${openT[x.k]?'o':''}"><div class="row ${cur===x.k?'act':''} ${LK.has(x.k)?'lk':''}" data-k="${k}" title="${d?fb(d.b):x.m.k}">${d?`<span class="cv" data-x="${k}"><span class="ch"></span></span>`:'<span class="cv"></span>'}${selMode&&d?`<input type="checkbox" class="ck" ${sel.has(x.k)?'checked':''}>`:ic(iconFor(x))}<span class="n">${esc(x.n)}</span><span class="c">${d&&!d.v?(S.side==='size'?fb(d.b):d.r.length):''}</span></div>${d?`<div class="cols">${d.c.map(c=>`<div class="col"><b>${c.pk?'<span class=pk>●</span> ':''}${c.n}</b><span>${c.t}</span></div>`).join('')}</div>`:''}</div>`}
 function treeX(f){$('#tree').innerHTML=Object.keys(DB).map(s=>{const ts=Object.keys(DB[s]).filter(t=>!f||t.toLowerCase().includes(f)||s.includes(f));if(!ts.length)return'';const o=openS[s]||f;
  return`<div class="${o?'o':''}"><button class="sh fo" data-s="${s}">${ic(o?'folderopen':'folder')}<span>${s}</span></button><div class="sub">${ts.map(t=>{const k=K(s,t);return`<div class="row ${cur===k?'act':''}" data-k="${esc(k)}">${ic(iconFor({n:t,d:DB[s][t]}))}<span class="n">${esc(t)}</span></div>`}).join('')}</div></div>`}).join('')||'<div class="col">Nothing matches.</div>'}
-function tree(){const f=$('#f').value.toLowerCase();if(S.mode==='explore')return treeX(f);LK=selMode&&incl?links(sel):new Set();
+function tree(){const f=$('#f').value.toLowerCase();if(!user){$('#tree').innerHTML='';return}if(!myConns().length){$('#tree').innerHTML='<div class="col" style="padding:12px">No databases assigned yet. Ask an administrator for access.</div>';return}if(S.mode==='explore')return treeX(f);LK=selMode&&incl?links(sel):new Set();
  $('#tree').innerHTML=`<div class="row ov ${cur==='__overview'?'act':''}" data-k="__overview"><span class="cv"></span>${ic('overview')}<span class="n">Overview</span><span class="c">${fb(total())}</span></div>`+Object.keys(DB).map(s=>{
   const it=items(s),gs=GR.map(([g,l])=>[g,l,it[g].filter(x=>!f||x.n.toLowerCase().includes(f)||s.includes(f))]).filter(x=>x[2].length);if(!gs.length)return'';
   return`<div class="${openS[s]||f?'o':''}"><button class="sh" data-s="${s}"><span class="ch"></span>${ic('schema')}${s}</button><div class="sub">${gs.map(([g,l,a])=>`<div class="${gOpen(s+'/'+g)||f?'o':''}"><button class="sh g" data-g="${s}/${g}"><span class="ch"></span>${l}<span class="tag">${a.length}</span></button><div class="sub">${a.map(trow).join('')}</div></div>`).join('')}</div></div>`}).join('')||'<div class="col">Nothing matches.</div>'}
@@ -281,7 +310,7 @@ $('#f').oninput=tree;
 const rs=$('#rs');rs.onpointerdown=e=>{rs.setPointerCapture(e.pointerId);rs.classList.add('d');rs.onpointermove=ev=>document.documentElement.style.setProperty('--sw',Math.min(520,Math.max(180,ev.clientX))+'px')};
 rs.onpointerup=()=>{rs.classList.remove('d');rs.onpointermove=null};rs.ondblclick=()=>document.documentElement.style.setProperty('--sw','264px');
 /* ---------- tabs & main ---------- */
-function openTab(k){cur=k;view='data';page=0;q='';selRow=null;const p=S.remember&&TP[k];sort=p?p.s:null;if(p)hid[k]=new Set(p.h);tree();main();if(innerWidth<761)$('#side').classList.remove('show')}
+function openTab(k){cur=k;editing=null;view='data';page=0;q='';selRow=null;const p=S.remember&&TP[k];sort=p?p.s:null;if(p)hid[k]=new Set(p.h);tree();main();if(innerWidth<761)$('#side').classList.remove('show')}
 function rows(){const d=T(cur);let r=d.r.map((x,i)=>({x,i}));
  if(q){const l=q.toLowerCase();r=r.filter(o=>o.x.some(v=>v!==null&&JSON.stringify(v).toLowerCase().includes(l)))}
  if(sort){const i=d.c.findIndex(c=>c.n===sort.c);r.sort((a,b)=>{let u=a.x[i],v=b.x[i];if(u===null)return 1;if(v===null)return-1;return(u>v?1:u<v?-1:0)*sort.d})}return r}
@@ -297,24 +326,25 @@ function cell(c,v,fk){if(v===null)return'<i class="nul">'+S.nulls+'</i>';
 function main(){if(S.mode==='explore')view='data';
  const b=$('#mainbody');
  if(!cur){b.innerHTML='<div style="margin:auto;text-align:center;color:var(--mu)"><h2 style="color:var(--tx);margin:0 0 4px">Pick a table to explore</h2>Choose one from the sidebar. Press ⌘K to filter.</div>';return}
- if(cur==='__overview'){b.innerHTML=ov();return}if(cur.includes(':')){b.innerHTML=mv();return}
+ if(cur==='__admin'){b.innerHTML=adm();return}if(cur==='__sql'){sqlView();return}if(cur==='__overview'){b.innerHTML=ov();return}if(cur.includes(':')){b.innerHTML=mv();return}
  const d=T(cur),[s,...tn]=cur.split('.'),t=tn.join('.'),h=hid[cur]||(hid[cur]=new Set()),vis=d.c.filter(c=>!h.has(c.n));
  let body='';
  if(view==='data'){const all=rows(),pages=Math.max(1,Math.ceil(all.length/PS));page=Math.min(page,pages-1);const pr=all.slice(page*PS,page*PS+PS);
-  body=`<div class="wrap"><div class="gw"><table class=""><thead><tr><th class="rn">#</th>${vis.map(c=>`<th data-sc="${c.n}" class="${numT(c.t)?'num':''}">${c.pk?'<span class=pk>●</span> ':''}${c.n}<small>${c.t}</small>${sort&&sort.c===c.n?`<span class="s">${sort.d>0?'↑':'↓'}</span>`:''}</th>`).join('')}</tr></thead><tbody>${pr.map(o=>`<tr data-r="${o.i}" class="${selRow===o.i?'sel':''}"><td class="rn">${o.i+1}</td>${vis.map(c=>`<td class="${numT(c.t)?'num':''}">${cell(c,o.x[d.c.indexOf(c)],d.fk)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="99" style="height:80px;text-align:center;color:var(--mu)">No rows match “${esc(q)}”. Clear the filter to see all rows.</td></tr>`}</tbody></table></div><div id="insp" class="${selRow!==null?'show':''}">${insp(d)}</div></div>
+  body=`<div class="wrap"><div class="gw"><table class=""><thead><tr><th class="rn">#</th>${vis.map(c=>`<th data-sc="${c.n}" class="${numT(c.t)?'num':''}">${c.pk?'<span class=pk>●</span> ':''}${c.n}<small>${c.t}</small>${sort&&sort.c===c.n?`<span class="s">${sort.d>0?'↑':'↓'}</span>`:''}</th>`).join('')}</tr></thead><tbody>${pr.map(o=>`<tr data-r="${o.i}" class="${selRow===o.i?'sel':''}"><td class="rn">${o.i+1}</td>${vis.map(c=>`<td class="${numT(c.t)?'num':''}">${cell(c,o.x[d.c.indexOf(c)],d.fk)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="99" style="height:80px;text-align:center;color:var(--mu)">No rows match “${esc(q)}”. Clear the filter to see all rows.</td></tr>`}</tbody></table></div><div id="insp" class="${selRow!==null||editing!==null?'show':''}">${insp(d)}</div></div>
   <div class="foot"><button class="btn ico" id="pv" ${page?'':'disabled'}>‹</button><span>${all.length?page*PS+1:0}–${Math.min(all.length,page*PS+PS)} of ${all.length}</span><button class="btn ico" id="nx" ${page<pages-1?'':'disabled'}>›</button><span class="sp"></span><span>${vis.length}/${d.c.length} columns</span><select id="ps">${[25,50,100].map(n=>`<option ${n===PS?'selected':''}>${n}</option>`).join('')}</select><span>rows/page</span><span class="tag ro">SELECT only</span></div>`}
  else if(view==='cols')body=`<div class="gw st"><table><thead><tr><th>#</th><th>Column</th><th>Type</th><th>Nullable</th><th>Key</th><th>References</th></tr></thead><tbody>${d.c.map((c,i)=>`<tr><td>${i+1}</td><td><b>${c.n}</b></td><td><code>${c.t}</code></td><td>${c.nl?'yes':'no'}</td><td>${c.pk?'primary':''}</td><td>${(d.fk&&d.fk[c.n])||''}</td></tr>`).join('')}</tbody></table></div>`;
  else body=`<div class="gw st"><h4>Indexes</h4>${d.ix.length?`<table><thead><tr><th>Name</th><th>Definition</th><th>Unique</th></tr></thead><tbody>${d.ix.map(i=>`<tr><td><b>${i[0]}</b></td><td><code>${i[1]}</code></td><td>${i[2]?'yes':'no'}</td></tr>`).join('')}</tbody></table>`:'<span style="color:var(--mu)">Views have no indexes.</span>'}<h4>Storage</h4><table><tbody><tr><td>Total size</td><td>${d.v?'—':fb(d.b)}</td></tr><tr><td>Table data</td><td>${d.v?'—':fb(d.b-d.ib)}</td></tr><tr><td>Indexes</td><td>${d.v?'—':fb(d.ib)}</td></tr><tr><td>Referenced by</td><td>${Object.keys(DB).flatMap(x=>Object.keys(DB[x]).filter(n=>DB[x][n].fk&&Object.values(DB[x][n].fk).includes(cur)).map(n=>x+'.'+n)).join(', ')||'—'}</td></tr><tr><td>Estimated rows</td><td>${d.r.length}</td></tr><tr><td>Schema</td><td>${s}</td></tr></tbody></table></div>`;
- b.innerHTML=`<div class="bar"><h1>${ic(iconFor({n:t,d}))}<span>${s}.</span>${esc(t)}</h1>${d.v?'<span class="tag">view</span>':''}<span class="meta">${d.r.length} rows · ${d.v?'view':fb(d.b)}</span><span class="sp"></span>${view==='data'?`<input class="inp" id="q" placeholder="Search rows…" value="${esc(q)}"><button class="btn ${h.size?'on':''}" id="colb">Columns${h.size?` · ${h.size} hidden`:''}</button><button class="btn ${['compact','dense'].includes(S.dens)?'on':''}" id="dn">Compact</button><button class="btn" id="expb">Export ▾</button>`:''}<div class="seg" id="seg">${[['data','Data'],['cols','Structure'],['idx','Indexes']].map(v=>`<button data-v="${v[0]}" class="${view===v[0]?'on':''}">${v[1]}</button>`).join('')}</div>${view==='data'?`<div class="pop" id="exppop"><button class="ci" data-ex="csv-view"><span><b>Download CSV</b><small>${rows().length} rows in this view, visible columns</small></span></button><button class="ci" data-ex="csv-all"><span><b>Download CSV: whole table</b><small>${d.r.length} rows, all columns</small></span></button><button class="ci" data-ex="json-all"><span><b>Download JSON: whole table</b><small>${d.r.length} rows</small></span></button><button class="ci" data-ex="copy"><span><b>Copy as CSV</b><small>This view, to clipboard</small></span></button><button class="ci" data-ex="linked"><span><b>Export with linked tables…</b><small>Pick tables, download a ZIP</small></span></button></div><div class="pop" id="colpop"><div class="pq"><button class="btn" data-q="all">Show all</button><button class="btn" data-q="none">Hide all</button></div>${d.c.map(c=>`<label class="pl"><input type="checkbox" data-h="${c.n}" ${h.has(c.n)?'':'checked'}>${c.n}<small>${c.t}</small></label>`).join('')}</div>`:''}</div>${body}`}
-function insp(d){if(selRow===null)return'';const r=d.r[selRow];return`<h3>Row ${selRow+1}<button data-x1 aria-label="Close">×</button></h3>`+d.c.map((c,i)=>`<div class="kv"><label>${c.n}<span>${c.t}</span></label><pre>${r[i]===null?'NULL':esc(typeof r[i]==='object'?JSON.stringify(r[i],null,2):r[i])}</pre></div>`).join('')}
+ b.innerHTML=`<div class="bar"><h1>${ic(iconFor({n:t,d}))}<span>${s}.</span>${esc(t)}</h1>${d.v?'<span class="tag">view</span>':''}<span class="meta">${d.r.length} rows · ${d.v?'view':fb(d.b)}</span><span class="tag m-${acc()}">${ML[acc()]}</span><span class="sp"></span>${view==='data'?`<input class="inp" id="q" placeholder="Search rows…" value="${esc(q)}"><button class="btn ${h.size?'on':''}" id="colb">Columns${h.size?` · ${h.size} hidden`:''}</button><button class="btn ${['compact','dense'].includes(S.dens)?'on':''}" id="dn">Compact</button><button class="btn" id="expb">Export ▾</button>${canE(d)?'<button class="btn on" data-act="add">+ Add row</button>':''}`:''}<div class="seg" id="seg">${[['data','Data'],['cols','Structure'],['idx','Indexes']].map(v=>`<button data-v="${v[0]}" class="${view===v[0]?'on':''}">${v[1]}</button>`).join('')}</div>${view==='data'?`<div class="pop" id="exppop"><button class="ci" data-ex="csv-view"><span><b>Download CSV</b><small>${rows().length} rows in this view, visible columns</small></span></button><button class="ci" data-ex="csv-all"><span><b>Download CSV: whole table</b><small>${d.r.length} rows, all columns</small></span></button><button class="ci" data-ex="json-all"><span><b>Download JSON: whole table</b><small>${d.r.length} rows</small></span></button><button class="ci" data-ex="copy"><span><b>Copy as CSV</b><small>This view, to clipboard</small></span></button><button class="ci" data-ex="linked"><span><b>Export with linked tables…</b><small>Pick tables, download a ZIP</small></span></button></div><div class="pop" id="colpop"><div class="pq"><button class="btn" data-q="all">Show all</button><button class="btn" data-q="none">Hide all</button></div>${d.c.map(c=>`<label class="pl"><input type="checkbox" data-h="${c.n}" ${h.has(c.n)?'':'checked'}>${c.n}<small>${c.t}</small></label>`).join('')}</div>`:''}</div>${body}`}
+function insp(d){if(editing!==null)return editor(d);if(selRow===null)return'';const r=d.r[selRow];
+ return`<h3>Row ${selRow+1}<span class="ia">${canE(d)?'<button class="btn" data-act="edit">Edit</button>':''}${canX(d)?'<button class="btn dg" data-act="del">Delete</button>':''}<button data-x1 aria-label="Close">×</button></span></h3>`+d.c.map((c,i)=>`<div class="kv"><label>${c.n}<span>${c.t}</span></label><pre>${r[i]===null?'NULL':esc(typeof r[i]==='object'?JSON.stringify(r[i],null,2):r[i])}</pre></div>`).join('')}
 /* main delegation */
 document.addEventListener('click',e=>{const g=s=>e.target.closest(s);
- if(!g('.pop')&&!g('#colb')&&!g('#cbtn')&&!g('#sbtn')&&!g('#expb')){$('#cpop').classList.remove('show');$('#spop').classList.remove('show');document.querySelectorAll('#colpop,#exppop').forEach(p=>p.classList.remove('show'))}
+ if(!g('.pop')&&!g('#colb')&&!g('#cbtn')&&!g('#sbtn')&&!g('#expb')&&!g('#dbtn')){$('#cpop').classList.remove('show');$('#spop').classList.remove('show');document.querySelectorAll('#dpop,#colpop,#exppop').forEach(p=>p.classList.remove('show'))}
  let x;
  if(x=g('[data-v]')){view=x.dataset.v;main()}
  else if(x=g('[data-sc]')){const c=x.dataset.sc;sort=!sort||sort.c!==c?{c,d:1}:sort.d===1?{c,d:-1}:null;tsave();main()}
- else if(g('[data-x1]')){selRow=null;main()}
- else if(x=g('tr[data-r]')){selRow=+x.dataset.r;main()}
+ else if(g('[data-x1]')){selRow=null;editing=null;main()}
+ else if(x=g('tr[data-r]')){selRow=+x.dataset.r;editing=null;main()}
  else if(g('#colb')){$('#colpop').classList.toggle('show')}
  else if(x=g('[data-q]')){const h=hid[cur];h.clear();if(x.dataset.q==='none')T(cur).c.slice(1).forEach(c=>h.add(c.n));tsave();main();$('#colpop').classList.add('show')}
  else if(g('#dn')){S.dens=S.dens==='compact'?'comfortable':'compact';sv();main()}else if(g('#pv')){page--;main()}else if(g('#nx')){page++;main()}
@@ -324,10 +354,133 @@ document.addEventListener('click',e=>{const g=s=>e.target.closest(s);
  else if(x=g('.br[data-k]')){openTab(x.dataset.k)}});
 document.addEventListener('change',e=>{if(e.target.dataset.h){const h=hid[cur];e.target.checked?h.delete(e.target.dataset.h):h.add(e.target.dataset.h);tsave();const sc=$('.gw').scrollLeft;main();$('#colpop').classList.add('show');$('.gw').scrollLeft=sc}else if(e.target.id==='ps'){PS=+e.target.value;page=0;main()}});
 document.addEventListener('input',e=>{if(e.target.id==='q'){q=e.target.value;page=0;const p=e.target.selectionStart;main();const i=$('#q');i.focus();i.setSelectionRange(p,p)}});
-/* connection switcher */
-function cpop(){$('#cpop').innerHTML=CONNS.map((c,i)=>`<button class="ci" data-cn="${i}" role="option"><span><b>${c[0]}</b><small>${c[1]} · ${c[2]}</small></span>${i===conn?'<span style="margin-left:auto;color:var(--ac)">✓</span>':''}</button>`).join('')+'<div style="border-top:1px solid var(--bd);margin:3px 0"></div><button class="ci" disabled style="color:var(--mu)">＋ New connection <span class="tag" style="margin-left:auto">soon</span></button>'}
-$('#cbtn').onclick=()=>{$('#spop').classList.remove('show');cpop();$('#cpop').classList.toggle('show')};
-$('#cpop').onclick=e=>{const b=e.target.closest('[data-cn]');if(!b)return;conn=+b.dataset.cn;$('#cname').textContent=CONNS[conn][0];$('#cpop').classList.remove('show');toast('Switched to '+CONNS[conn][0]+' (demo data)')};
+/* access model */
+const RK={none:0,read:1,write:2,destructive:3},ML={none:'No access',read:'Read-only',write:'Write',destructive:'Destructive'};
+const USERS=[{u:'admin',name:'Administrator',role:'admin',active:true,last:'just now'},{u:'analyst',name:'Amara Otieno',role:'member',active:true,last:'2 hours ago'},{u:'viewer',name:'Liam Smith',role:'member',active:true,last:'3 days ago'}];
+const PERM={analyst:{'pg-production':{app_db:'read',reporting:'write'},'pg-staging':{app_db:'destructive'}},viewer:{'pg-production':{app_db:'read'}}};
+const SEC={dep:'public',ttl:'8h'},ENUMS={plan:['free','pro','team'],status:['pending','paid','shipped','refunded']};
+const AUDIT=[{t:'09:12',u:'analyst',a:'update',x:'public.orders #90012',d:'app_db'},{t:'09:03',u:'admin',a:'permission',x:'viewer: pg-production/app_db to read',d:'app_db'},{t:'08:41',u:'analyst',a:'delete',x:'public.sessions row',d:'app_db'}];
+const audit=(a,x)=>AUDIT.unshift({t:new Date().toTimeString().slice(0,5),u:user?user.u:'system',a,x,d:adb});
+const access=(c,d)=>!user?'none':user.role==='admin'?'destructive':((PERM[user.u]||{})[c.id]||{})[d]||'none';
+const myConns=()=>CONNS.filter(c=>c.dbs.some(d=>RK[access(c,d)]>0));
+const acc=()=>access(CONNS[conn],adb),canE=d=>RK[acc()]>=2&&!d.v,canX=d=>RK[acc()]>=3&&!d.v;
+function pickAccess(){const cs=myConns();if(!cs.length)return;if(!cs.includes(CONNS[conn]))conn=CONNS.indexOf(cs[0]);const ok=CONNS[conn].dbs.filter(d=>RK[access(CONNS[conn],d)]>0);if(!ok.includes(adb))adb=ok[0]}
+/* connection + database switchers */
+function fsw(){$('#cname').textContent=CONNS[conn].name;$('#dname').textContent=adb}
+function cpop(){$('#cpop').innerHTML=myConns().map(c=>{const i=CONNS.indexOf(c);return`<button class="ci" data-cn="${i}" role="option"><span style="flex:1;min-width:0"><b>${esc(c.name)}</b> <span class="tag">${c.eng}</span><small>${esc(c.host)} · ${c.dbs.filter(d=>RK[access(c,d)]>0).length} databases</small></span>${i===conn?'<span style="color:var(--ac)">✓</span>':''}</button>`}).join('')+(user&&user.role==='admin'?'<div style="border-top:1px solid var(--bd);margin:3px 0"></div><button class="ci" id="mng" style="color:var(--mu)">Manage connections…</button>':'')}
+function dpop(){const c=CONNS[conn];$('#dpop').innerHTML=c.dbs.map(d=>{const a=access(c,d);return`<button class="ci" data-dn="${d}" ${a==='none'?'disabled style="opacity:.45"':''} role="option"><span style="flex:1"><b>${d}</b></span><span class="tag m-${a}">${ML[a]}</span>${d===adb?'<span style="color:var(--ac)">✓</span>':''}</button>`}).join('')}
+$('#cbtn').onclick=()=>{$('#spop').classList.remove('show');$('#dpop').classList.remove('show');cpop();$('#cpop').classList.toggle('show')};
+$('#dbtn').onclick=()=>{$('#spop').classList.remove('show');$('#cpop').classList.remove('show');dpop();$('#dpop').classList.toggle('show')};
+$('#cpop').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='mng'){$('#cpop').classList.remove('show');admTab='conns';openTab('__admin');return}if(b.dataset.cn===undefined)return;conn=+b.dataset.cn;pickAccess();fsw();$('#cpop').classList.remove('show');toast('Connected to '+CONNS[conn].name+' · '+adb+' (demo data)');editing=null;selRow=null;tree();main()};
+$('#dpop').onclick=e=>{const b=e.target.closest('button');if(!b||b.disabled||!b.dataset.dn)return;adb=b.dataset.dn;fsw();$('#dpop').classList.remove('show');toast('Switched to '+adb+' (demo data)');editing=null;selRow=null;tree();main()};
+$('#sqlb').onclick=()=>openTab('__sql');
+/* auth */
+function doLogin(){const u=$('#lu').value.trim().toLowerCase(),pw=$('#lp').value,x=USERS.find(y=>y.u===u);
+ if(!x||!pw||!x.active){$('#lerr').textContent=x&&!x.active?'This account is disabled.':'Invalid username or password.';return}
+ user=x;x.last='just now';audit('sign in',u);$('#login').classList.remove('show');$('#lp').value='';$('#lerr').textContent='';pickAccess();fsw();tree();RK[acc()]>0?openTab('public.users'):(cur=null,main())}
+function logout(){user=null;cur=null;editing=null;selRow=null;$('#spop').classList.remove('show');tree();main();$('#login').classList.add('show')}
+const acct=()=>user?`<div class="sg">Account</div><div class="sr who"><span><b>${esc(user.name)}</b><small>${user.role==='admin'?'Administrator':'Member'} · ${user.u}${SEC.dep==='local'?' · trusted local':''}</small></span>${SEC.dep==='local'?'':'<button class="btn" id="so">Sign out</button>'}</div>${user.role==='admin'?'<div class="sr"><button class="btn" id="adm" style="width:100%">Administration…</button></div>':''}`:'';
+/* modal */
+let MA=[];const mf=n=>document.querySelector('#modal [name="'+n+'"]'),closeModal=()=>$('#modal').classList.remove('show');
+function openModal(t,b,btns){MA=btns;$('#modal').innerHTML=`<div class="mc"><h3>${t}</h3><div class="mb">${b}</div><div class="mf">${btns.map((x,i)=>`<button class="btn ${x[1]||''}" data-ma="${i}">${x[0]}</button>`).join('')}</div></div>`;$('#modal').classList.add('show')}
+const fld=(l,n,v='',t='text',ex='')=>`<label class="fl"><span>${l}</span><input class="inp" name="${n}" type="${t}" value="${esc(v)}" ${ex} autocomplete="off"></label>`;
+const merr=m=>{$('#merr').textContent=m;return false};
+function userModal(i){const u=i===undefined?null:USERS[i];
+ openModal(u?'Edit member':'Add member',fld('Username','u',u?u.u:'','text',u?'readonly':'')+fld('Display name','n',u?u.name:'')+`<label class="fl"><span>Role</span><select class="inp" name="r"><option value="member" ${u&&u.role==='member'?'selected':''}>Member</option><option value="admin" ${u&&u.role==='admin'?'selected':''}>Administrator</option></select></label>`+(u?'':fld('Temporary password','p','','password')+'<p class="hint" style="margin:0 0 8px">They must choose a new password at first sign-in.</p>')+'<div class="err" id="merr"></div>',
+ [['Cancel'],[u?'Save':'Add member','on',()=>{const nm=mf('n').value.trim(),r=mf('r').value;
+  if(u){if(u===user&&r!=='admin')return merr('You cannot remove your own administrator role.');u.name=nm||u.u;u.role=r;audit('user updated',u.u);return main()}
+  const un=mf('u').value.trim().toLowerCase();if(!/^[a-z0-9._-]{3,}$/.test(un))return merr('Username: 3+ letters, digits, dot, dash or underscore.');if(USERS.some(x=>x.u===un))return merr('That username is taken.');if(mf('p').value.length<8)return merr('Temporary password needs 8+ characters.');
+  USERS.push({u:un,name:nm||un,role:r,active:true,last:'never'});audit('user added',un);toast('Member added');main()}]])}
+function connModal(i){const c=i===undefined?null:CONNS[i],sel=v=>c&&c.eng===v?'selected':'';
+ openModal(c?'Edit connection':'Add connection',fld('Name','n',c?c.name:'')+`<label class="fl"><span>Engine</span><select class="inp" name="e"><option value="postgres" ${sel('postgres')}>PostgreSQL</option><option value="sqlite" ${sel('sqlite')}>SQLite</option><option disabled>MySQL / MariaDB (later)</option></select></label>`+fld('Host and port, or file path','h',c?c.host:'')+fld('Username','us',c?c.user:'')+fld('Password','pw','','password',c?'placeholder="Leave blank to keep the saved password"':'')+fld('Default database','db',c?c.dbs[0]:'')+'<div class="err" id="merr"></div>',
+ [['Cancel'],['Test connection','',()=>{if(!mf('h').value.trim())return merr('Enter a host or file path first.');merr('');toast('Connection OK (simulated)');return false}],[c?'Save':'Add connection','on',()=>{const n=mf('n').value.trim(),h=mf('h').value.trim();if(!n||!h)return merr('Name and host are required.');
+  const o={name:n,eng:mf('e').value,host:h,user:mf('us').value.trim()||'—'};if(c)Object.assign(c,o);else CONNS.push({id:n.toLowerCase().replace(/[^a-z0-9]+/g,'-'),...o,dbs:[mf('db').value.trim()||'app_db']});
+  audit(c?'connection updated':'connection added',n);toast('Connection saved. Password stays on the server.');main()}]])}
+function confirmDel(t,body,fn){openModal(t,`<p style="margin:0">${body}</p>`,[['Cancel'],['Delete','dg on',fn]])}
+/* administration */
+const sgs=(k,o)=>`<div class="seg">${o.map(x=>`<button data-sec="${k}|${x[0]}" class="${SEC[k]===x[0]?'on':''}">${x[1]}</button>`).join('')}</div>`;
+function adm(){const t=[['users','Members'],['conns','Connections'],['perms','Permissions'],['audit','Audit log'],['sec','Security']];
+ return`<div class="bar"><h1>${ic('shield')}Administration</h1><span class="sp"></span><div class="seg">${t.map(x=>`<button data-at="${x[0]}" class="${admTab===x[0]?'on':''}">${x[1]}</button>`).join('')}</div></div><div class="gw st">${admBody()}</div>`}
+function admBody(){
+ if(admTab==='users')return`<div class="sr" style="max-width:920px"><b>${USERS.length} members</b><button class="btn on" data-act="adduser">+ Add member</button></div><table class="w"><thead><tr><th>Member</th><th>Role</th><th>Status</th><th>Last active</th><th></th></tr></thead><tbody>${USERS.map((u,i)=>`<tr><td class="who"><b>${esc(u.name)}</b><small>${u.u}</small></td><td><span class="tag">${u.role==='admin'?'Administrator':'Member'}</span></td><td>${u.active?'Active':'<span style="color:var(--mu)">Disabled</span>'}</td><td style="color:var(--mu)">${u.last}</td><td><div class="acts"><button class="btn" data-act="eu" data-i="${i}">Edit</button><button class="btn" data-act="tg" data-i="${i}">${u.active?'Disable':'Enable'}</button><button class="btn dg" data-act="du" data-i="${i}">Delete</button></div></td></tr>`).join('')}</tbody></table>`;
+ if(admTab==='conns')return`<div class="sr" style="max-width:920px"><b>${CONNS.length} connection profiles</b><button class="btn on" data-act="addconn">+ Add connection</button></div><table class="w"><thead><tr><th>Name</th><th>Engine</th><th>Host</th><th>Databases</th><th></th></tr></thead><tbody>${CONNS.map((c,i)=>`<tr><td><b>${esc(c.name)}</b></td><td><span class="tag">${c.eng}</span></td><td><code>${esc(c.host)}</code></td><td>${c.dbs.length}</td><td><div class="acts"><button class="btn" data-act="ec" data-i="${i}">Edit</button><button class="btn dg" data-act="dc" data-i="${i}">Remove</button></div></td></tr>`).join('')}</tbody></table><p class="hint">Passwords are stored encrypted on the server and are never sent back to the browser.</p>`;
+ if(admTab==='perms'){const mem=USERS.filter(u=>u.role!=='admin');if(!mem.find(u=>u.u===permU))permU=mem[0]?mem[0].u:'';
+  return`<div class="sr" style="max-width:920px"><span>Member <select class="inp" id="pu" style="width:200px;display:inline-block;margin-left:6px">${mem.map(u=>`<option value="${u.u}" ${u.u===permU?'selected':''}>${esc(u.name)} (${u.u})</option>`).join('')}</select></span><span style="color:var(--mu)">Administrators always have full access.</span></div>`+(mem.length?`<table class="w"><thead><tr><th>Connection</th><th>Database</th><th>Access</th></tr></thead><tbody>${CONNS.flatMap(c=>c.dbs.map(d=>{const a=((PERM[permU]||{})[c.id]||{})[d]||'none';return`<tr><td>${esc(c.name)} <span class="tag">${c.eng}</span></td><td><code>${d}</code></td><td><div class="seg">${[['none','None'],['read','Read-only'],['write','Write'],['destructive','Destructive']].map(m=>`<button data-p="${c.id}|${d}|${m[0]}" class="${a===m[0]?'on':''}">${m[1]}</button>`).join('')}</div></td></tr>`})).join('')}</tbody></table><p class="hint">Read-only: browse and run SELECT. Write: also insert and update rows. Destructive: also delete rows and run DROP, TRUNCATE and similar statements.</p>`:'<p class="hint">No non-admin members yet.</p>')}
+ if(admTab==='audit')return`<table class="w"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Database</th></tr></thead><tbody>${AUDIT.map(a=>`<tr><td style="color:var(--mu)">${a.t}</td><td>${a.u}</td><td><span class="tag">${a.a}</span></td><td>${esc(a.x)}</td><td><code>${a.d}</code></td></tr>`).join('')}</tbody></table>`;
+ return`<div style="max-width:640px"><div class="sr"><span><b>Deployment mode</b><small style="display:block;color:var(--mu)">Trusted local skips sign-in and is for 127.0.0.1 only. Authenticated public requires sign-in and HTTPS.</small></span>${sgs('dep',[['local','Trusted local'],['public','Authenticated public']])}</div><div class="sr"><span><b>Session lifetime</b><small style="display:block;color:var(--mu)">Server-side sessions expire after this time.</small></span>${sgs('ttl',[['1h','1 hour'],['8h','8 hours'],['7d','7 days']])}</div><p class="hint">Sign-in state and credentials live on the server. Nothing secret is kept in the browser.</p></div>`}
+function act(a,i){i=+i;const d=cur&&!cur.includes(':')&&cur[0]!=='_'?T(cur):null;
+ if(a==='adduser')userModal();else if(a==='eu')userModal(i);else if(a==='addconn')connModal();else if(a==='ec')connModal(i);
+ else if(a==='tg'){if(USERS[i]===user)return toast('You cannot disable yourself');USERS[i].active=!USERS[i].active;audit(USERS[i].active?'user enabled':'user disabled',USERS[i].u);main()}
+ else if(a==='du'){const u=USERS[i];if(u===user)return toast('You cannot delete yourself');confirmDel('Delete member?',`Remove <b>${esc(u.name)}</b> and all of their access?`,()=>{USERS.splice(i,1);audit('user deleted',u.u);main()})}
+ else if(a==='dc'){if(CONNS.length<2)return toast('Keep at least one connection');const c=CONNS[i];confirmDel('Remove connection?',`Remove <b>${esc(c.name)}</b>? Members lose access to its databases.`,()=>{CONNS.splice(i,1);conn=0;pickAccess();fsw();audit('connection removed',c.name);tree();main()})}
+ else if(a==='add'&&d&&canE(d)){editing='new';selRow=null;main()}
+ else if(a==='edit'&&d&&canE(d)){editing=selRow;main()}
+ else if(a==='ecancel'){editing=null;main()}else if(a==='esave')saveRow()
+ else if(a==='del'&&d&&canX(d)){const pk=d.c.findIndex(c=>c.pk),r=d.r[selRow],at=selRow;openModal('Delete this row?',`<p style="margin:0 0 6px">This permanently deletes row <code>${esc(r[pk])}</code> from <b>${esc(cur)}</b> in <b>${esc(adb)}</b>.</p><p style="margin:0;color:var(--mu)">It can't be undone. The action is recorded in the audit log.</p>`,[['Cancel'],['Delete row','dg on',()=>{d.r.splice(at,1);audit('delete',cur+' #'+r[pk]);selRow=null;toast('Row deleted');tree();main()}]])}}
+document.addEventListener('click',e=>{const g=s=>e.target.closest(s);let x;
+ if(x=g('[data-at]')){admTab=x.dataset.at;main()}
+ else if(x=g('[data-act]'))act(x.dataset.act,x.dataset.i)
+ else if(x=g('[data-p]')){const[c,d,m]=x.dataset.p.split('|');PERM[permU]=PERM[permU]||{};PERM[permU][c]=PERM[permU][c]||{};PERM[permU][c][d]=m;audit('permission',permU+': '+c+'/'+d+' to '+m);main()}
+ else if(x=g('[data-sec]')){const[k,v]=x.dataset.sec.split('|');SEC[k]=v;main()}
+ else if(x=g('[data-ma]')){const f=MA[x.dataset.ma][2];if(!f||f()!==false)closeModal()}
+ else if(g('#modal')&&!g('.mc'))closeModal()
+ else if(g('#lbtn'))doLogin()
+ else if(x=g('[data-demo]')){$('#lu').value=x.dataset.demo;$('#lp').value='demo-password'}
+ else if(g('#sqlrun'))runSql()});
+document.addEventListener('change',e=>{if(e.target.id==='pu'){permU=e.target.value;main()}
+ else if(e.target.dataset.nl!==undefined){const c=document.querySelector('#insp [name="'+e.target.dataset.nl+'"]');if(c)c.disabled=e.target.checked}});
+document.addEventListener('input',e=>{if(e.target.dataset.json!==undefined){try{JSON.parse(e.target.value);e.target.style.borderColor=''}catch(_){e.target.style.borderColor='#d0505f'}}});
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&e.target.id==='sql'){e.preventDefault();runSql()}if(e.key==='Enter'&&(e.target.id==='lu'||e.target.id==='lp'))doLogin()});
+/* record editor */
+function fctl(c,v,isN){const nm=c.n,ro=!isN&&c.pk,isNull=v===null,e0=v===null||v===undefined;let t;
+ if(ENUMS[nm]&&c.t==='text')t=`<select class="inp" name="${nm}">${ENUMS[nm].map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join('')}</select>`;
+ else if(c.t==='boolean')t=`<input type="checkbox" class="tg" name="${nm}" ${v?'checked':''}>`;
+ else if(c.t==='jsonb')t=`<textarea class="inp" name="${nm}" rows="4" data-json>${esc(e0?'{}':JSON.stringify(v,null,2))}</textarea>`;
+ else if(c.t==='timestamptz')t=`<input class="inp" type="datetime-local" name="${nm}" value="${v?v.slice(0,16):''}">`;
+ else if(numT(c.t))t=`<input class="inp" type="number" step="${c.t==='numeric'?'any':'1'}" name="${nm}" value="${e0?'':v}" ${isN&&c.pk&&c.t==='bigint'?'placeholder="auto"':''} ${ro?'readonly':''}>`;
+ else t=`<input class="inp" name="${nm}" value="${e0?'':esc(Array.isArray(v)?v.join(', '):v)}" ${ro?'readonly':''} ${c.t==='uuid'&&isN?'placeholder="generated if empty"':''}>`;
+ if(isNull&&c.nl)t=t.replace(/^<(\w+)/,'<$1 disabled');
+ return`<label class="fl"><span class="row2">${nm} <code>${c.t}</code>${c.nl?`<span class="nlt"><input type="checkbox" data-nl="${nm}" ${isNull?'checked':''}> NULL</span>`:''}</span>${t}</label>`}
+function editor(d){const isN=editing==='new',r=isN?null:d.r[editing];
+ return`<h3>${isN?'New row':'Edit row '+(editing+1)}<button data-x1 aria-label="Close">×</button></h3><div class="ed">${d.c.map((c,i)=>fctl(c,r?r[i]:(c.nl?null:undefined),isN)).join('')}</div><div class="ef"><span class="err" id="eerr"></span><button class="btn" data-act="ecancel">Cancel</button><button class="btn on" data-act="esave">${isN?'Insert row':'Save changes'}</button></div>`}
+function saveRow(){const d=T(cur),isN=editing==='new',row=[],er=m=>{$('#eerr').textContent=m;return false};
+ for(const c of d.c){const el=document.querySelector('#insp [name="'+c.n+'"]'),nc=document.querySelector('#insp [data-nl="'+c.n+'"]');let v;
+  if(nc&&nc.checked){row.push(null);continue}
+  if(c.t==='boolean')v=el.checked;
+  else if(c.t==='jsonb'){try{v=JSON.parse(el.value)}catch(_){return er(c.n+': invalid JSON')}}
+  else if(numT(c.t)){if(el.value===''){if(c.pk&&isN&&c.t==='bigint')v=Math.max(...d.r.map(r=>r[d.c.indexOf(c)]))+1;else return er(c.n+' is required')}else v=+el.value}
+  else if(c.t==='timestamptz'){if(!el.value)return er(c.n+' is required');v=el.value+':00Z'}
+  else if(c.t==='text[]')v=el.value.split(',').map(x=>x.trim()).filter(Boolean);
+  else{v=el.value;if(!v&&c.t==='uuid'&&c.pk&&isN)v=uid();if(!v)return er(c.n+' is required')}
+  row.push(v)}
+ const pk=d.c.findIndex(c=>c.pk);
+ if(isN){if(d.r.some(r=>r[pk]===row[pk]))return er('Duplicate primary key');d.r.unshift(row);selRow=0;audit('insert',cur+' #'+row[pk])}
+ else{d.r[editing]=row;selRow=editing;audit('update',cur+' #'+row[pk])}
+ editing=null;toast(isN?'Row inserted':'Row updated');tree();main()}
+/* SQL workspace */
+function runSel(q){const m=q.match(/^select\s+(.+?)\s+from\s+([\w."]+)(?:\s+where\s+(\w+)\s*(=|>=|<=|!=|>|<)\s*('[^']*'|[\w.-]+))?(?:\s+order\s+by\s+(\w+)(?:\s+(asc|desc))?)?(?:\s+limit\s+(\d+))?$/is);
+ if(!m)return{err:'Demo parser supports: SELECT cols FROM schema.table [WHERE col = value] [ORDER BY col [DESC]] [LIMIT n].'};
+ let ref=m[2].replace(/"/g,'');if(!ref.includes('.'))ref='public.'+ref;let d;try{d=T(ref)}catch(_){}
+ if(!d)return{err:'relation "'+m[2]+'" does not exist'};
+ const names=m[1].trim()==='*'?d.c.map(c=>c.n):m[1].split(',').map(x=>x.trim()),cs=names.map(n=>d.c.find(c=>c.n===n));
+ if(cs.includes(undefined))return{err:'column "'+names[cs.indexOf(undefined)]+'" does not exist'};
+ let r=d.r.slice();
+ if(m[3]){const i=d.c.findIndex(c=>c.n===m[3]);if(i<0)return{err:'column "'+m[3]+'" does not exist'};const raw=m[5].replace(/^'|'$/g,'');
+  r=r.filter(x=>{const v=x[i];if(v===null)return false;const a=typeof v==='number'?v:String(v),b=typeof v==='number'?+raw:raw,c=a>b?1:a<b?-1:0;return{'=':c===0,'>':c>0,'<':c<0,'>=':c>=0,'<=':c<=0,'!=':c!==0}[m[4]]})}
+ if(m[6]){const i=d.c.findIndex(c=>c.n===m[6]);if(i<0)return{err:'column "'+m[6]+'" does not exist'};const k=/desc/i.test(m[7]||'')?-1:1;r.sort((a,b)=>a[i]===null?1:b[i]===null?-1:(a[i]>b[i]?1:a[i]<b[i]?-1:0)*k)}
+ const lim=Math.min(+m[8]||500,500);return{cs,rows:r.slice(0,lim).map(x=>cs.map(c=>x[d.c.indexOf(c)])),total:r.length,lim,ms:Math.round(4+Math.random()*14)}}
+function runSql(){sqlText=$('#sql').value;const q=sqlText.trim().replace(/;+\s*$/,''),kw=(q.match(/^\w+/)||[''])[0].toLowerCase();
+ const need=['select','explain','show'].includes(kw)?1:['insert','update'].includes(kw)?2:['delete','drop','truncate','alter'].includes(kw)?3:9;
+ if(/;\s*\S/.test(q))sqlRes={err:'Only one statement can run at a time.'};
+ else if(need===9)sqlRes={err:'Unsupported statement. Allowed: SELECT, INSERT, UPDATE, DELETE and DDL, depending on your access.'};
+ else if(RK[acc()]<need)sqlRes={err:'Permission denied: '+kw.toUpperCase()+' needs '+['','read-only','write','destructive'][need]+' access to '+adb+'. You have '+ML[acc()].toLowerCase()+' access.'};
+ else if(need===1)sqlRes=kw==='select'?runSel(q):{msg:'Statement accepted (simulated).'};
+ else{sqlRes={msg:kw.toUpperCase()+' accepted (simulated, no data was changed in this demo).'};audit('sql',q.slice(0,60))}
+ $('#sqlout').innerHTML=sqlOut()}
+function sqlOut(){const r=sqlRes;if(!r)return'<div class="sqle" style="color:var(--mu)">Run a query to see results. Ctrl or ⌘ + Enter also runs it.</div>';
+ if(r.err)return`<div class="sqle err2">${esc(r.err)}</div>`;if(r.msg)return`<div class="sqle">${esc(r.msg)}</div>`;
+ return`<table><thead><tr>${r.cs.map(c=>`<th class="${numT(c.t)?'num':''}">${c.n}<small>${c.t}</small></th>`).join('')}</tr></thead><tbody>${r.rows.map(x=>`<tr>${x.map((v,i)=>`<td class="${numT(r.cs[i].t)?'num':''}">${cell(r.cs[i],v)}</td>`).join('')}</tr>`).join('')}</tbody></table><div class="sqle" style="color:var(--mu)">${r.rows.length} rows${r.total>r.lim?' (limited to '+r.lim+' of '+r.total+')':''} · ${r.ms} ms</div>`}
+function sqlView(){$('#mainbody').innerHTML=`<div class="bar"><h1>${ic('fn')}<span>SQL</span>workspace</h1><span class="meta">${esc(CONNS[conn].name)} · ${adb}</span><span class="tag m-${acc()}">${ML[acc()]}</span><span class="sp"></span><button class="btn on" id="sqlrun">Run ⌘↵</button></div><div class="sqlw"><textarea id="sql" spellcheck="false">${esc(sqlText)}</textarea><div class="sqlh">Max 500 rows · 10 s timeout · ${RK[acc()]>=3?'destructive statements allowed':RK[acc()]>=2?'writes allowed, destructive statements blocked':'read-only: SELECT only'}</div><div id="sqlout">${sqlOut()}</div></div>`}
 /* export */
 const cq=v=>{if(v===null||v===undefined)return'';const t=typeof v==='object'?(Array.isArray(v)?'{'+v.join(',')+'}':JSON.stringify(v)):String(v);return/[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
 const csvOf=(d,rs,cs)=>[cs.map(c=>c.n).join(','),...rs.map(r=>cs.map(c=>cq(r[d.c.indexOf(c)])).join(','))].join('\n');
@@ -354,13 +507,13 @@ $('#selbar').onclick=e=>{const b=e.target.closest('button');if(!b)return;
  if(b.id==='sx'){selMode=false;sel.clear();tree();selbar()}
  else if(b.id==='sz'){const all=new Set(sel);if(incl)links(sel).forEach(k=>all.add(k));const rel=['table,column,references'];
   const files=[...all].map(k=>{const d=T(k);Object.entries(d.fk||{}).forEach(([c,r])=>rel.push([k,c,r].join(',')));return[k.replace('.','_')+'.csv',csvOf(d,d.r,d.c)]});
-  files.push(['relations.csv',rel.join('\n')]);dl('cuadb-'+CONNS[conn][1]+'-export.zip',zip(files));toast('Exported '+all.size+' tables as ZIP')}};
+  files.push(['relations.csv',rel.join('\n')]);dl('cuadb-'+adb+'-export.zip',zip(files));toast('Exported '+all.size+' tables as ZIP')}};
 $('#selbar').onchange=e=>{if(e.target.id==='incl'){incl=e.target.checked;tree();selbar()}};
 document.addEventListener('dblclick',e=>{const c=e.target.closest('td:not(.rn)');if(c&&navigator.clipboard){navigator.clipboard.writeText(c.innerText);toast('Cell copied')}});
 /* overview + object pages */
 function bar(l,v,t,k){return`<div class="br" ${k?`data-k="${k}"`:''}><span>${esc(l)}</span><i><u style="width:${Math.max(1,v/t*100)}%"></u></i><b>${fb(v)}</b></div>`}
 function ov(){const ts=[];Object.keys(DB).forEach(s=>Object.keys(DB[s]).forEach(t=>ts.push({s,t,d:DB[s][t]})));const tb=ts.filter(x=>!x.d.v),tot=total(),cnt=k=>META.filter(m=>m.k===k).length,mx=Math.max(...tb.map(x=>x.d.b));
- return`<div class="bar"><h1>${ic('overview')}<span>db.</span>${CONNS[conn][1]}</h1><span class="meta">PostgreSQL 16.4 · UTF8 · ${fb(tot)} total</span></div><div class="gw st"><div class="cards">${[['Total size',fb(tot)],['Tables',tb.length],['Views',ts.length-tb.length],['Functions',cnt('function')],['Procedures',cnt('procedure')],['Sequences',cnt('sequence')],['Types',cnt('type')],['Triggers',cnt('trigger')],['Extensions',EXT.length]].map(c=>`<div class="card"><small>${c[0]}</small><b>${c[1]}</b></div>`).join('')}</div><h4>Size by schema</h4>${[...Object.keys(DB).map(s=>[s,Object.values(DB[s]).reduce((a,d)=>a+(d.b||0),0)]),['pg_catalog (system)',SYS]].map(z=>bar(z[0],z[1],tot)).join('')}<h4>Largest tables</h4>${tb.sort((a,b)=>b.d.b-a.d.b).slice(0,6).map(x=>bar(x.s+'.'+x.t,x.d.b,mx,x.s+'.'+x.t)).join('')}<h4>Extensions</h4><table><tbody>${EXT.map(e=>`<tr><td><b>${e[0]}</b></td><td>${e[1]}</td><td style="color:var(--mu)">${e[2]}</td></tr>`).join('')}</tbody></table></div>`}
+ return`<div class="bar"><h1>${ic('overview')}<span>db.</span>${adb}</h1><span class="meta">PostgreSQL 16.4 · UTF8 · ${fb(tot)} total</span></div><div class="gw st"><div class="cards">${[['Total size',fb(tot)],['Tables',tb.length],['Views',ts.length-tb.length],['Functions',cnt('function')],['Procedures',cnt('procedure')],['Sequences',cnt('sequence')],['Types',cnt('type')],['Triggers',cnt('trigger')],['Extensions',EXT.length]].map(c=>`<div class="card"><small>${c[0]}</small><b>${c[1]}</b></div>`).join('')}</div><h4>Size by schema</h4>${[...Object.keys(DB).map(s=>[s,Object.values(DB[s]).reduce((a,d)=>a+(d.b||0),0)]),['pg_catalog (system)',SYS]].map(z=>bar(z[0],z[1],tot)).join('')}<h4>Largest tables</h4>${tb.sort((a,b)=>b.d.b-a.d.b).slice(0,6).map(x=>bar(x.s+'.'+x.t,x.d.b,mx,x.s+'.'+x.t)).join('')}<h4>Extensions</h4><table><tbody>${EXT.map(e=>`<tr><td><b>${e[0]}</b></td><td>${e[1]}</td><td style="color:var(--mu)">${e[2]}</td></tr>`).join('')}</tbody></table></div>`}
 function mv(){const[k,r]=cur.split(':'),m=META.find(x=>x.k===k&&x.s+'.'+x.n===r);
  return`<div class="bar"><h1>${ic(iconFor({m}))}<span>${m.s}.</span>${esc(m.n)}</h1><span class="tag">${m.k}</span></div><div class="gw st"><table><tbody>${Object.entries(m.p).map(a=>`<tr><td style="color:var(--mu)">${a[0]}</td><td>${esc(a[1])}</td></tr>`).join('')}</tbody></table>${m.src?`<h4>Definition</h4><pre class="src">${esc(m.src)}</pre>`:''}</div>`}
 /* settings */
@@ -371,9 +524,10 @@ const SETS=[
 ['Grid',[['dens','Row height','seg',[['dense','XS'],['compact','S'],['comfortable','M'],['roomy','L']]],['lines','Lines','seg',[['rows','Rows'],['all','Grid'],['none','None']]],['nulls','Empty value','seg',[['NULL','NULL'],['∅','∅'],['','Blank']]],['rn','Row numbers','tg'],['ty','Column types in header','tg'],['zb','Striped rows','tg'],['wrap','Wrap long text','tg'],['sep','Thousands separators','tg']]],
 ['Sidebar',[['icons','Icons','seg',[['color','Color'],['mono','Mono'],['off','Off']]],['side','Show','seg',[['rows','Rows'],['size','Size']]],['unit','Size units','seg',[['auto','Auto'],['KB','KB'],['MB','MB'],['GB','GB']]]]],
 ['Tables',[['remember','Remember hidden columns and sort','tg']]]];
-function spop(){$('#spop').innerHTML=SETS.map(([h,rs])=>`<div class="sg">${h}</div>`+rs.map(([k,l,t,o])=>t==='tg'?`<div class="sr"><span>${l}</span><input type="checkbox" class="tg" data-tg="${k}" ${S[k]?'checked':''}></div>`:t==='seg'?`<div class="sr"><span>${l}</span><div class="seg">${o.map(x=>`<button data-st="${k}" data-val="${x[0]}" class="${String(S[k])===x[0]?'on':''}">${x[1]}</button>`).join('')}</div></div>`:`<div class="sr"><span>${l}</span><span style="display:flex;gap:5px;align-items:center">${['','#2f6fdb','#7b61d6','#2f8f5b','#c27a1a','#c2485a'].map(c=>`<button class="sw2 ${S.accent===c?'on':''}" data-ac="${c}" style="background:${c||'#0e7c86'}" aria-label="Accent ${c||'default'}"></button>`).join('')}<input type="color" class="cc" data-cc value="${S.accent||'#0e7c86'}" aria-label="Custom accent"></span></div>`).join('')).join('')+`<div class="sr" style="margin-top:8px"><button class="btn" id="rst" ${cur&&!cur.includes(':')&&cur!=='__overview'?'':'disabled'}>Reset this table</button><button class="btn" id="rall">Reset all</button></div>`}
-$('#sbtn').onclick=()=>{$('#cpop').classList.remove('show');spop();$('#spop').classList.toggle('show')};
+function spop(){$('#spop').innerHTML=acct()+SETS.map(([h,rs])=>`<div class="sg">${h}</div>`+rs.map(([k,l,t,o])=>t==='tg'?`<div class="sr"><span>${l}</span><input type="checkbox" class="tg" data-tg="${k}" ${S[k]?'checked':''}></div>`:t==='seg'?`<div class="sr"><span>${l}</span><div class="seg">${o.map(x=>`<button data-st="${k}" data-val="${x[0]}" class="${String(S[k])===x[0]?'on':''}">${x[1]}</button>`).join('')}</div></div>`:`<div class="sr"><span>${l}</span><span style="display:flex;gap:5px;align-items:center">${['','#2f6fdb','#7b61d6','#2f8f5b','#c27a1a','#c2485a'].map(c=>`<button class="sw2 ${S.accent===c?'on':''}" data-ac="${c}" style="background:${c||'#0e7c86'}" aria-label="Accent ${c||'default'}"></button>`).join('')}<input type="color" class="cc" data-cc value="${S.accent||'#0e7c86'}" aria-label="Custom accent"></span></div>`).join('')).join('')+`<div class="sr" style="margin-top:8px"><button class="btn" id="rst" ${cur&&!cur.includes(':')&&cur!=='__overview'?'':'disabled'}>Reset this table</button><button class="btn" id="rall">Reset all</button></div>`}
+$('#sbtn').onclick=()=>{$('#cpop').classList.remove('show');$('#dpop').classList.remove('show');spop();$('#spop').classList.toggle('show')};
 $('#spop').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+ if(b.id==='so'){logout();return}if(b.id==='adm'){$('#spop').classList.remove('show');openTab('__admin');return}
  if(b.dataset.st)S[b.dataset.st]=b.dataset.val;else if(b.dataset.ac!==undefined)S.accent=b.dataset.ac;
  else if(b.id==='rst'){hid[cur]=new Set();sort=null;delete TP[cur]}else if(b.id==='rall'){Object.assign(S,DEF);Object.keys(TP).forEach(k=>delete TP[k])}else return;
  sv();apply();spop();tree();main()};
@@ -382,9 +536,9 @@ $('#spop').onchange=e=>{if(e.target.dataset.tg)S[e.target.dataset.tg]=e.target.c
 let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1800)}
 $('#menu').onclick=()=>$('#side').classList.toggle('show');
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();$('#side').classList.add('show');$('#f').focus();$('#f').select()}
- if(e.key==='Escape'){$('#cpop').classList.remove('show');$('#spop').classList.remove('show');if(selRow!==null){selRow=null;main()}}});
+ if(e.key==='Escape'){closeModal();$('#dpop').classList.remove('show');$('#cpop').classList.remove('show');$('#spop').classList.remove('show');if(selRow!==null){selRow=null;main()}}});
 apply();
-tree();openTab('public.users');
+user=SEC.dep==='local'?USERS[0]:null;fsw();tree();if(user)openTab('public.users');else{main();$('#login').classList.add('show')}
 </script>
 </body>
 </html>

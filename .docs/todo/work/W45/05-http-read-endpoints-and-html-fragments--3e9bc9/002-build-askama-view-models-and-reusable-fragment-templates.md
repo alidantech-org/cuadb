@@ -34,6 +34,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
 
+## Updated demo amendment (2026-11-05)
+The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
+
+### Amendment acceptance
+- [ ] Every full page and fragment receives a principal view model (display name, role, local-or-authenticated mode, CSRF token, SQL-workspace and write capability flags) and shared popover, modal and toast partials exist.
+- [ ] No template emits `style=` attributes or inline handlers; bar widths, swatches and density use classes, `data-*` attributes or CSS variables set from bundled JS.
+- [ ] Fragments for the new surfaces (account block, database switcher, connection modal, admin tabs, row editor, SQL workspace) are Askama partials, each with empty, loading, denied and error states.
+
 ## Comments
 
 ### 2026-11-04T11:29:33.158Z · PETER IRUNGU

@@ -1,5 +1,5 @@
 ---
-{id: TSK-16AEEF4061F8,name: Wire paging controls and page size to the Rust server,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:06.572Z,updated_at: 2026-11-04T16:14:57.566Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8B8935A1684A],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.555Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:18.312Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-16AEEF4061F8/1793791781557-start,started_at: 2026-11-04T11:29:41.570Z,end_ref: refs/tracking/TSK-16AEEF4061F8/1793808858314-end,ended_at: 2026-11-04T16:14:18.312Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-812F816785FD}]}
+{id: TSK-16AEEF4061F8,name: Wire paging controls and page size to the Rust server,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.572Z,updated_at: 2026-11-04T23:18:19.988Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8B8935A1684A],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.555Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:18.312Z},{from: blocked,to: planned,at: 2026-11-04T23:18:19.988Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-16AEEF4061F8/1793791781557-start,started_at: 2026-11-04T11:29:41.570Z,end_ref: refs/tracking/TSK-16AEEF4061F8/1793808858314-end,ended_at: 2026-11-04T16:14:18.312Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-812F816785FD}]}
 ---
 
 # Wire paging controls and page size to the Rust server
@@ -33,6 +33,12 @@ The **required frontend specification** is `assets/cuadb-ui-demo.html` and the c
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Updated demo amendment (2026-11-05)
+The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
+
+### Amendment acceptance
+- [ ] Page size and previous/next remain bounded server fetches, and paging cancels any open row editor after confirming unsaved changes.
 
 ## Comments
 

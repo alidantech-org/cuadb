@@ -1,5 +1,5 @@
 ---
-{id: TSK-58382C325F5F,name: Add optional PostGIS geometry and geography inspection,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:07.352Z,updated_at: 2026-11-04T16:15:21.546Z,tags: [cuadb,inspectors],depends_on: [TSK-11615BE5E97B,TSK-725618F4E684],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.994Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.643Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-58382C325F5F/1793791788996-start,started_at: 2026-11-04T11:29:49.010Z,end_ref: refs/tracking/TSK-58382C325F5F/1793808860645-end,ended_at: 2026-11-04T16:14:20.644Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-A7B0DFC23314}]}
+{id: TSK-58382C325F5F,name: Add optional PostGIS geometry and geography inspection,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.352Z,updated_at: 2026-11-04T23:18:20.260Z,tags: [cuadb,inspectors],depends_on: [TSK-11615BE5E97B,TSK-725618F4E684],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.994Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.643Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.260Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-58382C325F5F/1793791788996-start,started_at: 2026-11-04T11:29:49.010Z,end_ref: refs/tracking/TSK-58382C325F5F/1793808860645-end,ended_at: 2026-11-04T16:14:20.644Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-A7B0DFC23314}]}
 ---
 
 # Add optional PostGIS geometry and geography inspection
@@ -33,6 +33,12 @@ The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Updated demo amendment (2026-11-05)
+The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
+
+### Amendment acceptance
+- [ ] PostGIS inspection stays optional and hidden when the extension is absent; if no PostGIS fixture exists the item stays open and is recorded as a limitation.
 
 ## Comments
 

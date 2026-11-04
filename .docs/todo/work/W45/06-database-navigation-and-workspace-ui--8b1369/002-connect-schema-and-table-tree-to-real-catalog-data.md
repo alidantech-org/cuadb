@@ -1,5 +1,5 @@
 ---
-{id: TSK-5EE171C4C580,name: Connect schema and table tree to real catalog data,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:06.091Z,updated_at: 2026-11-04T16:14:56.886Z,tags: [cuadb,explorer-ui],depends_on: [TSK-A513FD340BD5,TSK-5FC58B7B6E27,TSK-9890D0090922],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.351Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:16.782Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-5EE171C4C580/1793791751353-start,started_at: 2026-11-04T11:29:11.368Z,end_ref: refs/tracking/TSK-5EE171C4C580/1793808856783-end,ended_at: 2026-11-04T16:14:16.782Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-BE512E99EA68}]}
+{id: TSK-5EE171C4C580,name: Connect schema and table tree to real catalog data,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.091Z,updated_at: 2026-11-04T23:18:19.832Z,tags: [cuadb,explorer-ui],depends_on: [TSK-A513FD340BD5,TSK-5FC58B7B6E27,TSK-9890D0090922],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.351Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:16.782Z},{from: blocked,to: planned,at: 2026-11-04T23:18:19.832Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-5EE171C4C580/1793791751353-start,started_at: 2026-11-04T11:29:11.368Z,end_ref: refs/tracking/TSK-5EE171C4C580/1793808856783-end,ended_at: 2026-11-04T16:14:16.782Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-BE512E99EA68}]}
 ---
 
 # Connect schema and table tree to real catalog data
@@ -33,6 +33,13 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Updated demo amendment (2026-11-05)
+The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
+
+### Amendment acceptance
+- [ ] The tree shows only objects the signed-in principal may see, in Simple and Advanced modes, and a principal with no grants sees the demo's `No databases assigned yet` empty state.
+- [ ] Switching connection or database reloads the tree, clears the selection and any open editor or inspector, and keeps focus on the sidebar.
 
 ## Comments
 

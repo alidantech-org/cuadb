@@ -24,3 +24,7 @@ Do not implement adjacent groups speculatively. Keep changes modular, add tests 
 ## Mandatory visual acceptance
 
 The canonical frontend specification for this group is `assets/cuadb-ui-demo.html`, reinforced by `.docs/docs/frontend-interactions.md`. It is a binding acceptance baseline for all related tasks, not an alternative design sketch. Completion requires the demonstration's inline Data / Structure / Indexes mode switcher, with structure column details, indexes and storage together, and a separate Advanced Overview. The visual style, compact cards, size bars, object details and selected-row inspector must follow the demo. When an engine lacks specific metadata, display an honest unsupported state in the same design instead of inventing values or using a different page layout. All relevant tasks must pass a side-by-side comparison against the same browser viewport, mode and selected object state, and must not be marked complete based on a different layout.
+
+## Phase 2 update (2026-11-05)
+
+The owner accepted the PostgreSQL + SQLite backend gate (`.docs/docs/backend-gate-decision.md`) and started Phase 2. The gate wording above is historical. The updated `assets/cuadb-ui-demo.html` is the look-and-feel baseline and may be improved where it makes the product better, and the work must follow the CSP, CSRF and manual browser-verification rules in `.docs/docs/frontend-interactions.md`.

@@ -1,5 +1,5 @@
 ---
-{id: TSK-0AA246B508ED,name: Implement Table Info tab with honest statistics and storage,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:07.130Z,updated_at: 2026-11-04T16:14:19.983Z,tags: [cuadb,inspectors],depends_on: [TSK-CFEA5F712D4B,TSK-FFD6A5B94574],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.662Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.983Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-0AA246B508ED/1793791788664-start,started_at: 2026-11-04T11:29:48.680Z,end_ref: refs/tracking/TSK-0AA246B508ED/1793808859985-end,ended_at: 2026-11-04T16:14:19.983Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}}}
+{id: TSK-0AA246B508ED,name: Implement Table Info tab with honest statistics and storage,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.130Z,updated_at: 2026-11-04T23:18:20.179Z,tags: [cuadb,inspectors],depends_on: [TSK-CFEA5F712D4B,TSK-FFD6A5B94574],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.662Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.983Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.179Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-0AA246B508ED/1793791788664-start,started_at: 2026-11-04T11:29:48.680Z,end_ref: refs/tracking/TSK-0AA246B508ED/1793808859985-end,ended_at: 2026-11-04T16:14:19.983Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}}}
 ---
 
 # Implement Table Info tab with honest statistics and storage
@@ -33,6 +33,12 @@ The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Updated demo amendment (2026-11-05)
+The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
+
+### Amendment acceptance
+- [ ] The Indexes view lists indexes with unique/primary markers and a Storage section with honest (estimated versus exact) sizes, plus `Referenced by` from real foreign keys.
 
 ## Comments
 

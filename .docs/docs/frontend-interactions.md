@@ -10,6 +10,16 @@
 
 The demo contains **simulated records, connection names, PostgreSQL statistics and client-side export behavior**. These are examples only. In the production interface use actual, permission-scoped database metadata and rows. Preserve the same interactions and visible states, but implement unbounded operations safely (cancellable, bounded or streamed on the server); do not silently fetch whole tables into browser memory or suggest that a fake connection is live. Security, data truthfulness and accessibility take precedence where behavior conflicts, but visual departures require an explicit written rationale and user review.
 
+## Phase 2 decisions (2026-11-05, owner)
+
+- **Baseline plus improvements.** The updated demo is the baseline for look, feel, density and interaction ideology. It may be improved where that makes the product better; the "no departures" wording above is superseded. Record each deliberate departure in a Task comment.
+- **New surfaces from the updated demo:** login and sign-out, Account block in settings, roles and access tags (`none`, `read`, `write`, `destructive`), connection picker plus database picker, connection create/edit/test/delete modal, Administration view (Members, Connections, Permissions, Audit log, Security), typed row editor with insert and delete, and the SQL workspace with a pending-change bar.
+- **Server truth over demo simulation.** Any-password login, client-side audit, client-side statement classification, the runtime deployment-mode toggle and the simulated connection test are demo conveniences only. In production the server authenticates, authorizes, classifies SQL with its parser and writes the append-only audit log. The Security tab shows deployment mode, bind address and session lifetime as read-only operator configuration.
+- **Connection management is real.** Administrators create, edit, test and delete connection profiles through an admin-only backend; secrets are encrypted at rest, never returned to the browser, and a blank password on edit keeps the stored secret.
+- **Content-Security-Policy.** Scripts and styles come only from `/static`. No inline `<script>`, `style=` attributes or `on*=` handlers; bar widths, swatches and similar values use classes, `data-*` attributes and CSS custom properties applied by bundled JavaScript.
+- **CSRF.** The layout exposes the session CSRF token in a meta tag and the bundled script adds `x-csrf-token` to every HTMX request.
+- **Verification.** Manual side-by-side comparison in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, plus Rust tests for behavior. No browser-test dependency is added.
+
 ## Canonical layout, tokens and responsive appearance
 
 - Reference composition: full-height application without a separate global header; compact left sidebar with search at the top and connection/settings controls at the bottom; draggable 5px splitter; remaining width devoted to the selected object's main panel. Default sidebar width **264px**, adjustable between **180px and 520px**, reset by double-click. Mobile drawer and inspector overlay appear at **760px or narrower**.

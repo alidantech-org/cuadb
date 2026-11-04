@@ -1,5 +1,5 @@
 ---
-{id: TSK-470D81309D89,name: "Polish grid resizing, keyboard navigation and accessibility",type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:06.902Z,updated_at: 2026-11-04T16:15:21.389Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-812F816785FD,TSK-ABE2D51C83F3],order: 5120,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:42.035Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.361Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-470D81309D89/1793791782037-start,started_at: 2026-11-04T11:29:42.052Z,end_ref: refs/tracking/TSK-470D81309D89/1793808859363-end,ended_at: 2026-11-04T16:14:19.361Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-A7B0DFC23314}]}
+{id: TSK-470D81309D89,name: "Polish grid resizing, keyboard navigation and accessibility",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.902Z,updated_at: 2026-11-04T23:18:20.106Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-812F816785FD,TSK-ABE2D51C83F3],order: 5120,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:42.035Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.361Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.106Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-470D81309D89/1793791782037-start,started_at: 2026-11-04T11:29:42.052Z,end_ref: refs/tracking/TSK-470D81309D89/1793808859363-end,ended_at: 2026-11-04T16:14:19.361Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-A7B0DFC23314}]}
 ---
 
 # Polish grid resizing, keyboard navigation and accessibility
@@ -33,6 +33,12 @@ The **required frontend specification** is `assets/cuadb-ui-demo.html` and the c
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Updated demo amendment (2026-11-05)
+The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
+
+### Amendment acceptance
+- [ ] Column resizing, keyboard row and cell navigation, visible focus and screen-reader labels cover the grid, inspector, popovers and modals (focus trap in `#modal`, focus return on close).
 
 ## Comments
 
