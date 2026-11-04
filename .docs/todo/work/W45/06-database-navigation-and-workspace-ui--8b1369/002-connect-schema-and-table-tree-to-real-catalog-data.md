@@ -1,5 +1,5 @@
 ---
-{id: TSK-5EE171C4C580,name: Connect schema and table tree to real catalog data,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.091Z,updated_at: 2026-11-04T11:29:11.351Z,tags: [cuadb,explorer-ui],depends_on: [TSK-A513FD340BD5,TSK-5FC58B7B6E27,TSK-9890D0090922],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.351Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-5EE171C4C580/1793791751353-start,started_at: 2026-11-04T11:29:11.368Z}]}}}
+{id: TSK-5EE171C4C580,name: Connect schema and table tree to real catalog data,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:06.091Z,updated_at: 2026-11-04T16:14:56.886Z,tags: [cuadb,explorer-ui],depends_on: [TSK-A513FD340BD5,TSK-5FC58B7B6E27,TSK-9890D0090922],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.351Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:16.782Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-5EE171C4C580/1793791751353-start,started_at: 2026-11-04T11:29:11.368Z,end_ref: refs/tracking/TSK-5EE171C4C580/1793808856783-end,ended_at: 2026-11-04T16:14:16.782Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-BE512E99EA68}]}
 ---
 
 # Connect schema and table tree to real catalog data
@@ -43,3 +43,7 @@ Schema fragment is loaded through HTMX from actual PostgreSQL adapter routes. Re
 ### 2026-11-04T13:51:44.968Z · PETER IRUNGU
 
 Items 3,5 verified: permission-denied and empty states at route level, unusual/Unicode names live, 500-relation truncated tree. Fixed defect: truncation note was only rendered for empty lists (templates/components/relation_tree.html) - now shown whenever the list is cut off. Items 2,4,6,7,8 UI/expansion state: pending Phase B.
+
+### 2026-11-04T16:14:16.969Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.

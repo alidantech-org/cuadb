@@ -1,5 +1,5 @@
 ---
-{id: TSK-812F816785FD,name: Connect sortable headers with clear direction and stable state,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.702Z,updated_at: 2026-11-04T11:29:41.718Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-16AEEF4061F8,TSK-84DCF1B4A953],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.718Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-812F816785FD/1793791781721-start,started_at: 2026-11-04T11:29:41.736Z}]}}}
+{id: TSK-812F816785FD,name: Connect sortable headers with clear direction and stable state,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:06.702Z,updated_at: 2026-11-04T16:14:58.251Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-16AEEF4061F8,TSK-84DCF1B4A953],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.718Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:18.745Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-812F816785FD/1793791781721-start,started_at: 2026-11-04T11:29:41.736Z,end_ref: refs/tracking/TSK-812F816785FD/1793808858747-end,ended_at: 2026-11-04T16:14:18.745Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-470D81309D89}]}
 ---
 
 # Connect sortable headers with clear direction and stable state
@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T13:56:03.197Z · PETER IRUNGU
 
 BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Items 1,3,5 verified live (PostgreSQL 18, tests/rows_live_http.rs): sort links only for sortable types, links reset page/cursor, NULLs always last (explicit NULLS LAST, both directions), repeatable order, 120/120 unique rows across sorted pages, 16 concurrent mixed-direction requests each return their own aria-sort. Defect fixed: repeated column= params (emitted by the app's own links and column picker) failed with 'invalid type: string, expected a sequence'; new raw-query parser (src/web/rows.rs split_query) now used by /catalog/data and /catalog/export. Items 2,4 (visible state, restoring controls after a rejected sort in a browser), 6,7(UI cycle),8 pending Phase B. Limitation: sorted paging uses offset paging (keyset only for unsorted/unique-key scans).
+
+### 2026-11-04T16:14:18.900Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.

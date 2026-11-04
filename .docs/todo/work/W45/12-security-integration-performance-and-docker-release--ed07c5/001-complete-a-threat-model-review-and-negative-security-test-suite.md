@@ -1,5 +1,5 @@
 ---
-{id: TSK-103E94FA3053,name: Complete a threat-model review and negative security test suite,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:08.931Z,updated_at: 2026-11-04T14:37:44.709Z,tags: [cuadb,release],depends_on: [TSK-E09AA19D0352,TSK-0DB3969BA9F6,TSK-5689F3668ED7],order: 1024,extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T14:37:44.709Z}]}}
+{id: TSK-103E94FA3053,name: Complete a threat-model review and negative security test suite,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:08.931Z,updated_at: 2026-11-04T16:15:06.130Z,tags: [cuadb,release],depends_on: [TSK-E09AA19D0352,TSK-0DB3969BA9F6,TSK-5689F3668ED7],order: 1024,extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T14:37:44.709Z}]},links: [{type: blocks,task: TSK-0A7991D875A8}]}
 ---
 
 # Complete a threat-model review and negative security test suite

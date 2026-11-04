@@ -1,5 +1,5 @@
 ---
-{id: TSK-9890D0090922,name: "Design HTMX loading, cancellation, empty and error contracts",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.887Z,updated_at: 2026-11-04T11:29:07.621Z,tags: [cuadb,http],depends_on: [TSK-E09AA19D0352],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:07.621Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-9890D0090922/1793791747624-start,started_at: 2026-11-04T11:29:07.636Z}]}}}
+{id: TSK-9890D0090922,name: "Design HTMX loading, cancellation, empty and error contracts",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.887Z,updated_at: 2026-11-04T16:15:20.401Z,tags: [cuadb,http],depends_on: [TSK-E09AA19D0352],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:07.621Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-9890D0090922/1793791747624-start,started_at: 2026-11-04T11:29:07.636Z}]}},links: [{type: blocks,task: TSK-A513FD340BD5}]}
 ---
 
 # Design HTMX loading, cancellation, empty and error contracts

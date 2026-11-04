@@ -1,5 +1,5 @@
 ---
-{id: TSK-1C5E54BDB641,name: Add fast relation-name search and navigation breadcrumbs,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.170Z,updated_at: 2026-11-04T11:29:11.515Z,tags: [cuadb,explorer-ui],depends_on: [TSK-5EE171C4C580],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.515Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-1C5E54BDB641/1793791751518-start,started_at: 2026-11-04T11:29:11.532Z}]}}}
+{id: TSK-1C5E54BDB641,name: Add fast relation-name search and navigation breadcrumbs,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:06.170Z,updated_at: 2026-11-04T16:14:56.303Z,tags: [cuadb,explorer-ui],depends_on: [TSK-5EE171C4C580],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.515Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:17.168Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-1C5E54BDB641/1793791751518-start,started_at: 2026-11-04T11:29:11.532Z,end_ref: refs/tracking/TSK-1C5E54BDB641/1793808857170-end,ended_at: 2026-11-04T16:14:17.168Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-61DA50E7C274}]}
 ---
 
 # Add fast relation-name search and navigation breadcrumbs
@@ -43,3 +43,7 @@ Added immediate case-insensitive relation-name filtering on server-rendered cata
 ### 2026-11-04T13:51:44.854Z · PETER IRUNGU
 
 BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Added literal, case-insensitive, 64-char-bounded name filter 'q' on /catalog/relations (no SQL wildcards; control chars rejected). Tests: router_fake_adapter (special chars %_ <b>, case, long/control input, 500-item truncated list) and catalog_live_http (live PG: Unicode/mixed-case names, empty result). LIMITATION: the filter runs over the adapter's bounded list (500 relations), so on truncated lists the result is flagged incomplete rather than searched server-side; search is per-schema only. Item 4 debounce and items 1-3,6-8 are UI (Ctrl+K, keyboard nav, placement).
+
+### 2026-11-04T16:14:17.352Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.

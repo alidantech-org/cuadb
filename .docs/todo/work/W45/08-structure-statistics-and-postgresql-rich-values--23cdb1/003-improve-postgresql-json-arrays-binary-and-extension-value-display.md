@@ -1,5 +1,5 @@
 ---
-{id: TSK-11615BE5E97B,name: "Improve PostgreSQL JSON, arrays, binary and extension value display",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.257Z,updated_at: 2026-11-04T11:29:48.837Z,tags: [cuadb,inspectors],depends_on: [TSK-8DB2E738839F,TSK-ABE2D51C83F3],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.837Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-11615BE5E97B/1793791788839-start,started_at: 2026-11-04T11:29:48.856Z}]}}}
+{id: TSK-11615BE5E97B,name: "Improve PostgreSQL JSON, arrays, binary and extension value display",type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:07.257Z,updated_at: 2026-11-04T16:14:59.972Z,tags: [cuadb,inspectors],depends_on: [TSK-8DB2E738839F,TSK-ABE2D51C83F3],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.837Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.301Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-11615BE5E97B/1793791788839-start,started_at: 2026-11-04T11:29:48.856Z,end_ref: refs/tracking/TSK-11615BE5E97B/1793808860303-end,ended_at: 2026-11-04T16:14:20.301Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-58382C325F5F}]}
 ---
 
 # Improve PostgreSQL JSON, arrays, binary and extension value display
@@ -43,3 +43,7 @@ Items 1,8 verified live: sizes/estimated rows/type from the adapter, 'Engine-rep
 ### 2026-11-04T14:47:17.915Z · PETER IRUNGU
 
 CORRECTION/UPDATE: this is the rich-value task. Evidence (tests/rich_live_http.rs, live PostgreSQL 18): items 1,2,3,5,8 verified - bounded JSON/array/enum/bytea, exact numeric text, NULL vs empty, timestamptz microseconds in session zone (UTC), markup escaped and control/bidi characters shown as \u{XXXX}, README 'Rich values' section. Item 4 partial (20k-element JSON/array, 20 KB bytea tested; deeply nested JSON not). Earlier comment on this task wrongly described storage statistics; those belong to TSK-0AA246B508ED. Items 6,7 are UI.
+
+### 2026-11-04T16:14:20.462Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.

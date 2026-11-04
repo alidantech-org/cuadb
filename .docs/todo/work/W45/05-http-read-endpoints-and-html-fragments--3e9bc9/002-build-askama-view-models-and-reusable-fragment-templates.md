@@ -1,5 +1,5 @@
 ---
-{id: TSK-FFD6A5B94574,name: Build Askama view models and reusable fragment templates,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.740Z,updated_at: 2026-11-04T11:25:00.389Z,tags: [cuadb,http],depends_on: [TSK-DC88ADC32B93],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:25:00.389Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-FFD6A5B94574/1793791500391-start,started_at: 2026-11-04T11:25:00.407Z}]}}}
+{id: TSK-FFD6A5B94574,name: Build Askama view models and reusable fragment templates,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.740Z,updated_at: 2026-11-04T16:14:59.295Z,tags: [cuadb,http],depends_on: [TSK-DC88ADC32B93],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:25:00.389Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-FFD6A5B94574/1793791500391-start,started_at: 2026-11-04T11:25:00.407Z}]}},links: [{type: blocks,task: TSK-0AA246B508ED}]}
 ---
 
 # Build Askama view models and reusable fragment templates

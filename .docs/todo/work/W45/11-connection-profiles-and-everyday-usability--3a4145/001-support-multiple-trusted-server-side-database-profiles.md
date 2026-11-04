@@ -1,5 +1,5 @@
 ---
-{id: TSK-B92248F7876E,name: Support multiple trusted server-side database profiles,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:08.458Z,updated_at: 2026-11-04T07:32:08.458Z,tags: [cuadb,profiles],depends_on: [TSK-E68FB08CB73D,TSK-0D56383DBA25,TSK-F71C30D38C2C],order: 1024}
+{id: TSK-B92248F7876E,name: Support multiple trusted server-side database profiles,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:08.458Z,updated_at: 2026-11-04T16:15:01.311Z,tags: [cuadb,profiles],depends_on: [TSK-E68FB08CB73D,TSK-0D56383DBA25,TSK-F71C30D38C2C],order: 1024,links: [{type: blocks,task: TSK-4C7273B9E46A}]}
 ---
 
 # Support multiple trusted server-side database profiles

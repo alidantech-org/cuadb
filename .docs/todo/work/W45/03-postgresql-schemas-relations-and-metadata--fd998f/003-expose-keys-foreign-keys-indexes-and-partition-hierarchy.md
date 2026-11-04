@@ -1,5 +1,5 @@
 ---
-{id: TSK-047C7016EEAA,name: "Expose keys, foreign keys, indexes and partition hierarchy",type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.013Z,updated_at: 2026-11-04T11:13:41.347Z,tags: [cuadb,postgres-catalog],depends_on: [TSK-7AA22F3D0843],order: 3072,extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T11:13:41.347Z}]}}
+{id: TSK-047C7016EEAA,name: "Expose keys, foreign keys, indexes and partition hierarchy",type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.013Z,updated_at: 2026-11-04T16:14:58.638Z,tags: [cuadb,postgres-catalog],depends_on: [TSK-7AA22F3D0843],order: 3072,extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T11:13:41.347Z}]},links: [{type: blocks,task: TSK-8EC2E48964BC}]}
 ---
 
 # Expose keys, foreign keys, indexes and partition hierarchy

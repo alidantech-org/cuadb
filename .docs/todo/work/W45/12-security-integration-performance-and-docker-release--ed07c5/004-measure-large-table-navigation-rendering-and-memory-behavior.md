@@ -1,5 +1,5 @@
 ---
-{id: TSK-B51DF4691392,name: "Measure large-table navigation, rendering and memory behavior",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:09.345Z,updated_at: 2026-11-04T07:32:09.345Z,tags: [cuadb,release],depends_on: [TSK-54598487D0CE,TSK-8B8935A1684A],order: 4096}
+{id: TSK-B51DF4691392,name: "Measure large-table navigation, rendering and memory behavior",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:09.345Z,updated_at: 2026-11-04T16:15:06.280Z,tags: [cuadb,release],depends_on: [TSK-54598487D0CE,TSK-8B8935A1684A],order: 4096,links: [{type: blocks,task: TSK-0A7991D875A8}]}
 ---
 
 # Measure large-table navigation, rendering and memory behavior

@@ -37,8 +37,12 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv = process.e
   });
   if (result.error || result.status !== 0) {
     throw new Error(
-      'Command failed: ' + command + ' ' + args.join(' ') + '\n' +
-      (result.stderr || result.stdout || result.error),
+      'Command failed: ' +
+        command +
+        ' ' +
+        args.join(' ') +
+        '\n' +
+        (result.stderr || result.stdout || result.error),
     );
   }
   return result.stdout.trim();
@@ -81,9 +85,7 @@ function main(): void {
     } else if (archivedIds.has(id)) {
       console.log('Already archived: ' + id);
     } else {
-      throw new Error(
-        'Expected SQL Server task ' + id + ' was not found; refusing to continue.',
-      );
+      throw new Error('Expected SQL Server task ' + id + ' was not found; refusing to continue.');
     }
   }
 

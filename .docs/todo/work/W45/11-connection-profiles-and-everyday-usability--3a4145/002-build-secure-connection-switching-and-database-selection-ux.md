@@ -1,5 +1,5 @@
 ---
-{id: TSK-4C7273B9E46A,name: Build secure connection switching and database selection UX,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:08.583Z,updated_at: 2026-11-04T07:32:08.583Z,tags: [cuadb,profiles],depends_on: [TSK-B92248F7876E,TSK-61DA50E7C274],order: 2048}
+{id: TSK-4C7273B9E46A,name: Build secure connection switching and database selection UX,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:08.583Z,updated_at: 2026-11-04T16:15:04.087Z,tags: [cuadb,profiles],depends_on: [TSK-B92248F7876E,TSK-61DA50E7C274],order: 2048,links: [{type: blocks,task: TSK-E5355EF46139}]}
 ---
 
 # Build secure connection switching and database selection UX

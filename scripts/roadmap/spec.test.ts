@@ -4,7 +4,7 @@ import { groupGoal, groupDefinitionOfDone, LEGACY_GOAL_PARAGRAPH } from './goals
 
 describe('CuaDB Task roadmap definition', () => {
   test('defines ordered groups and complete documentation', () => {
-    expect(groups).toHaveLength(12);
+    expect(groups).toHaveLength(14);
     expect(documents).toHaveLength(5);
     expect(groups.map((group) => group.key)).toEqual([
       'foundation',
@@ -12,12 +12,14 @@ describe('CuaDB Task roadmap definition', () => {
       'postgres-catalog',
       'postgres-rows',
       'http',
+      'sqlite',
       'explorer-ui',
       'data-grid-ui',
       'inspectors',
       'mysql',
-      'sqlite',
       'profiles',
+      'auth',
+      'sql-workspace',
       'release',
     ]);
   });
@@ -43,7 +45,7 @@ describe('CuaDB Task roadmap definition', () => {
         count++;
       }
     }
-    expect(count).toBe(52);
+    expect(count).toBe(62);
   });
 
   test('renders meaningful group-specific goals that satisfy Task quality markers', () => {

@@ -1,5 +1,5 @@
 ---
-{id: TSK-A7B0DFC23314,name: "Discover MySQL/MariaDB namespaces, relations and columns",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.605Z,updated_at: 2026-11-04T12:46:12.997Z,tags: [cuadb,mysql],depends_on: [TSK-0D56383DBA25],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T12:46:12.997Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-A7B0DFC23314/1793796373007-start,started_at: 2026-11-04T12:46:13.031Z}]}}}
+{id: TSK-A7B0DFC23314,name: "Discover MySQL/MariaDB namespaces, relations and columns",type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:07.605Z,updated_at: 2026-11-04T16:14:20.933Z,tags: [cuadb,mysql],depends_on: [TSK-0D56383DBA25],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T12:46:12.997Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.933Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-A7B0DFC23314/1793796373007-start,started_at: 2026-11-04T12:46:13.031Z,end_ref: refs/tracking/TSK-A7B0DFC23314/1793808860934-end,ended_at: 2026-11-04T16:14:20.933Z,summary: {files: 71,insertions: 6290,deletions: 528}}]}}}
 ---
 
 # Discover MySQL/MariaDB namespaces, relations and columns
@@ -34,3 +34,7 @@ Implemented MySQL/MariaDB information_schema schema, relation, column, index, co
 ### 2026-11-04T14:04:42.068Z · PETER IRUNGU
 
 Item 5 left open: mixed-case names and hidden-schema (mysql/sys/information_schema/performance_schema) restriction verified on both engines; no fixture for an EMPTY database or a no-privilege account. Defect fixed: Structure tab returned 400 for EVERY MySQL/MariaDB relation because partitions() fell back to Unsupported; now implemented from information_schema.partitions. Same latent defect fixed for SQLite (empty list).
+
+### 2026-11-04T16:14:21.095Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: preserve completed MySQL/MariaDB groundwork and resume remaining engine-specific work only after the PostgreSQL + SQLite backend and canonical frontend milestones are accepted. Do not spend core-milestone time on cross-engine verification.

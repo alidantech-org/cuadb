@@ -1,5 +1,5 @@
 ---
-{id: TSK-16AEEF4061F8,name: Wire paging controls and page size to the Rust server,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.572Z,updated_at: 2026-11-04T11:29:41.555Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8B8935A1684A],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.555Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-16AEEF4061F8/1793791781557-start,started_at: 2026-11-04T11:29:41.570Z}]}}}
+{id: TSK-16AEEF4061F8,name: Wire paging controls and page size to the Rust server,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:06.572Z,updated_at: 2026-11-04T16:14:57.566Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8B8935A1684A],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.555Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:18.312Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-16AEEF4061F8/1793791781557-start,started_at: 2026-11-04T11:29:41.570Z,end_ref: refs/tracking/TSK-16AEEF4061F8/1793808858314-end,ended_at: 2026-11-04T16:14:18.312Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-812F816785FD}]}
 ---
 
 # Wire paging controls and page size to the Rust server
@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T13:56:03.346Z · PETER IRUNGU
 
 BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Items 1-4 verified live: Previous/Next from real continuation state, ranges 1-50/51-100/101-120/0-0, disabled buttons on first/last/empty, size/page/cursor bounds rejected (400), sort+size+column selection preserved in nav links. Item 5 left open: rapid paging is covered live and slow-adapter timeouts with a fake, but dropping stale responses is browser behavior (hx-sync) - unverified until Phase B. 6-8 UI.
+
+### 2026-11-04T16:14:18.517Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.

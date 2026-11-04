@@ -1,5 +1,5 @@
 ---
-{id: TSK-58382C325F5F,name: Add optional PostGIS geometry and geography inspection,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.352Z,updated_at: 2026-11-04T11:29:48.994Z,tags: [cuadb,inspectors],depends_on: [TSK-11615BE5E97B,TSK-725618F4E684],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.994Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-58382C325F5F/1793791788996-start,started_at: 2026-11-04T11:29:49.010Z}]}}}
+{id: TSK-58382C325F5F,name: Add optional PostGIS geometry and geography inspection,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:07.352Z,updated_at: 2026-11-04T16:15:21.546Z,tags: [cuadb,inspectors],depends_on: [TSK-11615BE5E97B,TSK-725618F4E684],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.994Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.643Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-58382C325F5F/1793791788996-start,started_at: 2026-11-04T11:29:49.010Z,end_ref: refs/tracking/TSK-58382C325F5F/1793808860645-end,ended_at: 2026-11-04T16:14:20.644Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-A7B0DFC23314}]}
 ---
 
 # Add optional PostGIS geometry and geography inspection
@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T14:00:06.424Z · PETER IRUNGU
 
 Items 1,2,4 verified live on PostGIS 3.6: extension + geometry/geography detection, type/SRID in column type, opt-in bounded GeoJSON (>~1KB refused), non-4326 labelled with CRS, POINT EMPTY preserved, no maps/bulk conversion. Item 3 partial (invalid geometry values not covered). Item 5 BLOCKED: no PostgreSQL fixture without PostGIS exists locally. 6-8 UI.
+
+### 2026-11-04T16:14:20.772Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.

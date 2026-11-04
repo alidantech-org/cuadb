@@ -1,5 +1,5 @@
 ---
-{id: TSK-CFEA5F712D4B,name: Implement efficient PostgreSQL table size and statistics inspection,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.080Z,updated_at: 2026-11-04T11:13:41.836Z,tags: [cuadb,postgres-catalog],depends_on: [TSK-047C7016EEAA],order: 4096,extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T11:13:41.836Z}]}}
+{id: TSK-CFEA5F712D4B,name: Implement efficient PostgreSQL table size and statistics inspection,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.080Z,updated_at: 2026-11-04T16:14:59.129Z,tags: [cuadb,postgres-catalog],depends_on: [TSK-047C7016EEAA],order: 4096,extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T11:13:41.836Z}]},links: [{type: blocks,task: TSK-0AA246B508ED}]}
 ---
 
 # Implement efficient PostgreSQL table size and statistics inspection

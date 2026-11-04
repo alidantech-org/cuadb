@@ -71,7 +71,7 @@ export const sqliteGroups: GroupSpec[] = [
         dependsOn: ['sqlite-rows'],
       },
     ],
-  }
+  },
 ];
 
 // MySQL/MariaDB and release work follow the PostgreSQL + SQLite backend and complete frontend.
@@ -428,7 +428,14 @@ export const expansionGroups: GroupSpec[] = [
           'Keep ordinary unit tests runnable offline without Docker or databases.',
           'Document fixture cleanup, local commands and any optional test dependencies.',
         ],
-        dependsOn: ['catalog-compat', 'grid-keyboard', 'mysql-stats', 'sqlite-info', 'auth-rbac', 'sql-audit'],
+        dependsOn: [
+          'catalog-compat',
+          'grid-keyboard',
+          'mysql-stats',
+          'sqlite-info',
+          'auth-rbac',
+          'sql-audit',
+        ],
       },
       {
         key: 'release-performance',

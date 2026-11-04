@@ -1,5 +1,5 @@
 ---
-{id: TSK-54598487D0CE,name: Establish disposable database fixtures and end-to-end acceptance tests,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:09.208Z,updated_at: 2026-11-04T07:32:09.208Z,tags: [cuadb,release],depends_on: [TSK-725618F4E684,TSK-470D81309D89,TSK-5689F3668ED7,TSK-0DB3969BA9F6],order: 3072}
+{id: TSK-54598487D0CE,name: Establish disposable database fixtures and end-to-end acceptance tests,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:09.208Z,updated_at: 2026-11-04T16:15:05.782Z,tags: [cuadb,release],depends_on: [TSK-725618F4E684,TSK-470D81309D89,TSK-5689F3668ED7,TSK-0DB3969BA9F6],order: 3072,links: [{type: blocks,task: TSK-B51DF4691392}]}
 ---
 
 # Establish disposable database fixtures and end-to-end acceptance tests

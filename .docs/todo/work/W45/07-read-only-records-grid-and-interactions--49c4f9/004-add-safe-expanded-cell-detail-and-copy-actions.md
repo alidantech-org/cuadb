@@ -1,5 +1,5 @@
 ---
-{id: TSK-ABE2D51C83F3,name: Add safe expanded cell detail and copy actions,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.797Z,updated_at: 2026-11-04T11:29:41.886Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8DB2E738839F],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.886Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-ABE2D51C83F3/1793791781888-start,started_at: 2026-11-04T11:29:41.902Z}]}}}
+{id: TSK-ABE2D51C83F3,name: Add safe expanded cell detail and copy actions,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:06.797Z,updated_at: 2026-11-04T16:14:59.785Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8DB2E738839F],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.886Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.078Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-ABE2D51C83F3/1793791781888-start,started_at: 2026-11-04T11:29:41.902Z,end_ref: refs/tracking/TSK-ABE2D51C83F3/1793808859080-end,ended_at: 2026-11-04T16:14:19.078Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-11615BE5E97B}]}
 ---
 
 # Add safe expanded cell detail and copy actions
@@ -44,3 +44,7 @@ Items 1,2,3,5 verified live (rich_values fixture, additive/idempotent tests/fixt
 ### 2026-11-04T14:47:17.773Z · PETER IRUNGU
 
 CORRECTION: earlier ticks on items 1 and 2 were made against the wrong task (I was verifying rich-value display, which is TSK-11615BE5E97B). Un-ticked. Current evidence for THIS task: item 3 (truncation markers, 'Unsupported' and 'GeoJSON detail exceeds' fallbacks) and item 5 (large JSON/array, control chars and bidi, Unicode, key-less SQLite heap tables; live tests) hold. Item 1: a detail aside with pretty-printed small JSON exists in data_page.html but accessibility and look are unverified. Item 2: there is no separate detail fetch - the inspector uses bounded per-cell detail embedded in the data page (no row-identity lookup); whether that satisfies the item is a design decision for the user. Items 4,6-9 need the browser.
+
+### 2026-11-04T16:14:19.228Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.

@@ -242,7 +242,10 @@ function repairExistingGroupGoals(executable: string): number {
 
 function reconcilePhasePolicy(executable: string, taskIds: Map<string, string>): void {
   const active = asArray<TaskRecord>(taskJson(executable, ['list']), 'list');
-  const archived = asArray<TaskRecord>(taskJson(executable, ['list', '--archived']), 'list --archived');
+  const archived = asArray<TaskRecord>(
+    taskJson(executable, ['list', '--archived']),
+    'list --archived',
+  );
   const records = [...active, ...archived];
   const byId = new Map(records.map((task) => [task.id, task]));
   const workspaceRoot = resolve(root, '.docs');
@@ -269,14 +272,27 @@ function reconcilePhasePolicy(executable: string, taskIds: Map<string, string>):
       }),
     );
 
-  const backendReady = allCompleted([
-    'foundation',
-    'contracts',
-    'postgres-catalog',
-    'postgres-rows',
-    'http',
-    'sqlite',
-  ]);
+  // Group 05 carries UI-only acceptance items, so 'all tasks completed' can never be true
+  // before the frontend phase. The owner records the gate decision as a document instead
+  // (docs/backend-gate-decision.md); the gate is open when that document exists.
+  const gateDecisionRecorded = asArray<DocRecord>(
+    taskJson(executable, ['docs', 'list']),
+    'docs list',
+  ).some(
+    (doc) =>
+      doc.path === 'docs/backend-gate-decision.md' ||
+      doc.path === '.docs/docs/backend-gate-decision.md',
+  );
+  const backendReady =
+    gateDecisionRecorded ||
+    allCompleted([
+      'foundation',
+      'contracts',
+      'postgres-catalog',
+      'postgres-rows',
+      'http',
+      'sqlite',
+    ]);
   if (!backendReady) {
     pauseGroup(
       'explorer-ui',
@@ -308,12 +324,13 @@ function reconcilePhasePolicy(executable: string, taskIds: Map<string, string>):
       if (!task.dependsOn?.length) continue;
       const taskId = taskIds.get(task.key);
       const record = taskId ? byId.get(taskId) : undefined;
-      if (!taskId || !record || record.status === 'completed' || record.status === 'in-progress') continue;
+      if (!taskId || !record || record.status === 'completed' || record.status === 'in-progress')
+        continue;
       if (!record.path) throw new Error(`Task ${taskId} has no path for dependency reconciliation`);
       const relative = record.path.startsWith('.docs/') ? record.path.slice(6) : record.path;
       const filepath = resolve(workspaceRoot, relative);
       const current = readFileSync(filepath, 'utf8');
-      const match = current.match(/^depends_on:\\s*\\[([^\\]]*)\\]/m);
+      const match = current.match(/depends_on:\s*\[([^\]]*)\]/);
       const existing = new Set(
         [...(match?.[1] ?? '').matchAll(/TSK-[A-F0-9]+/g)].map((item) => item[0]),
       );

@@ -1,5 +1,5 @@
 ---
-{id: TSK-0AA246B508ED,name: Implement Table Info tab with honest statistics and storage,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.130Z,updated_at: 2026-11-04T11:29:48.662Z,tags: [cuadb,inspectors],depends_on: [TSK-CFEA5F712D4B,TSK-FFD6A5B94574],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.662Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-0AA246B508ED/1793791788664-start,started_at: 2026-11-04T11:29:48.680Z}]}}}
+{id: TSK-0AA246B508ED,name: Implement Table Info tab with honest statistics and storage,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:07.130Z,updated_at: 2026-11-04T16:14:19.983Z,tags: [cuadb,inspectors],depends_on: [TSK-CFEA5F712D4B,TSK-FFD6A5B94574],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.662Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.983Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-0AA246B508ED/1793791788664-start,started_at: 2026-11-04T11:29:48.680Z,end_ref: refs/tracking/TSK-0AA246B508ED/1793808859985-end,ended_at: 2026-11-04T16:14:19.983Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}}}
 ---
 
 # Implement Table Info tab with honest statistics and storage
@@ -43,3 +43,7 @@ Group 07 note: the inspector reads bounded per-cell detail embedded in the data 
 ### 2026-11-04T14:47:18.087Z · PETER IRUNGU
 
 Storage/statistics evidence (live PG 18, MariaDB, MySQL, SQLite): items 1,2,8 hold - adapter sizes, estimated rows and relation kind rendered with a 'Meaning' caption ('Engine-reported estimate; not an exact COUNT(*)'), partitioned parents show Unavailable, SQLite shows everything Unavailable, no COUNT scan anywhere. Left open: 3 (refresh is the same bounded read, no UI control), 4 (no foreign-table or permission-restricted-stats fixture), 5 (capability flags exist and are tested in adapter_contract, but not audited against this item), 6,7 UI. (An earlier comment here about row detail belonged to TSK-ABE2D51C83F3.)
+
+### 2026-11-04T16:14:20.131Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.

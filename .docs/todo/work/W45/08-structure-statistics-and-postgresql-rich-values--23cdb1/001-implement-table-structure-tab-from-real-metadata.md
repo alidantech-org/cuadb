@@ -1,5 +1,5 @@
 ---
-{id: TSK-8EC2E48964BC,name: Implement table Structure tab from real metadata,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.044Z,updated_at: 2026-11-04T11:29:48.511Z,tags: [cuadb,inspectors],depends_on: [TSK-047C7016EEAA,TSK-FFD6A5B94574],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.511Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-8EC2E48964BC/1793791788513-start,started_at: 2026-11-04T11:29:48.525Z}]}}}
+{id: TSK-8EC2E48964BC,name: Implement table Structure tab from real metadata,type: task,status: blocked,priority: medium,created_at: 2026-11-04T07:32:07.044Z,updated_at: 2026-11-04T16:14:19.668Z,tags: [cuadb,inspectors],depends_on: [TSK-047C7016EEAA,TSK-FFD6A5B94574],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.511Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.668Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-8EC2E48964BC/1793791788513-start,started_at: 2026-11-04T11:29:48.525Z,end_ref: refs/tracking/TSK-8EC2E48964BC/1793808859670-end,ended_at: 2026-11-04T16:14:19.668Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}}}
 ---
 
 # Implement table Structure tab from real metadata
@@ -43,3 +43,7 @@ Implemented initial structure and indexes/statistics table fragments backed by s
 ### 2026-11-04T14:00:06.046Z · PETER IRUNGU
 
 BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Live PG18 (tests/rich_live_http.rs): composite PK, identity, generated, defaults, enum/domain, FK targets, views (no constraints), partition parents, inaccessible catalog relation -> 4xx. Defect fixed: identity/generated showed raw catalog codes ('a','s'); now ALWAYS/BY DEFAULT and STORED/VIRTUAL. Item 2 left open: FK targets render as text, not safe relation links. Items 5-8 are UI/HTMX visual (Phase B).
+
+### 2026-11-04T16:14:19.834Z · PETER IRUNGU
+
+Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.

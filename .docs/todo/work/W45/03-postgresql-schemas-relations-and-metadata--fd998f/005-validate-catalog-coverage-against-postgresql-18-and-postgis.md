@@ -1,5 +1,5 @@
 ---
-{id: TSK-725618F4E684,name: Validate catalog coverage against PostgreSQL 18 and PostGIS,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.147Z,updated_at: 2026-11-04T11:13:42.263Z,tags: [cuadb,postgres-catalog],depends_on: [TSK-CFEA5F712D4B],order: 5120,extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T11:13:42.263Z}]}}
+{id: TSK-725618F4E684,name: Validate catalog coverage against PostgreSQL 18 and PostGIS,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.147Z,updated_at: 2026-11-04T16:15:04.771Z,tags: [cuadb,postgres-catalog],depends_on: [TSK-CFEA5F712D4B],order: 5120,extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T11:13:42.263Z}]},links: [{type: blocks,task: TSK-54598487D0CE}]}
 ---
 
 # Validate catalog coverage against PostgreSQL 18 and PostGIS
