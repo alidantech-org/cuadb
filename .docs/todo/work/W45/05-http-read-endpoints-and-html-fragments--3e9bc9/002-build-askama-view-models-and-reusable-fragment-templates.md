@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T11:29:33.158Z · PETER IRUNGU
 
 Introduced reusable escaped catalog fragments and compact app shell regions for schema navigation, main content, connection state, loading and empty/error messaging. Tested suspicious markup escaping and disconnected state. The full demo toolbar, grid, inspector and metadata object views remain incomplete.
+
+### 2026-11-04T13:50:13.631Z · PETER IRUNGU
+
+Item 2 PARTIAL: Data/Structure/Indexes tab nav extracted to templates/components/relation_tabs.html (structure + indexes pages). catalog.html and data_page.html still carry their own nav markup (data_page differs: Data is a button). Items 6-8 are UI (Phase B).

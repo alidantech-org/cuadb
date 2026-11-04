@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T11:29:33.423Z · PETER IRUNGU
 
 Verified global no-store for HTML/database routes, CSP, frame denial, nosniff and referrer policy via regression tests. Disabled HTMX history snapshots for database fragments and set historyCacheSize to zero. CSS, JS and HTMX remain same-origin bundled assets.
+
+### 2026-11-04T13:50:13.907Z · PETER IRUNGU
+
+Backend items 1-5, 8 already checked. Items 6-7 (history snapshots with demo interaction; local persistence of non-sensitive settings) are UI - Phase B.

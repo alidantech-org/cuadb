@@ -86,7 +86,7 @@ pub(super) fn classified(db: DbError) -> AppError {
         DbErrorKind::Internal => ErrorKind::Internal,
     })
 }
-fn name(value: &str) -> Result<String, AppError> {
+pub(super) fn name(value: &str) -> Result<String, AppError> {
     if value.is_empty() || value.len() > 63 || value.chars().any(char::is_control) {
         Err(invalid())
     } else {

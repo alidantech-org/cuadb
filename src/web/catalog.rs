@@ -44,6 +44,7 @@ struct RelationLinks {
 #[template(path = "components/structure_page.html")]
 struct StructureTemplate {
     title: String,
+    active: &'static str,
     links: RelationLinks,
     columns: Vec<StructureColumn>,
     constraints: Vec<StructureConstraint>,
@@ -74,6 +75,7 @@ struct StructurePartition {
 #[template(path = "components/indexes_page.html")]
 struct IndexesTemplate {
     title: String,
+    active: &'static str,
     links: RelationLinks,
     indexes: Vec<IndexView>,
     statistics: Vec<StatisticView>,
@@ -488,6 +490,7 @@ pub async fn structure(
         .map(structure_partition)
         .collect();
     metadata_response(StructureTemplate {
+        active: "structure",
         title: format!("Structure · {}.{}", id.namespace, id.name),
         links: relation_links(&id),
         columns,
@@ -510,6 +513,7 @@ pub async fn indexes(
     let truncated = entries.truncated;
     let indexes = entries.items.into_iter().map(index_view).collect();
     metadata_response(IndexesTemplate {
+        active: "indexes",
         title: format!("Indexes · {}.{}", id.namespace, id.name),
         links: relation_links(&id),
         indexes,
@@ -530,6 +534,7 @@ pub async fn stats(
         .await
         .map_err(err)?;
     metadata_response(IndexesTemplate {
+        active: "indexes",
         title: format!("Indexes and storage · {}.{}", id.namespace, id.name),
         links: relation_links(&id),
         indexes: Vec::new(),

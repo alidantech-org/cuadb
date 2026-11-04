@@ -1,4 +1,4 @@
-<section id="catalog-panel" aria-label="Database catalog" aria-live="polite" hx-history="false">
+<section id="catalog-panel" aria-label="Database catalog" aria-live="polite" hx-history="false" hx-sync="this:replace">
   <header class="bar"><h2>{{ title }}</h2>
     {% match relation %}{% when Some with (links) %}
     <span class="spacer"></span><nav class="seg" aria-label="Table view">

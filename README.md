@@ -45,7 +45,15 @@ for caps, limitations, fixture tests and export policy.
 - `scope=page` (default) exports the requested page (size ≤ 100). `scope=relation` walks pages until the end or a cap: 10,000 rows and 16 MiB. Hitting a cap, a truncated cell or truncated columns sets `x-cuadb-export-truncated: true` (JSON also has a `truncated` field).
 - CSV neutralizes formula-leading text cells (`= + - @`, tab, CR) with a leading `'`. Responses are `attachment`, `no-store`, with an ASCII-safe filename.
 - The request timeout cancels a running export. Output is buffered within the byte cap, not streamed.
-- Linked-table ZIP export is **not implemented**.
+- `format=zip&scope=related[&depth=0..2]` (default depth 1) returns a stored (uncompressed) ZIP: the relation plus relations it references through foreign keys (outgoing keys only, at most 8 relations), one bounded CSV each, and `manifest.json` (relations, row counts, relationships, truncation). Linked relations the role cannot read are listed as omitted; the root must be readable. The archive obeys a 16 MiB total cap and refuses sort/filter/column/page parameters. It is assembled in memory within that cap, not streamed.
+- Limits: incoming (child) relations are not followed; cells over the preview limit export their bounded preview; a SQLite/MySQL walk has not been verified for export (Postgres live only).
+
+## Stale responses, failures and retry (Group 05)
+
+- Each data/structure/indexes panel root carries `hx-sync="this:replace"`, so a newer sort, page, size or filter request aborts the in-flight one; the tree and main body use the same `replace` strategy. Fragments set `hx-history="false"` and `Cache-Control: no-store`.
+- Errors (validation, permission, timeout, disconnected) are the same small `role="alert"` fragment (`x-cuadb-error` header) for full-page and HTMX requests; `assets/js/app.js` lets 4xx/5xx fragments swap into their region.
+- Retry is manual: re-click the control or reload the relation. Nothing polls; the connection badge is refreshed only when requested. Sorting and filtering are validated server-side per request, so a rejected request never changes server state.
+- Not covered by automated tests: actual browser abort behavior (needs Phase B browser validation).
 
 ## Canonical frontend UI reference
 

@@ -28,7 +28,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ### Reference-specific acceptance
 - [x] Expose typed read-only routes for the demo's sidebar tree, selected-object toolbar, Data/Structure/Indexes segment, Overview and advanced metadata screens, with all relation identifiers and options checked server-side.
-- [ ] Specify secure, cancellable, resource-bounded backend routes for the demo's CSV/JSON exports and linked-table ZIP; do not implement its unbounded JavaScript whole-table export against real data.
+- [x] Specify secure, cancellable, resource-bounded backend routes for the demo's CSV/JSON exports and linked-table ZIP; do not implement its unbounded JavaScript whole-table export against real data.
 - [ ] Preserve the selected connection, relation, row filter, column visibility, sort and page state across the same on-screen controls shown in the reference.
 
 ## Verification and handoff
@@ -47,3 +47,7 @@ Item 5 verified: tests/router_fake_adapter.rs drives the real router with an in-
 ### 2026-11-04T13:14:12.788Z · PETER IRUNGU
 
 Item 7 PARTIAL: bounded CSV/JSON export route /catalog/export implemented (row 10k/byte 16MiB caps, formula-safe CSV, attachment+no-store, timeout cancellation, tests in router_fake_adapter.rs, documented in README). Linked-table ZIP not implemented; walk not yet verified against a live adapter. Item stays open.
+
+### 2026-11-04T13:50:13.490Z · PETER IRUNGU
+
+Item 7 VERIFIED: /catalog/export serves CSV, JSON and related-table ZIP (zip =2.6.1, stored, no default features). Caps: 10k rows/relation, 16 MiB, 8 relations, depth<=2; independent validation; formula-safe CSV; cancellable via request timeout. Evidence: tests/router_fake_adapter.rs (14 pass) and tests/export_live.rs (3 pass against live PostgreSQL 18 cuadb_fixture_catalog, reader role). LIMITATIONS: output buffered in memory within the cap (not streamed); ZIP follows outgoing FKs only; export walk NOT verified live on MySQL/MariaDB/SQLite. Item 8 (state across on-screen controls) is UI - BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING.

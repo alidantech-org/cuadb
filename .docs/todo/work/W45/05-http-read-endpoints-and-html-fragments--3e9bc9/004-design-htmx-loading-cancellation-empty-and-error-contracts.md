@@ -19,8 +19,8 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [x] Define swap targets, request synchronization and stable loading indicators per fragment.
 - [x] Provide safe fragments for timeout, validation, permission and disconnected states.
 - [ ] Ensure stale responses cannot replace a newer selected relation or sort.
-- [ ] Test full-page and HTMX failure behavior with simulated slow fake adapters.
-- [ ] Document retry and refresh actions without automatic unbounded polling.
+- [x] Test full-page and HTMX failure behavior with simulated slow fake adapters.
+- [x] Document retry and refresh actions without automatic unbounded polling.
 
 ## Canonical UI fidelity
 
@@ -43,3 +43,7 @@ Established stable sidebar/tree/main targets, HTMX loading indicator, disabled h
 ### 2026-11-04T13:12:04.975Z · PETER IRUNGU
 
 Backend partial: slow fake adapter is cancelled by the request timeout (router_fake_adapter.rs). HTMX-vs-full-page failure variants, stale-response handling and retry docs still open.
+
+### 2026-11-04T13:50:13.779Z · PETER IRUNGU
+
+Items 4,5 verified (router_fake_adapter: identical in-region error fragment for full-page and HX-Request, slow adapter timeout; README retry section). Items 3,7: hx-sync=this:replace added on all catalog panel roots and asserted in a test; real abort behavior is browser-only and UNVERIFIED - left open for Phase B. Items 6,8 UI.

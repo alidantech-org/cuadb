@@ -1,0 +1,5 @@
+<nav class="seg" aria-label="Table view">
+    <a class="{% if active == "data" %}on{% endif %}" href="{{ links.data }}" hx-get="{{ links.data }}" hx-target="#catalog-panel" hx-swap="outerHTML"{% if active == "data" %} aria-current="page"{% endif %}>Data</a>
+    <a class="{% if active == "structure" %}on{% endif %}" href="{{ links.structure }}" hx-get="{{ links.structure }}" hx-target="#catalog-panel" hx-swap="outerHTML"{% if active == "structure" %} aria-current="page"{% endif %}>Structure</a>
+    <a class="{% if active == "indexes" %}on{% endif %}" href="{{ links.indexes }}" hx-get="{{ links.indexes }}" hx-target="#catalog-panel" hx-swap="outerHTML"{% if active == "indexes" %} aria-current="page"{% endif %}>Indexes</a>
+  </nav>

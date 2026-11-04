@@ -19,6 +19,7 @@ tower-http = { version = "0.6", features = ["fs"] }
 sqlx = { version = "=0.8.6", default-features = false, features = ["mysql", "postgres", "sqlite", "runtime-tokio", "tls-rustls-ring-webpki"] }
 url = "=2.5.8"
 getrandom = "0.3"
+zip = { version = "=2.6.1", default-features = false }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
