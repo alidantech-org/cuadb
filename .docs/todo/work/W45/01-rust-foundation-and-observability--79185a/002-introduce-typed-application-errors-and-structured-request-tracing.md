@@ -1,5 +1,5 @@
 ---
-{id: TSK-23F3D2D0DDE1,name: Introduce typed application errors and structured request tracing,type: task,status: planned,priority: high,created_at: 2026-11-04T07:32:04.240Z,updated_at: 2026-11-04T07:32:04.240Z,tags: [cuadb,foundation],depends_on: [TSK-BDEAE8F3E238],order: 2048}
+{id: TSK-23F3D2D0DDE1,name: Introduce typed application errors and structured request tracing,type: task,status: in-progress,priority: high,created_at: 2026-11-04T07:32:04.240Z,updated_at: 2026-11-04T08:59:42.533Z,tags: [cuadb,foundation],depends_on: [TSK-BDEAE8F3E238],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T08:59:42.533Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-23F3D2D0DDE1/1793782782535-start,started_at: 2026-11-04T08:59:42.545Z}]}}}
 ---
 
 # Introduce typed application errors and structured request tracing
