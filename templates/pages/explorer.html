@@ -1,36 +1,39 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="app-shell">
+<div class="app" data-local="{{ shell.local }}" data-sql="{{ shell.sql }}" data-admin="{{ shell.admin }}">
   <aside id="side" aria-label="Database explorer">
     <div class="sf">
-      <input class="inp" id="f" placeholder="Search tables…" autocomplete="off" aria-label="Search tables">
-      <span class="kbd">Ctrl K</span>
+      <input class="inp" id="f" placeholder="Search tables…" autocomplete="off" aria-label="Search tables" aria-keyshortcuts="Control+K Meta+K">
+      {% if shell.sql %}<button class="btn ico" id="sqlb" type="button" title="SQL workspace" aria-label="SQL workspace" data-view="sql">&gt;_</button>{% endif %}
+      <button class="btn ico" id="selb" type="button" title="Select tables to export" aria-label="Select tables to export" hidden>☑</button>
     </div>
-    <div id="tree" aria-label="Schemas and relations" hx-sync="#tree:replace">
-      <div hx-get="/catalog/schemas" hx-trigger="load" hx-target="#tree" hx-swap="innerHTML"
-        hx-indicator="#tree-loading">Loading accessible schemas…</div>
+    <div id="tree" aria-label="Schemas and relations" hx-sync="this:replace" hx-get="/catalog/schemas" hx-trigger="load" hx-swap="innerHTML">
+      <div class="note" role="status">Loading accessible schemas…</div>
     </div>
+    <div id="selbar"></div>
     <div class="sfoot">
-      <span class="conn-label">Configured connection</span>
-      <span id="connection-indicator" role="status" aria-live="polite"
-        hx-get="/connection/status" hx-trigger="load" hx-swap="outerHTML">Checking…</span>
-      <button class="gear" type="button" aria-label="Settings" title="Settings">⚙</button>
+      <button class="cbtn" id="cbtn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="cpop"
+        hx-get="/connection/profiles" hx-target="#cpop" hx-swap="innerHTML" hx-trigger="click">
+        <b id="cname">Connection</b><span class="ch dn" aria-hidden="true"></span>
+      </button>
+      <button class="gear" id="sbtn" type="button" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false" aria-controls="spop">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      </button>
+      <div class="pop" id="cpop" role="listbox" aria-label="Connections" hx-get="/connection/profiles" hx-trigger="load" hx-swap="innerHTML"></div>
+      <div class="pop" id="spop" role="dialog" aria-label="Settings">
+        {% include "components/settings.html" %}
+      </div>
     </div>
   </aside>
-  <div id="rs" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="180" aria-valuemax="520" aria-valuenow="264" title="Drag to resize; double-click to reset"></div>
+  <div id="rs" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="180" aria-valuemax="520" aria-valuenow="264" title="Drag to resize · double-click to reset"></div>
   <main>
-    <div id="mainbody" hx-sync="#mainbody:replace" hx-indicator="#mainbody">
-      <section class="empty-state" aria-live="polite">
-        <h1>CuaDB</h1>
-        <p>Choose an accessible schema or relation to inspect read-only database information.</p>
-        <p id="tree-loading" class="htmx-indicator">Loading catalog…</p>
+    <div id="mainbody" hx-sync="this:replace">
+      <section class="es" aria-live="polite">
+        <h2>Pick a table to explore</h2>
+        <p>Choose one from the sidebar. Press Ctrl/⌘ K to filter.</p>
       </section>
-      <section id="catalog-panel" aria-label="Selected database content" aria-live="polite"
-        hx-history="false"></section>
     </div>
   </main>
 </div>
-<button class="btn ico hm" id="menu" data-toggle-sidebar aria-controls="side" aria-expanded="false"
-  aria-label="Toggle sidebar">☰</button>
-<div id="toast" role="status" aria-live="polite"></div>
+<button class="btn ico hm" id="menu" type="button" data-toggle-sidebar aria-controls="side" aria-expanded="false" aria-label="Toggle sidebar">☰</button>
 {% endblock %}

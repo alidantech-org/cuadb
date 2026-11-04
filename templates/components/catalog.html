@@ -1,32 +1,24 @@
-<section id="catalog-panel" aria-label="Database catalog" aria-live="polite" hx-history="false" hx-sync="this:replace">
-  <header class="bar"><h2>{{ title }}</h2>
+<section id="catalog-panel" class="panel" aria-label="Database catalog" hx-history="false" hx-sync="this:replace">
+  <header class="bar"><h1>{{ title }}</h1>
     {% match relation %}{% when Some with (links) %}
-    <span class="spacer"></span><nav class="seg" aria-label="Table view">
+    <span class="sp"></span><nav class="seg" id="seg" aria-label="Table view">
       <a class="{% if data_active %}on{% endif %}" href="{{ links.data }}" hx-get="{{ links.data }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-current="{% if data_active %}page{% else %}false{% endif %}">Data</a>
       <a class="{% if structure_active %}on{% endif %}" href="{{ links.structure }}" hx-get="{{ links.structure }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-current="{% if structure_active %}page{% else %}false{% endif %}">Structure</a>
       <a class="{% if indexes_active %}on{% endif %}" href="{{ links.indexes }}" hx-get="{{ links.indexes }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-current="{% if indexes_active %}page{% else %}false{% endif %}">Indexes</a>
     </nav>
     {% when None %}{% endmatch %}
   </header>
-  <p class="catalog-note">{{ note }}</p>
-  {% if truncated %}
-    <p class="catalog-note" role="status">Results are capped; this list is incomplete.</p>
-  {% endif %}
+  <div class="wrap"><div class="gw st">
+  <p class="note">{{ note }}</p>
+  {% if truncated %}<p class="note" role="status">Results are capped; this list is incomplete.</p>{% endif %}
   {% if rows.is_empty() %}
-    <p class="catalog-note">No visible objects.</p>
+    <p class="note">No visible objects.</p>
   {% else %}
-    <ul class="catalog-list">
+    <table><tbody>
       {% for item in rows %}
-      <li>
-        {% if item.href.is_empty() %}
-        <span class="font-medium text-slate-200">{{ item.title }}</span>
-        {% else %}
-        <a href="{{ item.href }}" hx-get="{{ item.href }}" hx-target="#catalog-panel" hx-swap="outerHTML"
-          class="row-link">{{ item.title }}</a>
-        {% endif %}
-        <p class="catalog-note">{{ item.description }}</p>
-      </li>
+      <tr><td>{% if item.href.is_empty() %}<b>{{ item.title }}</b>{% else %}<a class="fk" href="{{ item.href }}" hx-get="{{ item.href }}" hx-target="#catalog-panel" hx-swap="outerHTML">{{ item.title }}</a>{% endif %}</td><td class="mu">{{ item.description }}</td></tr>
       {% endfor %}
-    </ul>
+    </tbody></table>
   {% endif %}
+  </div></div>
 </section>

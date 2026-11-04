@@ -1,0 +1,32 @@
+{# Settings popover: static markup, state is applied from localStorage by app.js. #}
+<div class="sg">Account</div>
+<div class="sr who"><span>{% if shell.local %}Trusted local session{% else %}{{ shell.login }}<small>{{ shell.role }}</small>{% endif %}</span>
+{% if !shell.local %}<form method="post" action="/logout" class="acts"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit" id="so">Sign out</button></form>{% endif %}</div>
+{% if shell.admin %}<div class="sr"><span>Administration</span><button class="btn" type="button" id="adm" data-view="admin">Open…</button></div>{% endif %}
+<div class="sg">Explorer</div>
+<div class="sr"><span>Mode</span><div class="seg"><button type="button" data-st="mode" data-val="explore">Simple</button><button type="button" data-st="mode" data-val="advanced">Advanced</button></div></div>
+<div class="sg">Theme</div>
+<div class="sr"><span>Mode</span><div class="seg"><button type="button" data-st="theme" data-val="system">Auto</button><button type="button" data-st="theme" data-val="light">Light</button><button type="button" data-st="theme" data-val="dark">Dark</button></div></div>
+<div class="sr"><span>Palette</span><div class="seg"><button type="button" data-st="pal" data-val="mist">Mist</button><button type="button" data-st="pal" data-val="slate">Slate</button><button type="button" data-st="pal" data-val="sand">Sand</button><button type="button" data-st="pal" data-val="mono">Mono</button></div></div>
+<div class="sr"><span>Accent</span><span class="swr"><button type="button" class="sw2" data-ac="" aria-label="Accent default"></button><button type="button" class="sw2" data-ac="#2f6fdb" aria-label="Accent #2f6fdb"></button><button type="button" class="sw2" data-ac="#7b61d6" aria-label="Accent #7b61d6"></button><button type="button" class="sw2" data-ac="#2f8f5b" aria-label="Accent #2f8f5b"></button><button type="button" class="sw2" data-ac="#c27a1a" aria-label="Accent #c27a1a"></button><button type="button" class="sw2" data-ac="#c2485a" aria-label="Accent #c2485a"></button><input type="color" class="cc" data-cc value="#0e7c86" aria-label="Custom accent"></span></div>
+<div class="sr"><span>Corners</span><div class="seg"><button type="button" data-st="rad" data-val="2">Sharp</button><button type="button" data-st="rad" data-val="6">Soft</button><button type="button" data-st="rad" data-val="10">Round</button></div></div>
+<div class="sg">Type</div>
+<div class="sr"><span>Text size</span><div class="seg"><button type="button" data-st="fs" data-val="11.5">S</button><button type="button" data-st="fs" data-val="12.5">M</button><button type="button" data-st="fs" data-val="14">L</button></div></div>
+<div class="sr"><span>Font</span><div class="seg"><button type="button" data-st="ff" data-val="sans">Sans</button><button type="button" data-st="ff" data-val="serif">Serif</button><button type="button" data-st="ff" data-val="mono">Mono</button></div></div>
+<div class="sr"><span>Monospace data cells</span><input type="checkbox" class="tg" data-tg="dmono" aria-label="Monospace data cells"></div>
+<div class="sg">Grid</div>
+<div class="sr"><span>Row height</span><div class="seg"><button type="button" data-st="dens" data-val="dense">XS</button><button type="button" data-st="dens" data-val="compact">S</button><button type="button" data-st="dens" data-val="comfortable">M</button><button type="button" data-st="dens" data-val="roomy">L</button></div></div>
+<div class="sr"><span>Lines</span><div class="seg"><button type="button" data-st="lines" data-val="rows">Rows</button><button type="button" data-st="lines" data-val="all">Grid</button><button type="button" data-st="lines" data-val="none">None</button></div></div>
+<div class="sr"><span>Empty value</span><div class="seg"><button type="button" data-st="nulls" data-val="NULL">NULL</button><button type="button" data-st="nulls" data-val="∅">∅</button><button type="button" data-st="nulls" data-val="">Blank</button></div></div>
+<div class="sr"><span>Row numbers</span><input type="checkbox" class="tg" data-tg="rn" aria-label="Row numbers"></div>
+<div class="sr"><span>Column types in header</span><input type="checkbox" class="tg" data-tg="ty" aria-label="Column types in header"></div>
+<div class="sr"><span>Striped rows</span><input type="checkbox" class="tg" data-tg="zb" aria-label="Striped rows"></div>
+<div class="sr"><span>Wrap long text</span><input type="checkbox" class="tg" data-tg="wrap" aria-label="Wrap long text"></div>
+<div class="sr"><span>Thousands separators</span><input type="checkbox" class="tg" data-tg="sep" aria-label="Thousands separators"></div>
+<div class="sg">Sidebar</div>
+<div class="sr"><span>Icons</span><div class="seg"><button type="button" data-st="icons" data-val="color">Color</button><button type="button" data-st="icons" data-val="mono">Mono</button><button type="button" data-st="icons" data-val="off">Off</button></div></div>
+<div class="sr"><span>Show</span><div class="seg"><button type="button" data-st="side" data-val="rows">Rows</button><button type="button" data-st="side" data-val="size">Size</button></div></div>
+<div class="sr"><span>Size units</span><div class="seg"><button type="button" data-st="unit" data-val="auto">Auto</button><button type="button" data-st="unit" data-val="KB">KB</button><button type="button" data-st="unit" data-val="MB">MB</button><button type="button" data-st="unit" data-val="GB">GB</button></div></div>
+<div class="sg">Tables</div>
+<div class="sr"><span>Remember hidden columns and sort</span><input type="checkbox" class="tg" data-tg="remember" aria-label="Remember hidden columns and sort"></div>
+<div class="sr sr-reset"><button class="btn" type="button" id="rst">Reset this table</button><button class="btn" type="button" id="rall">Reset all</button></div>

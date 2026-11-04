@@ -236,6 +236,8 @@ fn no_store(mut response: Response) -> Response {
 #[template(path = "auth/login.html")]
 struct LoginTemplate {
     message: String,
+    csrf: String,
+    title: &'static str,
 }
 
 #[derive(Template)]
@@ -272,6 +274,8 @@ pub(super) fn notice_status(
 pub async fn login_form() -> Result<Response, AppError> {
     render(LoginTemplate {
         message: String::new(),
+        csrf: String::new(),
+        title: "Sign in · CuaDB",
     })
 }
 
@@ -308,6 +312,8 @@ pub async fn login(
         Err(AuthError::Locked) => {
             let mut response = render(LoginTemplate {
                 message: "Too many attempts. Try again later.".into(),
+                csrf: String::new(),
+                title: "Sign in · CuaDB",
             })?;
             *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
             Ok(response)
@@ -315,6 +321,8 @@ pub async fn login(
         Err(_) => {
             let mut response = render(LoginTemplate {
                 message: "Sign-in failed.".into(),
+                csrf: String::new(),
+                title: "Sign in · CuaDB",
             })?;
             *response.status_mut() = StatusCode::UNAUTHORIZED;
             Ok(response)

@@ -4,13 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark light" />
-    <meta name="htmx-config" content='{"historyCacheSize":0}' />
+    <meta name="csrf-token" content="{{ csrf }}" />
+    <meta name="htmx-config" content='{"historyCacheSize":0,"allowEval":false,"includeIndicatorStyles":false}' />
     <title>{{ title }}</title>
     <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/theme.js"></script>
     <script defer src="/static/htmx.min.js"></script>
     <script defer src="/static/app.js"></script>
   </head>
-  <body class="min-h-screen font-sans antialiased">
+  <body>
     {% block content %}{% endblock %}
+    <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"></div>
+    <div id="toast" role="status" aria-live="polite"></div>
   </body>
 </html>

@@ -15,10 +15,43 @@ use axum::{
 
 use crate::{error::AppError, state::AppState};
 
+/// What the page shell needs to know about the caller. Display and capability hints
+/// only: every route still authorizes on the server.
+pub struct Shell {
+    pub login: String,
+    pub role: &'static str,
+    /// Trusted local mode: no administrator exists yet, so there is no session.
+    pub local: bool,
+    pub admin: bool,
+    /// The SQL workspace is enabled by the operator and the caller is signed in.
+    pub sql: bool,
+}
+
+impl Shell {
+    pub fn new(state: &AppState, principal: &crate::auth::Principal) -> Self {
+        let local = principal.is_open();
+        Self {
+            login: principal.login().to_string(),
+            role: if local {
+                "local"
+            } else if principal.is_admin() {
+                "admin"
+            } else {
+                "member"
+            },
+            local,
+            admin: principal.is_admin(),
+            sql: state.sql_settings().enabled && !local,
+        }
+    }
+}
+
 #[derive(Template)]
 #[template(path = "pages/explorer.html")]
 struct ExplorerTemplate {
     title: &'static str,
+    csrf: String,
+    shell: Shell,
 }
 
 #[derive(Template)]
@@ -34,10 +67,21 @@ fn html<T: Template>(view: T) -> Result<Html<String>, AppError> {
     view.render().map(Html).map_err(|_| AppError::template())
 }
 
-pub async fn explorer() -> Result<Html<String>, AppError> {
-    html(ExplorerTemplate {
+pub async fn explorer(
+    State(state): State<AppState>,
+    auth: auth::Auth,
+) -> Result<Response, AppError> {
+    let shell = Shell::new(&state, &auth.0);
+    let mut response = html(ExplorerTemplate {
         title: "CuaDB · Database explorer",
-    })
+        csrf: auth.0.csrf().to_string(),
+        shell,
+    })?
+    .into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
 }
 
 /// Small, independently requested fragment proving HTMX wiring works.

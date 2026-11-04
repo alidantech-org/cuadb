@@ -1,86 +1,78 @@
-<section id="catalog-panel" class="data-panel" aria-label="Read-only data grid" aria-live="polite" hx-history="false" hx-sync="this:replace">
+<section id="catalog-panel" class="panel" aria-label="Table data" hx-history="false" hx-sync="this:replace" data-table="{{ schema_name }}.{{ relation_name }}">
   <header class="bar">
-    <h1><span>{{ title }}</span></h1>
-    <span class="meta">{{ shown_from }}–{{ shown_to }} · ~{{ approximate_total }} rows</span>
-    <span class="spacer"></span>
-    <div class="grid-actions">
-      <button class="view-link" type="button" data-pop="columns-pop" aria-controls="columns-pop" aria-expanded="false">Columns</button>
-      <button class="view-link" type="button" data-compact-toggle aria-pressed="{{ compact }}">Compact</button>
-      <button class="view-link" type="button" disabled title="Bounded server export is not available yet">Export ▾</button>
-      <div class="pop" id="columns-pop" hidden>
-        <div class="pq"><button class="view-link" type="button" data-columns-all>Show all</button><button class="view-link" type="button" data-columns-none>Hide all</button></div>
-        {% for column in available_columns %}<label class="column-choice"><input type="checkbox" data-column-choice="{{ column.name }}" {% if column.selected %}checked{% endif %}><span>{{ column.name }}</span><small>{{ column.native_type }}</small></label>{% endfor %}
-      </div>
-    </div>
-    <div class="seg" aria-label="Table view">
-      <button type="button" class="on" aria-current="page">Data</button>
-      <a class="view-link" href="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-get="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-target="#catalog-panel" hx-swap="outerHTML">Structure</a>
-      <a class="view-link" href="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-get="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-target="#catalog-panel" hx-swap="outerHTML">Indexes</a>
-    </div>
-  </header>
-  <div class="toolbar">
+    <h1><i class="ic-slot" data-ic="relation" data-name="{{ relation_name }}" aria-hidden="true"></i><span>{{ schema_name }}.</span>{{ relation_name }}</h1>
+    <span class="meta">{{ shown_from }}–{{ shown_to }}{% if approximate_total != "unavailable" %} · ~{{ approximate_total }} rows{% endif %}</span>
+    <span class="sp"></span>
     <form class="row-search" action="/catalog/data" method="get" role="search" hx-get="/catalog/data" hx-target="#catalog-panel" hx-swap="outerHTML" hx-trigger="submit, keyup changed delay:350ms from:input[name=filter]">
-      <input type="hidden" name="schema" value="{{ schema }}">
-      <input type="hidden" name="relation" value="{{ relation }}">
+      <input type="hidden" name="schema" value="{{ schema_name }}">
+      <input type="hidden" name="relation" value="{{ relation_name }}">
       <input type="hidden" name="size" value="{{ page_size }}">
       {% if !profile.is_empty() %}<input type="hidden" name="profile" value="{{ profile }}">{% endif %}
       {% if geojson_active %}<input type="hidden" name="spatial" value="geojson">{% endif %}
       {% match sort %}{% when Some with (column) %}<input type="hidden" name="sort" value="{{ column }}"><input type="hidden" name="direction" value="{% match direction %}{% when Some with (value) %}{{ value }}{% when None %}{% endmatch %}">{% when None %}{% endmatch %}
       {% for column in selected_columns %}<input type="hidden" name="column" value="{{ column }}">{% endfor %}
-      <input class="inp" name="filter" value="{{ filter }}" maxlength="128" placeholder="Search rows…" aria-label="Search rows">
-      <button class="view-link" type="submit">Search</button>
+      <input class="inp" name="filter" id="q" value="{{ filter }}" maxlength="128" placeholder="Search rows…" aria-label="Search rows">
     </form>
-    {% if has_spatial %}<a class="view-link" href="{{ geojson_url }}" hx-get="{{ geojson_url }}" hx-target="#catalog-panel" hx-swap="outerHTML">{% if geojson_active %}Hide GeoJSON details{% else %}Show GeoJSON details{% endif %}</a>{% endif %}
-    <span class="spacer"></span>
-    <span class="tag">SELECT only</span>
-  </div>
-  {% if geojson_active %}<p class="catalog-note" role="status">Spatial values remain in their stored coordinate reference system; no reprojection or map rendering is applied.</p>{% endif %}
-  {% if stable %}{% else %}<p class="catalog-note" role="status">No suitable unique key. Ordering is best effort; concurrent changes may repeat or skip rows.</p>{% endif %}
-  {% if truncated_columns %}<p class="catalog-note" role="status">Showing the first 24 columns; explicit catalog-qualified selection is available.</p>{% endif %}
-  <div class="grid-wrap">
-    <div class="grid-scroll">
-      <table class="data-grid {% if compact %}compact{% endif %}">
-        <thead><tr><th scope="col" class="row-number">#</th>
+    <button class="btn" type="button" data-pop="colpop" aria-controls="colpop" aria-expanded="false">Columns</button>
+    <button class="btn" type="button" id="dn" data-density aria-label="Toggle compact rows">Compact</button>
+    <button class="btn" type="button" data-pop="exppop" aria-controls="exppop" aria-expanded="false">Export ▾</button>
+    <nav class="seg" id="seg" aria-label="Table view">
+      <a class="on" aria-current="page" href="#">Data</a>
+      <a href="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-get="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-target="#catalog-panel" hx-swap="outerHTML">Structure</a>
+      <a href="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-get="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-target="#catalog-panel" hx-swap="outerHTML">Indexes</a>
+    </nav>
+    <div class="pop" id="exppop">
+      <a class="ci" href="{{ export_view_csv }}" download><span><b>Download CSV</b><small>This page, visible columns</small></span></a>
+      <a class="ci" href="{{ export_all_csv }}" download><span><b>Download CSV: whole table</b><small>Bounded server stream</small></span></a>
+      <a class="ci" href="{{ export_all_json }}" download><span><b>Download JSON: whole table</b><small>Bounded server stream</small></span></a>
+      <button class="ci" type="button" data-copy-csv><span><b>Copy as CSV</b><small>This page, to clipboard</small></span></button>
+    </div>
+    <div class="pop" id="colpop">
+      <div class="pq"><button class="btn" type="button" data-columns-all>Show all</button><button class="btn" type="button" data-columns-none>Hide all</button></div>
+      {% for column in available_columns %}<label class="pl"><input type="checkbox" data-column-choice="{{ column.name }}" {% if column.selected %}checked{% endif %}>{{ column.name }}<small>{{ column.native_type }}</small></label>{% endfor %}
+    </div>
+  </header>
+  {% if geojson_active %}<p class="note" role="status">Spatial values remain in their stored coordinate reference system; no reprojection or map rendering is applied.</p>{% endif %}
+  {% if has_spatial %}<p class="note"><a class="fk" href="{{ geojson_url }}" hx-get="{{ geojson_url }}" hx-target="#catalog-panel" hx-swap="outerHTML">{% if geojson_active %}Hide GeoJSON details{% else %}Show GeoJSON details{% endif %}</a></p>{% endif %}
+  {% if stable %}{% else %}<p class="note" role="status">No suitable unique key. Ordering is best effort; concurrent changes may repeat or skip rows.</p>{% endif %}
+  {% if truncated_columns %}<p class="note" role="status">Showing the first 24 columns; use Columns to choose others.</p>{% endif %}
+  <div class="wrap">
+    <div class="gw">
+      <table class="grid">
+        <thead><tr><th class="rn" scope="col">#</th>
           {% for col in headers %}
-          <th scope="col" aria-sort="{% match col.sort_direction %}{% when Some with (direction) %}{{ direction }}{% when None %}none{% endmatch %}">
-            <span>{{ col.name }}</span><small>{{ col.native_type }}</small>
-            {% if col.sortable %}<span class="sort-links">
-              <a href="{{ col.asc }}" hx-get="{{ col.asc }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-label="{% if col.is_ascending %}Clear sort on {{ col.name }}{% else %}Sort {{ col.name }} ascending{% endif %}" title="{% if col.is_ascending %}Clear sort{% else %}Sort ascending{% endif %}">↑</a>
-              <a href="{{ col.desc }}" hx-get="{{ col.desc }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-label="{% if col.is_descending %}Clear sort on {{ col.name }}{% else %}Sort {{ col.name }} descending{% endif %}" title="{% if col.is_descending %}Clear sort{% else %}Sort descending{% endif %}">↓</a>
-            </span>{% else %}<span class="sort-disabled" aria-label="Sorting is not supported for {{ col.native_type }}">↕</span>{% endif %}
+          <th scope="col" class="{% if col.numeric %}num{% endif %}" data-col="{{ col.name }}" data-type="{{ col.native_type }}" aria-sort="{% match col.sort_direction %}{% when Some with (direction) %}{{ direction }}{% when None %}none{% endmatch %}">
+            {% if col.sortable %}<a class="sortlink" href="{% if col.is_ascending %}{{ col.desc }}{% else if col.is_descending %}{{ col.asc }}{% else %}{{ col.asc }}{% endif %}" hx-get="{% if col.is_ascending %}{{ col.desc }}{% else if col.is_descending %}{{ col.asc }}{% else %}{{ col.asc }}{% endif %}" hx-target="#catalog-panel" hx-swap="outerHTML" title="Sort by {{ col.name }}">{{ col.name }}</a>{% else %}<span title="Sorting is not supported for {{ col.native_type }}">{{ col.name }}</span>{% endif %}<small>{{ col.native_type }}</small>{% if col.is_ascending %}<span class="s">↑</span>{% else if col.is_descending %}<span class="s">↓</span>{% endif %}
           </th>
           {% endfor %}
         </tr></thead>
         <tbody>
           {% for row in rows %}
-          <tr>
-            <th scope="row" class="row-number">{{ row.number }}</th>
+          <tr tabindex="0" data-row="{{ row.number }}">
+            <td class="rn">{{ row.number }}</td>
             {% for cell in row.values %}
-            <td class="{{ cell.class }}{% if cell.is_null %} null-value{% endif %}" title="{{ cell.native_type }}">
-              <button type="button" class="cell-value" data-detail="{{ cell.detail }}" data-type="{{ cell.native_type }}" aria-label="Inspect {{ cell.native_type }} value">{% if cell.is_null %}NULL{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}</button>
-            </td>
+            <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if cell.class == "bool-value" %}<span class="pill {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
             {% endfor %}
           </tr>
           {% endfor %}
-          {% if rows.is_empty() %}<tr><td colspan="25" class="empty-row">No rows are visible for this relation.</td></tr>{% endif %}
+          {% if rows.is_empty() %}<tr><td colspan="99" class="empty-row">{% if filter.is_empty() %}No rows are visible for this relation.{% else %}No rows match “{{ filter }}”. Clear the search to see all rows.{% endif %}</td></tr>{% endif %}
         </tbody>
       </table>
     </div>
-    <aside id="insp" aria-label="Cell details" hidden>
-      <h2>Cell detail <button type="button" data-close-detail aria-label="Close detail">×</button></h2>
-      <p data-detail-type></p><pre data-detail-value></pre>
-      <button type="button" data-copy-detail>Copy value</button>
-    </aside>
+    <aside id="insp" aria-label="Row details"></aside>
   </div>
   <footer class="foot">
-    {% if previous_url.is_empty() %}<button type="button" disabled>Previous</button>{% else %}<a href="{{ previous_url }}" hx-get="{{ previous_url }}" hx-target="#catalog-panel" hx-swap="outerHTML">Previous</a>{% endif %}
+    {% if previous_url.is_empty() %}<button class="btn ico" type="button" disabled aria-label="Previous page">‹</button>{% else %}<a class="btn ico" href="{{ previous_url }}" hx-get="{{ previous_url }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-label="Previous page">‹</a>{% endif %}
     <span>{{ shown_from }}–{{ shown_to }} · page {{ page_number }}</span>
-    {% if next_url.is_empty() %}<button type="button" disabled>Next</button>{% else %}<a href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="#catalog-panel" hx-swap="outerHTML">Next</a>{% endif %}
-    <span class="spacer"></span>
+    {% if next_url.is_empty() %}<button class="btn ico" type="button" disabled aria-label="Next page">›</button>{% else %}<a class="btn ico" href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-label="Next page">›</a>{% endif %}
+    <span class="sp"></span>
     <span>{{ headers.len() }} columns</span>
-    <a href="{{ size_25 }}" hx-get="{{ size_25 }}" hx-target="#catalog-panel" hx-swap="outerHTML">25</a>
-    <a href="{{ size_50 }}" hx-get="{{ size_50 }}" hx-target="#catalog-panel" hx-swap="outerHTML">50</a>
-    <a href="{{ size_100 }}" hx-get="{{ size_100 }}" hx-target="#catalog-panel" hx-swap="outerHTML">100</a>
-    <span class="tag">SELECT only</span>
+    <nav class="seg" aria-label="Rows per page">
+      <a class="{% if page_size == 25 %}on{% endif %}" href="{{ size_25 }}" hx-get="{{ size_25 }}" hx-target="#catalog-panel" hx-swap="outerHTML">25</a>
+      <a class="{% if page_size == 50 %}on{% endif %}" href="{{ size_50 }}" hx-get="{{ size_50 }}" hx-target="#catalog-panel" hx-swap="outerHTML">50</a>
+      <a class="{% if page_size == 100 %}on{% endif %}" href="{{ size_100 }}" hx-get="{{ size_100 }}" hx-target="#catalog-panel" hx-swap="outerHTML">100</a>
+    </nav>
+    <span>rows/page</span>
+    <span class="tag ro">SELECT only</span>
   </footer>
 </section>

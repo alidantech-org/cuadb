@@ -1,15 +1,15 @@
-<section id="catalog-panel" class="data-panel" aria-label="Indexes and storage" aria-live="polite" hx-history="false" hx-sync="this:replace">
-  <header class="bar"><h2>{{ title }}</h2><span class="spacer"></span>{% include "components/relation_tabs.html" %}</header>
-  <div class="grid-scroll metadata-scroll">
-    <h3>Indexes</h3>
-    {% if indexes.is_empty() %}<p class="catalog-note">No visible indexes.</p>{% else %}
-    <table class="metadata-grid"><thead><tr><th>Name</th><th>Kind</th><th>Columns / expressions</th><th>Valid</th><th>Predicate</th><th>Definition</th></tr></thead><tbody>
-      {% for index in indexes %}<tr><th scope="row">{{ index.name }}</th><td>{{ index.kind }}</td><td>{{ index.columns }}</td><td>{% if index.valid %}Yes{% else %}No{% endif %}</td><td>{{ index.predicate }}</td><td>{{ index.definition }}</td></tr>{% endfor %}
+<section id="catalog-panel" class="panel" aria-label="Indexes and storage" hx-history="false" hx-sync="this:replace">
+  <header class="bar"><h1><i class="ic-slot" data-ic="relation" data-name="{{ title }}" aria-hidden="true"></i>{{ title }}</h1><span class="sp"></span>{% include "components/relation_tabs.html" %}</header>
+  <div class="wrap"><div class="gw st">
+    <h4>Indexes</h4>
+    {% if indexes.is_empty() %}<p class="note">No visible indexes.</p>{% else %}
+    <table><thead><tr><th>Name</th><th>Kind</th><th>Columns / expressions</th><th>Valid</th><th>Predicate</th><th>Definition</th></tr></thead><tbody>
+      {% for index in indexes %}<tr><td><b>{{ index.name }}</b></td><td>{{ index.kind }}</td><td>{{ index.columns }}</td><td>{% if index.valid %}yes{% else %}no{% endif %}</td><td>{{ index.predicate }}</td><td><code>{{ index.definition }}</code></td></tr>{% endfor %}
     </tbody></table>{% endif %}
-    {% if truncated %}<p class="catalog-note" role="status">The index list is capped and may be incomplete.</p>{% endif %}
-    <h3>Storage and statistics</h3><table class="metadata-grid"><thead><tr><th>Measurement</th><th>Value</th><th>Meaning</th></tr></thead><tbody>
-      {% for stat in statistics %}<tr><th scope="row">{{ stat.name }}</th><td>{{ stat.value }}</td><td>{{ stat.meaning }}</td></tr>{% endfor %}
+    {% if truncated %}<p class="note" role="status">The index list is capped and may be incomplete.</p>{% endif %}
+    <h4>Storage</h4><table><thead><tr><th>Measurement</th><th>Value</th><th>Meaning</th></tr></thead><tbody>
+      {% for stat in statistics %}<tr><td>{{ stat.name }}</td><td>{{ stat.value }}</td><td class="mu">{{ stat.meaning }}</td></tr>{% endfor %}
     </tbody></table>
-    <p class="catalog-note">Row counts and storage values are engine-reported estimates and may be stale, unavailable or permission-limited.</p>
-  </div>
+    <p class="note">Row counts and storage values are engine-reported estimates and may be stale, unavailable or permission-limited.</p>
+  </div></div>
 </section>

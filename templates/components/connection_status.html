@@ -1,6 +1,4 @@
 <span id="connection-indicator" role="button" tabindex="0" aria-label="Connection status. Activate to retry."
   title="{{ detail }}"
   hx-get="/connection/status" hx-trigger="click" hx-swap="outerHTML"
-  class="ml-auto rounded-full border px-3 py-1 text-xs font-medium {% if ready %}border-emerald-500/30 bg-emerald-500/10 text-emerald-200{% else %}border-amber-500/30 bg-amber-500/10 text-amber-200{% endif %}">
-  {{ label }}
-</span>
+  class="tag {% if ready %}ro{% else %}warn{% endif %}">{{ label }}</span>

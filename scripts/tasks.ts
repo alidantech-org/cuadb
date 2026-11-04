@@ -16,6 +16,7 @@ const tailwindArgs = ['-i', 'assets/css/app.css', '-o', 'public/app.css'];
 const prettierFiles = [
   'assets/css/app.css',
   'assets/js/app.js',
+  'assets/js/theme.js',
   'scripts/**/*.ts',
   'package.json',
   'tsconfig.json',
@@ -58,6 +59,7 @@ function buildAssets(release = false): void {
   run(bin('tailwindcss'), release ? [...tailwindArgs, '--minify'] : tailwindArgs);
   copyFileSync(path('node_modules/htmx.org/dist/htmx.min.js'), path('public/htmx.min.js'));
   copyFileSync(path('assets/js/app.js'), path('public/app.js'));
+  copyFileSync(path('assets/js/theme.js'), path('public/theme.js'));
 }
 
 /**
@@ -192,6 +194,7 @@ function dev(): void {
   watchers.push(
     watch(path('assets/js'), () => {
       copyFileSync(path('assets/js/app.js'), path('public/app.js'));
+      copyFileSync(path('assets/js/theme.js'), path('public/theme.js'));
     }),
   );
 

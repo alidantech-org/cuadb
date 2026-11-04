@@ -1,18 +1,18 @@
-<section id="catalog-panel" class="data-panel" aria-label="Table structure" aria-live="polite" hx-history="false" hx-sync="this:replace">
-  <header class="bar"><h2>{{ title }}</h2><span class="spacer"></span>{% include "components/relation_tabs.html" %}</header>
-  <div class="grid-scroll metadata-scroll">
-    <h3>Columns</h3>
-    {% if columns.is_empty() %}<p class="catalog-note">No visible column metadata.</p>{% else %}
-    <table class="metadata-grid"><thead><tr><th>Position</th><th>Column</th><th>Type</th><th>Nullable</th><th>Key</th><th>Default / generation</th></tr></thead><tbody>
-      {% for column in columns %}<tr><td>{{ column.position }}</td><th scope="row">{{ column.name }}</th><td>{{ column.native_type }}</td><td>{% if column.nullable %}Yes{% else %}No{% endif %}</td><td>{{ column.key }}</td><td>{{ column.generation }}</td></tr>{% endfor %}
+<section id="catalog-panel" class="panel" aria-label="Table structure" hx-history="false" hx-sync="this:replace">
+  <header class="bar"><h1><i class="ic-slot" data-ic="relation" data-name="{{ title }}" aria-hidden="true"></i>{{ title }}</h1><span class="sp"></span>{% include "components/relation_tabs.html" %}</header>
+  <div class="wrap"><div class="gw st">
+    <h4>Columns</h4>
+    {% if columns.is_empty() %}<p class="note">No visible column metadata.</p>{% else %}
+    <table><thead><tr><th>#</th><th>Column</th><th>Type</th><th>Nullable</th><th>Key</th><th>Default / generation</th></tr></thead><tbody>
+      {% for column in columns %}<tr><td>{{ column.position }}</td><td><b>{{ column.name }}</b></td><td><code>{{ column.native_type }}</code></td><td>{% if column.nullable %}yes{% else %}no{% endif %}</td><td>{{ column.key }}</td><td>{{ column.generation }}</td></tr>{% endfor %}
     </tbody></table>{% endif %}
-    <h3>Constraints</h3>
-    {% if constraints.is_empty() %}<p class="catalog-note">No visible constraints, or this relation does not expose constraint metadata.</p>{% else %}
-    <table class="metadata-grid"><thead><tr><th>Name</th><th>Kind</th><th>Columns</th><th>References</th><th>Definition</th></tr></thead><tbody>
-      {% for constraint in constraints %}<tr><th scope="row">{{ constraint.name }}</th><td>{{ constraint.kind }}</td><td>{{ constraint.columns }}</td><td>{{ constraint.references }}</td><td>{{ constraint.definition }}</td></tr>{% endfor %}
+    <h4>Constraints</h4>
+    {% if constraints.is_empty() %}<p class="note">No visible constraints, or this relation does not expose constraint metadata.</p>{% else %}
+    <table><thead><tr><th>Name</th><th>Kind</th><th>Columns</th><th>References</th><th>Definition</th></tr></thead><tbody>
+      {% for constraint in constraints %}<tr><td><b>{{ constraint.name }}</b></td><td>{{ constraint.kind }}</td><td>{{ constraint.columns }}</td><td>{{ constraint.references }}</td><td><code>{{ constraint.definition }}</code></td></tr>{% endfor %}
     </tbody></table>{% endif %}
-    {% if partitions.is_empty() %}{% else %}<h3>Partitions</h3><table class="metadata-grid"><thead><tr><th>Parent</th><th>Child</th><th>Bound</th></tr></thead><tbody>{% for partition in partitions %}<tr><td>{{ partition.parent }}</td><td>{{ partition.child }}</td><td>{{ partition.bound }}</td></tr>{% endfor %}</tbody></table>{% endif %}
-    {% if truncated %}<p class="catalog-note" role="status">Some catalog metadata was capped; lists may be incomplete.</p>{% endif %}
-    <p class="catalog-note">Definitions are metadata only. Permissions can hide related objects; views may not expose table constraints.</p>
-  </div>
+    {% if partitions.is_empty() %}{% else %}<h4>Partitions</h4><table><thead><tr><th>Parent</th><th>Child</th><th>Bound</th></tr></thead><tbody>{% for partition in partitions %}<tr><td>{{ partition.parent }}</td><td>{{ partition.child }}</td><td>{{ partition.bound }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+    {% if truncated %}<p class="note" role="status">Some catalog metadata was capped; lists may be incomplete.</p>{% endif %}
+    <p class="note">Definitions are metadata only. Permissions can hide related objects; views may not expose table constraints.</p>
+  </div></div>
 </section>

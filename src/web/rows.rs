@@ -20,6 +20,7 @@ struct Header {
     is_ascending: bool,
     is_descending: bool,
     sortable: bool,
+    numeric: bool,
 }
 #[derive(Clone)]
 struct Value {
@@ -38,7 +39,6 @@ struct DisplayRow {
 #[derive(Template)]
 #[template(path = "components/data_page.html")]
 struct PageTemplate {
-    title: String,
     /// Selected profile id, or empty for the default profile.
     profile: String,
     profile_arg: String,
@@ -51,9 +51,10 @@ struct PageTemplate {
     direction: Option<&'static str>,
     selected_columns: Vec<String>,
     available_columns: Vec<ColumnView>,
-    compact: bool,
     schema: String,
     relation: String,
+    schema_name: String,
+    relation_name: String,
     headers: Vec<Header>,
     rows: Vec<DisplayRow>,
     previous_url: String,
@@ -62,6 +63,9 @@ struct PageTemplate {
     size_25: String,
     size_50: String,
     size_100: String,
+    export_view_csv: String,
+    export_all_csv: String,
+    export_all_json: String,
     stable: bool,
     truncated_columns: bool,
     shown_from: u64,
@@ -121,6 +125,12 @@ fn value_class(native_type: &str) -> &'static str {
         "json-value"
     } else if native.ends_with("[]") {
         "array-value"
+    } else if native == "boolean" || native == "bool" {
+        "bool-value"
+    } else if matches!(native.as_str(), "uuid" | "inet" | "cidr" | "macaddr") {
+        "mono-value"
+    } else if native.starts_with("timestamp") || matches!(native.as_str(), "date" | "time") {
+        "ts-value"
     } else if native == "bytea" || native.contains("blob") || native.contains("binary") {
         "binary-value"
     } else if matches!(
@@ -366,6 +376,40 @@ fn link(nav: &Navigation, page: u32, cursor: Option<&str>, sort: Option<SortSpec
     }
     format!("/catalog/data?{}", q.finish())
 }
+/// Bounded server-side export links; the export route re-validates every parameter.
+fn export_link(nav: &Navigation, format: &str, scope: &str, page: u32) -> String {
+    let mut q = url::form_urlencoded::Serializer::new(String::new());
+    q.append_pair("schema", &nav.id.namespace);
+    q.append_pair("relation", &nav.id.name);
+    q.append_pair("format", format);
+    q.append_pair("scope", scope);
+    q.append_pair("size", &nav.options.limit.to_string());
+    if scope == "page" && page > 0 {
+        q.append_pair("page", &page.to_string());
+    }
+    if let Some(profile) = nav.profile.as_deref() {
+        q.append_pair("profile", profile);
+    }
+    if scope == "page" {
+        if let Some(sort) = nav.options.sort.as_ref() {
+            q.append_pair("sort", &sort.column);
+            q.append_pair(
+                "direction",
+                match sort.direction {
+                    SortDirection::Asc => "asc",
+                    SortDirection::Desc => "desc",
+                },
+            );
+        }
+        if let Some(filter) = nav.options.filter.as_deref() {
+            q.append_pair("filter", filter);
+        }
+        for col in &nav.options.selected_columns {
+            q.append_pair("column", col);
+        }
+    }
+    format!("/catalog/export?{}", q.finish())
+}
 pub async fn data(
     State(state): State<AppState>,
     auth: crate::web::auth::Auth,
@@ -392,6 +436,7 @@ pub async fn data(
                 name: c.name.clone(),
                 native_type: c.native_type.clone(),
                 sortable: catalog.sort_supported(&c.native_type),
+                numeric: value_class(&c.native_type) == "numeric",
                 asc: {
                     let clear = nav.options.sort.as_ref().is_some_and(|sort| {
                         sort.column == c.name && sort.direction == SortDirection::Asc
@@ -515,11 +560,13 @@ pub async fn data(
     let size_50 = link(&sizes, 0, None, sizes.options.sort.clone());
     sizes.options.limit = 100;
     let size_100 = link(&sizes, 0, None, sizes.options.sort.clone());
+    let export_view_csv = export_link(&nav, "csv", "page", page.page);
+    let export_all_csv = export_link(&nav, "csv", "relation", 0);
+    let export_all_json = export_link(&nav, "json", "relation", 0);
     let mut geojson_nav = nav.clone();
     geojson_nav.options.spatial_geojson = !nav.options.spatial_geojson;
     let geojson_url = link(&geojson_nav, 0, None, geojson_nav.options.sort.clone());
     let view = PageTemplate {
-        title: format!("Data · {}.{}", nav.id.namespace, nav.id.name),
         profile: nav.profile.clone().unwrap_or_default(),
         profile_arg: nav
             .profile
@@ -550,9 +597,13 @@ pub async fn data(
                 },
             })
             .collect(),
-        compact: false,
         schema: url::form_urlencoded::byte_serialize(nav.id.namespace.as_bytes()).collect(),
         relation: url::form_urlencoded::byte_serialize(nav.id.name.as_bytes()).collect(),
+        schema_name: nav.id.namespace.clone(),
+        relation_name: nav.id.name.clone(),
+        export_view_csv,
+        export_all_csv,
+        export_all_json,
         headers,
         rows: rendered,
         previous_url,
