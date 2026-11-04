@@ -40,7 +40,7 @@ bun run dev
 
 Open **http://localhost:4848**. On the first invocation the Bun dispatcher installs missing JS tooling automatically, builds CSS, copies HTMX and the local JS into `public/`, and launches Rust. Subsequent code changes under `src/` or `templates/` restart the Rust process; Tailwind watches styles. Reload the browser after changes. Restart `bun run dev` if you create a *new nested directory*, change environment variables, or add dependencies.
 
-The first Rust compilation downloads crates from crates.io and can take longer than later incremental builds. Generated `bun.lock` and `Cargo.lock` should be **committed after the first successful install** for reproducible future builds. Both lockfiles are intentionally not fabricated in this initial scaffold.
+On a fresh clone, the first Rust compilation downloads crates from crates.io and can take longer than later incremental builds. `bun.lock` and `Cargo.lock` are committed for reproducible dependency resolution.
 
 ## Root commands
 
@@ -148,7 +148,55 @@ CuaDB is intentionally **not** a SQL console, migration system, editor or full d
 - There is no external CSS/JS CDN dependency: generated CSS and HTMX are served by Rust.
 - UI placeholders must never pretend a real database query succeeded.
 
-**Next milestone:** Implement the real PostgreSQL adapter only after confirming the shell launches and the root scripts work on a fresh clone.
+**Next milestone:** Follow the managed Task roadmap, beginning with Rust foundation and secure connection contracts. The shell has been verified on Fedora; actual database browsing is not implemented yet.
+
+## Task-managed implementation roadmap
+
+The project uses [Task / taskcode](https://github.com/alidantech-org/task) to manage implementation. **The active Task workspace is `.docs/`**, as configured in the root `task.yaml`; the generic Task-managed instructions below may refer to `tasks/`, but `task.yaml` is authoritative. The Task workspace has already been initialized; **do not run `task init` again**.
+
+A one-time, idempotent bootstrap in `scripts/roadmap/` prepares a full dependency-ordered implementation roadmap: **13 groups, 55 detailed tasks, and 5 architecture/design/test documents**. The bootstrap is source input only; after creation, the generated Markdown under `.docs/` is the **single source of truth**. Never change task IDs, status history or status manually, and never maintain a parallel TODO list.
+
+### Preview and create the real Task records
+
+From the CuaDB repository root, with the Task CLI installed:
+
+```bash
+task --version
+bun run task:preview        # Read-only preview; works even without Task installed
+bun run task:seed           # Creates .docs/docs and .docs/todo through Task CLI
+bun run task:verify         # Runs task validate on the generated workspace
+task group list
+task list
+task docs list
+```
+
+If `task` is not installed, install the `taskcode` CLI using its upstream installation instructions; the bootstrap also recognizes an executable named `taskcode`. **Do not install or run Task as part of the CuaDB runtime container.** The tasks are developer workflow metadata only. The seeder safely skips existing documents, named groups and named tasks on reruns, making it possible to resume after a partial failure. It will not overwrite existing task bodies or status history.
+
+After successful validation, commit the CLI-generated Markdown on the existing `main` branch:
+
+```bash
+git add .docs
+git commit -m "plan: initialize CuaDB Task roadmap and architecture documents"
+git push origin main
+```
+
+To work one task at a time:
+
+```bash
+task list
+task show <TSK-ID>
+task start <TSK-ID>
+# Implement, format, check and test the task's scoped change.
+task checklist <TSK-ID>
+task check <TSK-ID> --item 1
+task comment <TSK-ID> --text "Implementation and verification evidence"
+task update <TSK-ID> --status completed
+task validate
+```
+
+Group plans describe purpose, order, risks and completion criteria; blocking task links prevent starting dependent work without checking prerequisites. The seeded groups cover Rust foundations, secure database connections, PostgreSQL catalogs and paging, HTTP/HTMX, explorer navigation, data grid, inspector/PostGIS support, MySQL/MariaDB, SQLite, trusted connection profiles, release quality, and later SQL Server compatibility.
+
+The root `bun run test` includes Task roadmap definition tests; `bun run format` and `bun run format:check` include the roadmap scripts. Task-managed Markdown is **not** automatically reformatted because its tool owns the frontmatter and status fields.
 
 <!-- BEGIN TASK MANAGED TASK-TOOL -->
 ## Task workspace
