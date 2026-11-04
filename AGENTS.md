@@ -1,3 +1,15 @@
+# CuaDB implementation rules
+
+CuaDB is a local-first, read-only database explorer: one Rust/Axum server, Askama/HTMX frontend, Tailwind CSS, small vanilla JavaScript, and one Docker runtime container with one published UI port. PostgreSQL is the first engine; MySQL/MariaDB and SQLite follow through typed adapters. Do not add SQL editing, write operations, a second web runtime or unrequested administrative features.
+
+**Workspace path:** `task.yaml` configures Task at `.docs/`. Treat that file as authoritative even when the Task-generated guidance below uses the generic `tasks/` example. Read `.docs/README.md`, `.docs/rules/task-writing.md` and the selected group's goal/plan before work.
+
+**Execution order:** A one-time seed command (`bun run task:seed`) prepares the backlog through the Task CLI. Once created, `.docs/` is the single source of truth; never regenerate or hand-edit managed task IDs, status history or checkboxes. Before implementation, inspect the selected task and its blocking dependencies, move only that task to in-progress, implement the smallest complete vertical slice, and record tests and findings on that task. Run `task validate` for any Task workspace edits.
+
+**Quality and security:** Keep database-specific SQL and driver behavior in `src/db/` adapters, route/input validation in Rust web handlers and display-only behavior in templates/assets. Use least-privilege, bounded read-only database access, safe identifier quoting, escaped output, redacted logs and explicit feature capability flags. Run `bun run format:check`, `bun run check`, and `bun run test` after implementation. Live database integration tests require disposable fixtures; never mutate the user's existing PostgreSQL data.
+
+---
+
 <!-- BEGIN TASK MANAGED TASK-TOOL -->
 ## Task workspace
 
