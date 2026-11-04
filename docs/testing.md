@@ -1,0 +1,40 @@
+# Running the tests
+
+Everything under `cargo test` runs offline except the live-database tests, which **return early (and so prove nothing)** when their `CUADB_TEST_*_URL` is unset. Always check that the engines you care about were actually exercised.
+
+```bash
+cargo test --locked                      # offline + whatever env vars are set
+bun run format:check && bun run check && bun run test
+task validate && bun run task:verify
+```
+
+## Live fixtures
+
+Use dedicated databases whose names start with `cuadb_fixture_` and a SELECT-only reader account. Fixture SQL is additive and idempotent and is run by a separate fixture *operator* account, never by the reader and never by root:
+
+| Engine | Fixture SQL | Reader URL variable |
+|---|---|---|
+| PostgreSQL 18 + PostGIS | `tests/fixtures/catalog.sql` (schema is **destructive**: it drops/recreates `cuadb_fixture`, run only on a fresh fixture DB), `rows.sql`, `catalog_postgis.sql`, `rich_values.sql`, `perf.sql` | `CUADB_TEST_CATALOG_URL`, `CUADB_TEST_ROWS_URL`, `CUADB_TEST_CATALOG_POSTGIS_URL`, `CUADB_TEST_LOCAL_TRUST_URL` |
+| MariaDB 11.8 | `tests/fixtures/mysql-catalog.sql`, `mysql-rich.sql`, `perf-mysql.sql` | `CUADB_TEST_MARIADB_URL` |
+| MySQL 8.4 | same files | `CUADB_TEST_MYSQL_URL` |
+| SQLite | generated per test under `target/tmp`; committed file `tests/fixtures/sqlite-data/` | none |
+
+Do **not** set `CUADB_TEST_POSTGRES_URL` to a trust-authenticated server: that test expects a wrong password to be rejected. `CUADB_TEST_CATALOG_DENIED_URL` needs a reader that lacks privileges on some objects.
+
+Example (local containers, passwordless loopback readers):
+
+```bash
+export CUADB_TEST_CATALOG_URL='postgresql://cuadb_fixture_reader@127.0.0.1:5432/cuadb_fixture_catalog'
+export CUADB_TEST_ROWS_URL="$CUADB_TEST_CATALOG_URL" CUADB_TEST_CATALOG_POSTGIS_URL="$CUADB_TEST_CATALOG_URL" CUADB_TEST_LOCAL_TRUST_URL="$CUADB_TEST_CATALOG_URL"
+export CUADB_TEST_MARIADB_URL='mariadb://cuadb_reader@127.0.0.1:3306/cuadb_fixture_mariadb'
+export CUADB_TEST_MYSQL_URL='mysql://cuadb_reader@127.0.0.1:3307/cuadb_fixture_mysql'
+```
+
+Cleanup: nothing needs cleanup; the tests never write to databases. Fixture tables are left in place. Temporary SQLite files live in `target/tmp` (removed by `cargo clean`). The 1M-row tables take a few hundred MB; drop them manually as the fixture owner if you no longer need `tests/performance_live.rs`.
+
+## Test map
+`router_fake_adapter` (router with an in-memory adapter), `adapter_contract` (one contract across four engines), `*_live_http` and `rich_live_http` (real routes against live engines), `sqlite_live`, `profiles_http`, `security_negative`, `performance_live`, `export_live`.
+
+## Docker verification
+
+Manual; results and commands are in [docker.md](docker.md).

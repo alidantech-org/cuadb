@@ -693,9 +693,14 @@ impl DatabaseAdapter for MySqlCatalog {
                 return Err(DbError::new(DbErrorKind::Unsupported));
             }
             // NULLs last in both directions, matching the PostgreSQL adapter.
+            // Skipped for NOT NULL columns so an index can serve the sort.
+            let nulls_last = if column.column.nullable {
+                format!("({}) IS NULL, ", quote(&sort.column)?)
+            } else {
+                String::new()
+            };
             let mut order = format!(
-                " ORDER BY ({} IS NULL), {} {}",
-                quote(&sort.column)?,
+                " ORDER BY {nulls_last}{} {}",
                 quote(&sort.column)?,
                 if sort.direction == SortDirection::Asc {
                     "ASC"

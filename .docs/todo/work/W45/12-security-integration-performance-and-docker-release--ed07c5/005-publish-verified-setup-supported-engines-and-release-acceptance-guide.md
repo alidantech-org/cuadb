@@ -17,10 +17,10 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Acceptance checklist
 - [ ] Update README with verified native and Docker workflows for each supported engine.
-- [ ] Document connection URLs, database permissions, TLS and read-only mounts safely.
-- [ ] Add a compatibility matrix and explicit known limitations for metadata and pagination.
-- [ ] Include a release checklist that exercises check, test, build and container smoke flows.
-- [ ] Record how Task groups were completed, validated and handed off without duplicating task records.
+- [x] Document connection URLs, database permissions, TLS and read-only mounts safely.
+- [x] Add a compatibility matrix and explicit known limitations for metadata and pagination.
+- [x] Include a release checklist that exercises check, test, build and container smoke flows.
+- [x] Record how Task groups were completed, validated and handed off without duplicating task records.
 
 ## UI-demo backend support
 
@@ -32,3 +32,9 @@ The real frontend must match the canonical committed `assets/cuadb-ui-demo.html`
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T14:34:19.141Z · PETER IRUNGU
+
+Items 2-5 verified as documentation (docs/release.md, docs/threat-model.md, docs/testing.md, docs/docker.md, README links): permissions, TLS, :ro mounts, compatibility matrix with explicit not-verified list, release checklist, execution record. Item 1 left open: native run verified for PostgreSQL/MariaDB/SQLite and Docker for SQLite/PostgreSQL, but no MySQL/MariaDB container run. Items 6-7: UI baseline statement and deviations - nothing approved yet; PENDING Phase B.

@@ -478,8 +478,14 @@ impl DatabaseAdapter for SqliteCatalog {
                 return Err(DbError::new(DbErrorKind::Unsupported));
             }
             let q = quote(&s.column)?;
+            // NULLs last; skipped for NOT NULL columns so an index can serve the sort.
+            let nulls_last = if column.column.nullable {
+                format!("({q} IS NULL), ")
+            } else {
+                String::new()
+            };
             let mut order = format!(
-                " ORDER BY ({q} IS NULL), {q} {}",
+                " ORDER BY {nulls_last}{q} {}",
                 if s.direction == SortDirection::Asc {
                     "ASC"
                 } else {

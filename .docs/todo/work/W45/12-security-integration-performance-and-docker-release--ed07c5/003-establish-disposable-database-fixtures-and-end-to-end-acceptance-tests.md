@@ -16,11 +16,11 @@ This task belongs to **12 — Security, integration, performance and Docker rele
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Add isolated PostgreSQL/PostGIS, MySQL/MariaDB and SQLite integration fixtures.
-- [ ] Run query and metadata acceptance tests with a restricted read-only user.
-- [ ] Exercise real HTMX routes and verify sanitized HTML output and paging state.
-- [ ] Keep ordinary unit tests runnable offline without Docker or databases.
-- [ ] Document fixture cleanup, local commands and any optional test dependencies.
+- [x] Add isolated PostgreSQL/PostGIS, MySQL/MariaDB and SQLite integration fixtures.
+- [x] Run query and metadata acceptance tests with a restricted read-only user.
+- [x] Exercise real HTMX routes and verify sanitized HTML output and paging state.
+- [x] Keep ordinary unit tests runnable offline without Docker or databases.
+- [x] Document fixture cleanup, local commands and any optional test dependencies.
 
 ## UI-demo backend support
 
@@ -32,3 +32,9 @@ The real frontend must match the canonical committed `assets/cuadb-ui-demo.html`
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T14:34:18.833Z · PETER IRUNGU
+
+Items 1-5 verified (BACKEND). Fixtures: PostgreSQL/PostGIS (catalog, rows, rich_values, spatial_edges, perf_big), MariaDB and MySQL (Mixed_Items, rich_values, perf_big, empty_t, MyISAM), SQLite generated per test. docs/testing.md has commands, env vars, additive/idempotent rules and cleanup. 'cargo test' with no CUADB_TEST_* variables passes 154 tests offline. With fixtures all live suites pass (see commits). Items 6-7 are visual/browser acceptance: PENDING Phase B.

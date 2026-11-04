@@ -31,19 +31,34 @@ impl MySqlManager {
             Engine::MySql
         };
         let options = url::parse(raw)?.into_options();
+        let milliseconds = limits.query_timeout.as_millis() as u64;
         let pool = MySqlPoolOptions::new()
             .max_connections(limits.max_pool_connections)
             .min_connections(0)
             .acquire_timeout(limits.connection_timeout)
             .idle_timeout(Duration::from_secs(120))
             .max_lifetime(Duration::from_secs(1800))
-            .after_connect(|connection, _| {
+            .after_connect(move |connection, _| {
+                let milliseconds = milliseconds;
                 Box::pin(async move {
                     // Server-side privileges remain mandatory; this adds a
                     // read-only default for pooled sessions as defense in depth.
                     sqlx::query("SET SESSION TRANSACTION READ ONLY")
                         .execute(&mut *connection)
                         .await?;
+                    // Ask the server to abort long SELECTs instead of only abandoning them
+                    // client-side. MySQL: max_execution_time (ms); MariaDB: max_statement_time
+                    // (seconds). Each engine rejects the other's variable, which is expected.
+                    let _ =
+                        sqlx::query(&format!("SET SESSION max_execution_time = {milliseconds}"))
+                            .execute(&mut *connection)
+                            .await;
+                    let _ = sqlx::query(&format!(
+                        "SET SESSION max_statement_time = {}",
+                        milliseconds as f64 / 1000.0
+                    ))
+                    .execute(&mut *connection)
+                    .await;
                     Ok(())
                 })
             })
@@ -134,14 +149,33 @@ impl MySqlManager {
 }
 
 pub(crate) fn classify(error: sqlx::Error) -> DbError {
-    let code = error
-        .as_database_error()
-        .and_then(|database| database.code());
-    let kind = match code.as_deref() {
-        Some("1044" | "1045" | "28000") => DbErrorKind::AuthenticationFailed,
-        Some("1142" | "1143" | "1227") => DbErrorKind::PermissionDenied,
-        Some("1205" | "1317") => DbErrorKind::TimedOut,
+    // `database.code()` is the SQLSTATE ("42000", "70100"), which is shared by many
+    // different errors; the driver's numeric error code is the precise discriminator.
+    let database = error.as_database_error();
+    let number = database
+        .and_then(|database| database.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>())
+        .map(|mysql| mysql.number());
+    let sqlstate = database.and_then(|database| database.code());
+    let kind = match (number, sqlstate.as_deref()) {
+        (Some(1044 | 1045), _) | (_, Some("28000")) => DbErrorKind::AuthenticationFailed,
+        (Some(1142 | 1143 | 1227 | 1370), _) => DbErrorKind::PermissionDenied,
+        // 1205 lock wait, 1317 interrupted, 1969 MariaDB max_statement_time,
+        // 3024 MySQL max_execution_time.
+        (Some(1205 | 1317 | 1969 | 3024), _) | (_, Some("70100")) => DbErrorKind::TimedOut,
         _ => DbErrorKind::ConnectionUnavailable,
     };
     DbError::new(kind)
+}
+
+#[cfg(test)]
+mod classify_tests {
+    use super::*;
+
+    #[test]
+    fn non_database_errors_are_unavailable_and_secret_free() {
+        assert_eq!(
+            classify(sqlx::Error::PoolTimedOut).kind,
+            DbErrorKind::ConnectionUnavailable
+        );
+    }
 }

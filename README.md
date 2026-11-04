@@ -74,6 +74,10 @@ Several trusted connections can be served by one CuaDB process. The browser only
 - **Isolation:** each profile has its own adapter and pools (created lazily, closed when idle). The configured `CUADB_MAX_POOL_CONNECTIONS` is divided across profiles (at least one connection each), so many profiles cannot multiply open connections. An offline profile fails alone. Pagination cursors are issued per profile and are rejected on any other profile. The explorer must drop its selected relation, sort and cursor when the profile changes (Phase B UI).
 - **Not covered:** switching is stateless per request, so there is no server-side "current profile"; live reload of the file; profiles that differ only by credentials sharing a pool.
 
+## More documentation
+
+[Threat model](docs/threat-model.md) · [Release checklist and compatibility matrix](docs/release.md) · [Running tests and fixtures](docs/testing.md) · [Docker verification](docs/docker.md) · [Performance](docs/performance.md) · [SQLite](docs/sqlite.md) · [MySQL/MariaDB](docs/mysql-mariadb.md)
+
 ## Canonical frontend UI reference
 
 The committed [CuaDB UI demo](assets/cuadb-ui-demo.html) is the **mandatory visual and interaction reference** for implementation, not a loose example. The final Rust/Askama/HTMX frontend must faithfully reproduce the demo's compact sidebar, resizer, Simple/Advanced explorer, Data/Structure/Indexes switcher, dense grid, row inspector, bottom connection/settings controls, themes and export menus. Compare against the standalone HTML at matching desktop/mobile viewports before completing frontend tasks.
