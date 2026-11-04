@@ -1112,3 +1112,204 @@ async fn non_admins_and_anonymous_visitors_never_get_the_administration_view() {
         );
     }
 }
+
+async fn admin_session(w: &World) -> (String, String) {
+    let login = post(
+        &w.router,
+        "/login",
+        None,
+        None,
+        &format!("login=admin&password={}", PW.replace(' ', "+")),
+    )
+    .await;
+    let cookie = cookie_of(&login);
+    let shell = get(&w.router, "/", Some(&cookie)).await.body;
+    let csrf = shell
+        .split(r#"name="csrf-token" content=""#)
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .unwrap()
+        .to_string();
+    (cookie, csrf)
+}
+
+#[tokio::test]
+async fn roles_change_and_members_are_deleted_with_last_admin_and_self_protection() {
+    let w = world(true).await;
+    let (cookie, csrf) = admin_session(&w).await;
+    let me = w
+        .svc
+        .store
+        .list_users()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|u| u.login == "admin")
+        .unwrap()
+        .id;
+    let other = w
+        .svc
+        .create_user(&w.admin, "casey", "a long enough passphrase!", Role::Viewer)
+        .await
+        .unwrap();
+    // Promote, then check the sidebar of that member really changed (role cap lifts).
+    let r = post(
+        &w.router,
+        "/admin/users/role",
+        Some(&cookie),
+        Some(&csrf),
+        &format!("user_id={other}&role=editor"),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.headers.get("hx-trigger").unwrap(), "cuadb:changed");
+    assert_eq!(
+        w.svc.store.user_by_id(other).await.unwrap().unwrap().role,
+        "editor"
+    );
+    // Not yourself, not the last administrator, not an unknown role.
+    let r = post(
+        &w.router,
+        "/admin/users/role",
+        Some(&cookie),
+        Some(&csrf),
+        &format!("user_id={me}&role=viewer"),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    assert!(r.body.contains("your own role"));
+    let r = post(
+        &w.router,
+        "/admin/users/delete",
+        Some(&cookie),
+        Some(&csrf),
+        &format!("user_id={me}"),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    assert!(r.body.contains("own account"));
+    let r = post(
+        &w.router,
+        "/admin/users/role",
+        Some(&cookie),
+        Some(&csrf),
+        &format!("user_id={other}&role=root"),
+    )
+    .await;
+    assert_ne!(r.status, StatusCode::OK);
+    // A second admin can be demoted again; the last one cannot be demoted or deleted by another admin.
+    w.svc.store.set_user_role(other, "admin").await.unwrap();
+    let r = post(
+        &w.router,
+        "/admin/users/role",
+        Some(&cookie),
+        Some(&csrf),
+        &format!("user_id={other}&role=viewer"),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK);
+    // Grants and sessions go with the member; the audit history stays.
+    w.svc
+        .add_grant(&w.admin, other, "alpha", "", "", 1)
+        .await
+        .unwrap();
+    let s = w
+        .svc
+        .login("casey", "a long enough passphrase!")
+        .await
+        .unwrap();
+    let r = post(
+        &w.router,
+        "/admin/users/delete",
+        Some(&cookie),
+        Some(&csrf),
+        &format!("user_id={other}"),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert!(w.svc.store.user_by_id(other).await.unwrap().is_none());
+    assert!(w.svc.store.grants_for_user(other).await.unwrap().is_empty());
+    assert_eq!(
+        get(
+            &w.router,
+            "/catalog/schemas",
+            Some(&format!("cuadb_session={}", s.token))
+        )
+        .await
+        .status,
+        StatusCode::SEE_OTHER,
+        "their session ended"
+    );
+    let audit = get(&w.router, "/admin/audit", Some(&cookie)).await.body;
+    assert!(
+        audit.contains("user_deleted")
+            && audit.contains("user_role_changed")
+            && audit.contains("casey")
+    );
+}
+
+#[tokio::test]
+async fn the_audit_log_filters_by_user_action_outcome_and_date() {
+    let w = world(true).await;
+    let (cookie, csrf) = admin_session(&w).await;
+    let _ = post(
+        &w.router,
+        "/login",
+        None,
+        None,
+        "login=admin&password=wrong+wrong+wrong+x",
+    )
+    .await;
+    let _ = post(
+        &w.router,
+        "/admin/users",
+        Some(&cookie),
+        Some(&csrf),
+        "login=zed&password=another+long+passphrase&role=viewer",
+    )
+    .await;
+    let all = get(&w.router, "/admin/audit", Some(&cookie)).await.body;
+    assert!(all.contains("<td>login_failed</td>") && all.contains("<td>user_created</td>"));
+    let by_kind = get(&w.router, "/admin/audit?kind=user_created", Some(&cookie))
+        .await
+        .body;
+    assert!(
+        by_kind.contains("<td>user_created</td>") && !by_kind.contains("<td>login_failed</td>")
+    );
+    assert!(
+        by_kind.contains(r#"<option value="user_created" selected>"#),
+        "filter state is kept"
+    );
+    let by_outcome = get(&w.router, "/admin/audit?outcome=failed", Some(&cookie))
+        .await
+        .body;
+    assert!(
+        !by_outcome.contains("<td>user_created</td>")
+            && by_outcome.contains("<td>login_failed</td>")
+    );
+    let by_actor = get(&w.router, "/admin/audit?actor=nobody", Some(&cookie))
+        .await
+        .body;
+    assert!(by_actor.contains("No events match."));
+    let past = get(&w.router, "/admin/audit?until=2001-01-01", Some(&cookie))
+        .await
+        .body;
+    assert!(past.contains("No events match."));
+    let future = get(
+        &w.router,
+        "/admin/audit?since=2001-01-01&until=2999-12-31",
+        Some(&cookie),
+    )
+    .await
+    .body;
+    assert!(future.contains("<td>user_created</td>"));
+    // Unknown kinds and malformed dates are ignored rather than echoed or executed.
+    let junk = get(
+        &w.router,
+        "/admin/audit?kind=%27%3Bdrop&since=nope",
+        Some(&cookie),
+    )
+    .await
+    .body;
+    assert!(junk.contains("<td>user_created</td>") && !junk.contains("drop"));
+}

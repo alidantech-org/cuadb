@@ -311,7 +311,7 @@ async fn single_url_configuration_still_works_as_the_default_profile() {
     let state = AppState::from_config(&config).unwrap();
     let router = router_with_state(&config.limits, state.clone());
     assert_eq!(state.profiles().len(), 1);
-    assert_eq!(state.default_profile_id(), Some("default"));
+    assert_eq!(state.default_profile_id(), Some("default".to_string()));
     let (_, plain) = get(&router, "/catalog/relations?schema=main").await;
     let (_, named) = get(&router, "/catalog/relations?schema=main&profile=default").await;
     assert!(plain.contains("alpha_items") && named.contains("alpha_items"));

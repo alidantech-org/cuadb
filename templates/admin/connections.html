@@ -1,0 +1,28 @@
+<div class="adm" data-tab="connections" data-src="/admin/connections">
+  <div class="adm-head"><h4>Connections</h4>
+    {% if can_manage && key_set %}<button class="btn on" type="button" hx-get="/admin/connections/form" hx-target="#modal" hx-swap="innerHTML">+ New connection</button>{% endif %}
+  </div>
+  <div id="adm-msg" class="adm-msg" role="status" aria-live="polite"></div>
+  {% if !key_set %}<p class="hint">Saving connections needs an encryption key. Run <code>openssl rand -hex 32</code> and set it as <code>CUADB_SECRET_KEY</code> on the server, then restart CuaDB. Connections defined in the server configuration are listed below.</p>{% endif %}
+  <table class="w">
+    <thead><tr><th>Name</th><th>Engine</th><th>Defined in</th><th></th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="who"><b>{{ row.label }}</b><small>{{ row.id }}{% if row.is_default %} · default{% endif %}</small></td>
+        <td>{{ row.engine }}</td>
+        <td>{% if row.managed %}<span class="tag">saved here</span>{% else %}<span class="tag ro">server configuration</span>{% endif %}</td>
+        <td class="acts">
+          <button class="btn" type="button" hx-get="/connection/status?profile={{ row.id }}" hx-target="#adm-msg" hx-swap="innerHTML">Check</button>
+          {% if row.managed %}
+          <button class="btn" type="button" hx-get="/admin/connections/form?id={{ row.id }}" hx-target="#modal" hx-swap="innerHTML">Edit</button>
+          <button class="btn dg" type="button" hx-confirm="Remove {{ row.label }} and every permission that names it?" hx-post="/admin/connections/delete" hx-vals='{"id": "{{ row.id }}"}' hx-target="#adm-msg" hx-swap="innerHTML">Remove</button>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if rows.is_empty() %}<tr><td colspan="4" class="empty-row">No connection is configured.</td></tr>{% endif %}
+    </tbody>
+  </table>
+  <p class="hint">Passwords are encrypted before they are stored and are never shown again. Removing a connection also removes the permissions that name it.</p>
+</div>

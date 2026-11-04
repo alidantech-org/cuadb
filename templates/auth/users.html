@@ -14,13 +14,14 @@
       {% for user in users %}
       <tr>
         <td class="who"><b>{{ user.login }}</b>{% if user.id == me %}<small>you</small>{% endif %}</td>
-        <td>{{ user.role }}</td>
+        <td>{% if user.id == me %}{{ user.role }}{% else %}<select class="inp inp-sm" aria-label="Role of {{ user.login }}" hx-post="/admin/users/role" hx-vals='{"user_id": {{ user.id }}}' name="role" hx-target="#adm-msg" hx-swap="innerHTML"><option value="viewer" {% if user.role == "viewer" %}selected{% endif %}>viewer</option><option value="editor" {% if user.role == "editor" %}selected{% endif %}>editor</option><option value="admin" {% if user.role == "admin" %}selected{% endif %}>admin</option></select>{% endif %}</td>
         <td><span class="tag {% if user.status == "active" %}ro{% endif %}">{{ user.status }}</span></td>
         <td class="acts">
           <button class="btn" type="button" hx-get="/admin/grants?user={{ user.id }}" hx-target="#admin-body" hx-swap="innerHTML">Permissions</button>
           {% if user.id != me %}
           <button class="btn" type="button" hx-post="/admin/users/status" hx-vals='{"user_id": {{ user.id }}, "active": {% if user.status == "active" %}false{% else %}true{% endif %}}' hx-target="#adm-msg" hx-swap="innerHTML">{% if user.status == "active" %}Disable{% else %}Enable{% endif %}</button>
           <button class="btn" type="button" data-adm-toggle="adm-pw-{{ user.id }}">Reset password</button>
+          <button class="btn dg" type="button" hx-post="/admin/users/delete" hx-vals='{"user_id": {{ user.id }}}' hx-confirm="Delete {{ user.login }} and all of their permissions?" hx-target="#adm-msg" hx-swap="innerHTML">Delete</button>
           {% endif %}
         </td>
       </tr>
@@ -36,5 +37,5 @@
       {% endfor %}
     </tbody>
   </table>
-  <p class="hint">Changing a role or deleting a member is not available yet.</p>
+  <p class="hint">Roles cap what grants can allow. The last active administrator cannot be demoted, disabled or deleted.</p>
 </div>

@@ -356,6 +356,26 @@ impl TxRegistry {
         }
         count
     }
+
+    /// Roll back every transaction that was working on one connection (it is being removed).
+    pub async fn rollback_profile(&self, profile: &str) -> usize {
+        let doomed: Vec<TxEntry> = {
+            let mut map = self.inner.lock().await;
+            let ids: Vec<String> = map
+                .iter()
+                .filter(|(_, e)| e.profile == profile)
+                .map(|(id, _)| id.clone())
+                .collect();
+            ids.into_iter().filter_map(|id| map.remove(&id)).collect()
+        };
+        let count = doomed.len();
+        for mut entry in doomed {
+            if let Some(tx) = entry.tx.take() {
+                let _ = tx.rollback().await;
+            }
+        }
+        count
+    }
 }
 
 #[cfg(test)]

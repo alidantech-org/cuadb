@@ -70,6 +70,8 @@ fn api_routes() -> Router<crate::state::AppState> {
             get(web::auth::admin_users).post(web::auth::admin_create_user),
         )
         .route("/admin/users/status", post(web::auth::admin_user_status))
+        .route("/admin/users/role", post(web::auth::admin_user_role))
+        .route("/admin/users/delete", post(web::auth::admin_user_delete))
         .route(
             "/admin/users/password",
             post(web::auth::admin_user_password),
@@ -81,6 +83,14 @@ fn api_routes() -> Router<crate::state::AppState> {
         .route("/admin/grants/remove", post(web::auth::admin_grant_remove))
         .route("/admin/audit", get(web::auth::admin_audit))
         .route("/admin", get(web::auth::admin_view))
+        .route(
+            "/admin/connections",
+            get(web::connections::list).post(web::connections::create),
+        )
+        .route("/admin/connections/form", get(web::connections::form))
+        .route("/admin/connections/update", post(web::connections::update))
+        .route("/admin/connections/delete", post(web::connections::delete))
+        .route("/admin/connections/test", post(web::connections::test))
         .route("/admin/security", get(web::auth::admin_security))
         .route("/sql", get(web::sql::workspace_page))
         .route("/connection/profiles", get(web::connection_profiles))

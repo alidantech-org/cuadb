@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod catalog;
+pub mod connections;
 pub mod export;
 pub mod rows;
 pub mod sql;

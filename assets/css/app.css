@@ -1781,3 +1781,31 @@ td.acts .btn {
 #sql-tx:empty {
   display: none;
 }
+
+[data-engine='sqlite'] .eng-pg {
+  display: none;
+}
+[data-engine='postgresql'] .eng-sqlite {
+  display: none;
+}
+.fl-port {
+  max-width: 96px;
+}
+.chk-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0 8px;
+  color: var(--mu);
+}
+.notice.info {
+  color: var(--tx);
+}
+#modal .mc form {
+  margin: 0;
+}
+
+.adm-filter{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin:0 0 8px}
+.adm-filter label{display:flex;flex-direction:column;gap:2px;color:var(--mu);font-size:11px}
+.adm-filter .inp{height:26px;min-width:110px}
+.inp-sm{height:24px;padding:0 4px}

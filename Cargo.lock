@@ -324,6 +324,7 @@ dependencies = [
  "async-trait",
  "axum",
  "getrandom 0.3.4",
+ "ring",
  "serde",
  "serde_json",
  "sha2",

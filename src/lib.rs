@@ -5,9 +5,11 @@
 pub mod app;
 pub mod auth;
 pub mod config;
+pub mod connections;
 pub mod db;
 pub mod error;
 pub mod profiles;
+pub mod secrets;
 pub mod sql;
 pub mod state;
 pub mod web;

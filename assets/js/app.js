@@ -172,6 +172,22 @@ function setDrawer(/** @type {boolean} */ open) {
   document.getElementById('menu')?.setAttribute('aria-expanded', String(open));
 }
 
+/* ------------------------------------------------------------ modal */
+function openModal() {
+  const modal = document.getElementById('modal');
+  if (!modal) return;
+  modal.classList.add('show');
+  /** @type {HTMLElement | null} */ (
+    modal.querySelector('input:not([type=hidden]),select,textarea')
+  )?.focus();
+}
+function closeModal() {
+  const modal = document.getElementById('modal');
+  if (!modal) return;
+  modal.classList.remove('show');
+  modal.replaceChildren();
+}
+
 /* ------------------------------------------------------------ popovers */
 const POPS = ['cpop', 'spop', 'colpop', 'exppop'];
 function closePops(/** @type {string} */ except = '') {
@@ -339,6 +355,10 @@ document.addEventListener('click', (event) => {
   const inPop = target.closest('.pop');
   if (!inPop && !target.closest('[data-pop],#cbtn,#sbtn')) closePops();
 
+  if (target.closest('[data-modal-close]') || target.id === 'modal') {
+    closeModal();
+    return;
+  }
   if (target.closest('[data-toggle-sidebar]')) {
     setDrawer(!(document.getElementById('side')?.classList.contains('show') ?? false));
     return;
@@ -493,6 +513,11 @@ document.addEventListener('dblclick', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  const field = event.target;
+  if (field instanceof HTMLSelectElement && field.matches('[data-engine-select]')) {
+    field.closest('form')?.setAttribute('data-engine', field.value);
+    return;
+  }
   const el = event.target;
   if (!(el instanceof HTMLInputElement)) return;
   if (el.dataset.tg) {
@@ -532,6 +557,7 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   if (event.key === 'Escape') {
+    closeModal();
     closePops();
     setDrawer(false);
     closeInspector();
@@ -590,6 +616,7 @@ document.addEventListener('htmx:afterSwap', (event) => {
     formatTimes(target);
     syncAdminTabs();
   }
+  if (target.id === 'modal') openModal();
   if (target.id === 'sql-tx') {
     const open = target.querySelector('[data-tx]');
     win.cuadbTx = open instanceof HTMLElement ? (open.dataset.tx ?? '') : '';
@@ -615,7 +642,11 @@ document.addEventListener('htmx:beforeRequest', (event) => {
 });
 // A successful admin change: say so, then refresh the list it altered.
 document.addEventListener('cuadb:changed', () => {
-  const message = document.querySelector('#adm-msg')?.textContent?.trim();
+  const inModal = document.getElementById('modal')?.classList.contains('show');
+  const message = (
+    inModal ? document.querySelector('#modal-msg') : document.querySelector('#adm-msg')
+  )?.textContent?.trim();
+  if (inModal) closeModal();
   if (message) toast(message);
   const src = document.querySelector('#admin-body [data-src]')?.getAttribute('data-src');
   if (src) fetchInto(src, '#admin-body', 'innerHTML');

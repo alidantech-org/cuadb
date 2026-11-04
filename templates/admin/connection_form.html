@@ -1,0 +1,38 @@
+<div class="mc" role="document">
+  <form id="conn-form" hx-post="{% if editing %}/admin/connections/update{% else %}/admin/connections{% endif %}" hx-target="#modal-msg" hx-swap="innerHTML" autocomplete="off" data-engine="{{ fields.engine }}">
+    <h3 id="modal-title">{% if editing %}Edit connection{% else %}New connection{% endif %}</h3>
+    <div class="mb">
+      {% if editing %}<input type="hidden" name="id" value="{{ id }}">{% endif %}
+      <label class="fl"><span>Name</span><input class="inp" name="label" value="{{ label }}" required maxlength="48" autocomplete="off"></label>
+      <label class="fl"><span>Engine</span>
+        <select class="inp" name="engine" data-engine-select>
+          <option value="postgresql" {% if fields.engine == "postgresql" %}selected{% endif %}>PostgreSQL</option>
+          <option value="sqlite" {% if fields.engine == "sqlite" %}selected{% endif %}>SQLite</option>
+          <option value="" disabled>MySQL / MariaDB (later)</option>
+        </select></label>
+      <div class="eng-pg">
+        <div class="adm-row"><label class="fl"><span>Host</span><input class="inp" name="host" value="{{ fields.host }}" maxlength="253" placeholder="db.internal"></label>
+        <label class="fl fl-port"><span>Port</span><input class="inp" name="port" value="{{ fields.port }}" inputmode="numeric" maxlength="5"></label></div>
+        <div class="adm-row"><label class="fl"><span>User</span><input class="inp" name="user" value="{{ fields.user }}" maxlength="64" autocomplete="off"></label>
+        <label class="fl"><span>Password</span><input class="inp" name="password" type="password" maxlength="256" autocomplete="new-password" placeholder="{% if editing %}Leave blank to keep the saved password{% else %}Password{% endif %}"></label></div>
+        <div class="adm-row"><label class="fl"><span>Database</span><input class="inp" name="database" value="{{ fields.database }}" maxlength="63"></label>
+        <label class="fl"><span>TLS</span><select class="inp" name="tls">
+          <option value="verify-full" {% if fields.tls == "verify-full" || fields.tls.is_empty() %}selected{% endif %}>Verify certificate (recommended)</option>
+          <option value="require" {% if fields.tls == "require" %}selected{% endif %}>Encrypt only</option>
+          <option value="disable" {% if fields.tls == "disable" %}selected{% endif %}>Off (local only)</option>
+        </select></label></div>
+      </div>
+      <div class="eng-sqlite">
+        <label class="fl"><span>File (inside the SQLite folder)</span><input class="inp" name="file" value="{{ fields.file }}" maxlength="255" placeholder="shop.db"></label>
+      </div>
+      <label class="chk-row"><input type="checkbox" name="writable" {% if writable %}checked{% endif %}> Allow changes (SQL workspace and row editing, with the right permissions)</label>
+      <p class="hint">Saved on the server and encrypted. The browser never receives the password.</p>
+      <div id="modal-msg" class="adm-msg" role="status" aria-live="polite"></div>
+    </div>
+    <div class="mf">
+      <button class="btn" type="button" data-modal-close>Cancel</button>
+      <button class="btn" type="button" hx-post="/admin/connections/test" hx-include="#conn-form" hx-target="#modal-msg" hx-swap="innerHTML">Test connection</button>
+      <button class="btn on" type="submit">{% if editing %}Save changes{% else %}Save connection{% endif %}</button>
+    </div>
+  </form>
+</div>

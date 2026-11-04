@@ -4,6 +4,7 @@
     <span class="sp"></span>
     <nav class="seg" id="adm-seg" aria-label="Administration sections">
       <button type="button" data-tab="members" hx-get="/admin/users" hx-target="#admin-body" hx-swap="innerHTML">Members</button>
+      <button type="button" data-tab="connections" hx-get="/admin/connections" hx-target="#admin-body" hx-swap="innerHTML">Connections</button>
       <button type="button" data-tab="permissions" hx-get="/admin/grants?user=0" hx-target="#admin-body" hx-swap="innerHTML">Permissions</button>
       <button type="button" data-tab="audit" hx-get="/admin/audit" hx-target="#admin-body" hx-swap="innerHTML">Audit log</button>
       <button type="button" data-tab="security" hx-get="/admin/security" hx-target="#admin-body" hx-swap="innerHTML">Security</button>

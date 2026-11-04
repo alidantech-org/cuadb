@@ -652,6 +652,14 @@ pub async fn admin_grant_remove(
 struct AuditTemplate {
     events: Vec<StoredEvent>,
     next_before: Option<i64>,
+    kinds: &'static [&'static str],
+    actor: String,
+    kind: String,
+    outcome: String,
+    since: String,
+    until: String,
+    /// Query string that repeats the filters for the "Older events" link.
+    filter_query: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -659,6 +667,40 @@ struct AuditTemplate {
 pub struct AuditQuery {
     limit: Option<i64>,
     before: Option<i64>,
+    #[serde(default)]
+    actor: String,
+    #[serde(default)]
+    kind: String,
+    #[serde(default)]
+    outcome: String,
+    #[serde(default)]
+    since: String,
+    #[serde(default)]
+    until: String,
+}
+
+/// `YYYY-MM-DD` (UTC midnight) to Unix seconds; `None` for anything else.
+fn day_start(text: &str) -> Option<i64> {
+    let mut parts = text.split('-');
+    let (y, m, d): (i64, i64, i64) = (
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    );
+    if parts.next().is_some()
+        || !(1970..=2200).contains(&y)
+        || !(1..=12).contains(&m)
+        || !(1..=31).contains(&d)
+    {
+        return None;
+    }
+    // Days from civil (Howard Hinnant's algorithm).
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    Some((era * 146_097 + doe - 719_468) * 86_400)
 }
 
 pub async fn admin_audit(
@@ -668,16 +710,63 @@ pub async fn admin_audit(
 ) -> Result<Response, AppError> {
     auth.require_admin(&state, "/admin/audit").await?;
     let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let pick =
+        |value: &str| (!value.is_empty()).then(|| value.chars().take(64).collect::<String>());
+    // Only the closed vocabulary is accepted as a kind or outcome.
+    let kind = pick(&query.kind).filter(|k| audit::KINDS.contains(&k.as_str()));
+    let outcome = pick(&query.outcome)
+        .filter(|o| [audit::OK, audit::DENIED, audit::FAILED].contains(&o.as_str()));
+    let since = day_start(&query.since);
+    // `until` is inclusive of the whole day.
+    let until = day_start(&query.until).map(|t| t + 86_400);
+    let filter = crate::auth::store::AuditFilter {
+        actor: pick(&query.actor),
+        kind: kind.clone(),
+        outcome: outcome.clone(),
+        since,
+        until,
+    };
     let events = service(&state)?
-        .audit_events(limit, query.before)
+        .audit_events_filtered(&filter, limit, query.before)
         .await
         .map_err(map_auth_error)?;
     let next_before = (events.len() as i64 == limit)
         .then(|| events.last().map(|e| e.id))
         .flatten();
+    let mut repeat = url::form_urlencoded::Serializer::new(String::new());
+    if let Some(a) = &filter.actor {
+        repeat.append_pair("actor", a);
+    }
+    if let Some(k) = &kind {
+        repeat.append_pair("kind", k);
+    }
+    if let Some(o) = &outcome {
+        repeat.append_pair("outcome", o);
+    }
+    if since.is_some() {
+        repeat.append_pair("since", &query.since);
+    }
+    if until.is_some() {
+        repeat.append_pair("until", &query.until);
+    }
     render(AuditTemplate {
         events,
         next_before,
+        kinds: audit::KINDS,
+        actor: filter.actor.clone().unwrap_or_default(),
+        kind: kind.unwrap_or_default(),
+        outcome: outcome.unwrap_or_default(),
+        since: if since.is_some() {
+            query.since.clone()
+        } else {
+            String::new()
+        },
+        until: if until.is_some() {
+            query.until.clone()
+        } else {
+            String::new()
+        },
+        filter_query: repeat.finish(),
     })
 }
 
@@ -721,4 +810,56 @@ pub async fn admin_security(
         sql_workspace: state.sql_settings().enabled,
         profiles: state.profiles().len(),
     })
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UserRoleForm {
+    user_id: i64,
+    role: String,
+    #[serde(default)]
+    csrf: String,
+}
+
+/// POST /admin/users/role
+pub async fn admin_user_role(
+    State(state): State<AppState>,
+    auth: Auth,
+    Form(form): Form<UserRoleForm>,
+) -> Result<Response, AppError> {
+    auth.require_admin(&state, "/admin/users/role").await?;
+    let _ = &form.csrf;
+    let role = Role::parse(&form.role).map_err(map_auth_error)?;
+    match service(&state)?
+        .set_user_role(&auth.0, form.user_id, role)
+        .await
+    {
+        Ok(()) => notice("ok", "Role updated."),
+        Err(error) => refused(error),
+    }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UserDeleteForm {
+    user_id: i64,
+    #[serde(default)]
+    csrf: String,
+}
+
+/// POST /admin/users/delete
+pub async fn admin_user_delete(
+    State(state): State<AppState>,
+    auth: Auth,
+    Form(form): Form<UserDeleteForm>,
+) -> Result<Response, AppError> {
+    auth.require_admin(&state, "/admin/users/delete").await?;
+    let _ = &form.csrf;
+    match service(&state)?.delete_user(&auth.0, form.user_id).await {
+        Ok(()) => {
+            state.txs().rollback_user(form.user_id).await;
+            notice("ok", "Member deleted.")
+        }
+        Err(error) => refused(error),
+    }
 }

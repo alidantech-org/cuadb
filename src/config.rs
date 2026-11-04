@@ -75,6 +75,8 @@ pub struct Config {
     pub tx_timeout_seconds: u64,
     /// Access of the single `CUADB_DATABASE_URL` profile (`read-write` adds a writer pool).
     pub database_writable: bool,
+    /// Key for saved connection passwords (`CUADB_SECRET_KEY`, 64 hex characters).
+    pub secret_key: Option<crate::secrets::SecretKey>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -344,6 +346,14 @@ impl Config {
             }
         };
 
+        let secret_key = match read("CUADB_SECRET_KEY")? {
+            None => None,
+            Some(text) if text.trim().is_empty() => None,
+            Some(text) => Some(crate::secrets::SecretKey::parse_hex(&text).ok_or(
+                ConfigError::invalid("CUADB_SECRET_KEY", "must be 64 hexadecimal characters"),
+            )?),
+        };
+
         Ok(Self {
             host,
             port,
@@ -369,6 +379,7 @@ impl Config {
             sql_max_rows,
             tx_timeout_seconds,
             database_writable,
+            secret_key,
         })
     }
 }

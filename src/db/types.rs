@@ -337,6 +337,14 @@ pub struct ConnectionSnapshot {
 }
 
 impl ConnectionSnapshot {
+    pub const fn unavailable() -> Self {
+        Self {
+            engine: Engine::PostgreSql,
+            status: ConnectionStatus::Unavailable,
+            error_code: None,
+        }
+    }
+
     pub const fn disconnected() -> Self {
         Self {
             engine: Engine::PostgreSql,

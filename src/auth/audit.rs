@@ -21,7 +21,36 @@ pub mod kind {
     pub const TX_BEGIN: &str = "tx_begin";
     pub const TX_COMMIT: &str = "tx_commit";
     pub const TX_ROLLBACK: &str = "tx_rollback";
+    pub const CONNECTION_CHANGED: &str = "connection_changed";
+    pub const USER_ROLE: &str = "user_role_changed";
+    pub const USER_DELETED: &str = "user_deleted";
 }
+
+/// Every kind, for the audit filter.
+pub const KINDS: &[&str] = &[
+    kind::LOGIN_OK,
+    kind::LOGIN_FAILED,
+    kind::LOGIN_LOCKED,
+    kind::LOGOUT,
+    kind::SESSION_REVOKED,
+    kind::USER_CREATED,
+    kind::USER_STATUS,
+    kind::USER_ROLE,
+    kind::USER_DELETED,
+    kind::PASSWORD_CHANGED,
+    kind::GRANT_ADDED,
+    kind::GRANT_REMOVED,
+    kind::CONNECTION_CHANGED,
+    kind::PROFILE_ACCESS,
+    kind::EXPORT,
+    kind::ACCESS_DENIED,
+    kind::BOOTSTRAP,
+    kind::SQL_EXECUTE,
+    kind::DATA_CHANGE,
+    kind::TX_BEGIN,
+    kind::TX_COMMIT,
+    kind::TX_ROLLBACK,
+];
 
 pub const OK: &str = "ok";
 pub const DENIED: &str = "denied";

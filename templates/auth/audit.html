@@ -1,11 +1,19 @@
-<div class="adm" data-tab="audit" data-src="/admin/audit">
+<div class="adm" data-tab="audit" data-src="/admin/audit?{{ filter_query }}">
   <div class="adm-head"><h4>Audit log</h4><span class="hint">Newest first. Values are never recorded.</span></div>
+  <form class="adm-filter" hx-get="/admin/audit" hx-target="#admin-body" hx-swap="innerHTML" hx-trigger="submit, change">
+    <label>User <input class="inp" name="actor" value="{{ actor }}" maxlength="64" placeholder="any"></label>
+    <label>Action <select class="inp" name="kind"><option value="">any</option>{% for k in kinds %}<option value="{{ k }}" {% if kind == *k %}selected{% endif %}>{{ k }}</option>{% endfor %}</select></label>
+    <label>Outcome <select class="inp" name="outcome"><option value="">any</option><option value="ok" {% if outcome == "ok" %}selected{% endif %}>ok</option><option value="denied" {% if outcome == "denied" %}selected{% endif %}>denied</option><option value="failed" {% if outcome == "failed" %}selected{% endif %}>failed</option></select></label>
+    <label>From <input class="inp" type="date" name="since" value="{{ since }}"></label>
+    <label>To <input class="inp" type="date" name="until" value="{{ until }}"></label>
+    <button class="btn" type="submit">Filter</button>
+  </form>
   <table class="w">
     <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Connection</th><th>Outcome</th></tr></thead>
     <tbody>
       {% for event in events %}<tr><td><time data-ts="{{ event.ts }}">{{ event.ts }}</time></td><td>{{ event.actor }}</td><td>{{ event.kind }}</td><td>{{ event.resource }}{% if !event.detail.is_empty() %}<small class="mu"> · {{ event.detail }}</small>{% endif %}</td><td>{{ event.profile }}</td><td><span class="tag {% if event.outcome == "ok" %}ro{% endif %}">{{ event.outcome }}</span></td></tr>{% endfor %}
-      {% if events.is_empty() %}<tr><td colspan="6" class="empty-row">No events yet.</td></tr>{% endif %}
+      {% if events.is_empty() %}<tr><td colspan="6" class="empty-row">No events match.</td></tr>{% endif %}
     </tbody>
   </table>
-  {% if let Some(next) = next_before %}<p><button class="btn" type="button" hx-get="/admin/audit?before={{ next }}" hx-target="#admin-body" hx-swap="innerHTML">Older events</button></p>{% endif %}
+  {% if let Some(next) = next_before %}<p><button class="btn" type="button" hx-get="/admin/audit?before={{ next }}&amp;{{ filter_query }}" hx-target="#admin-body" hx-swap="innerHTML">Older events</button></p>{% endif %}
 </div>

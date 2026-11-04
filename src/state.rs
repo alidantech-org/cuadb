@@ -1,6 +1,6 @@
 //! Shared server-owned state. No mutable global connection registry.
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use crate::{
     config::{Config, Limits},
@@ -79,7 +79,10 @@ impl Runtime {
     }
 }
 
+#[derive(Clone)]
 struct Entry {
+    /// Saved from the Administration screen (editable); file-defined ones are read-only.
+    managed: bool,
     id: String,
     label: String,
     runtime: Option<Runtime>,
@@ -90,6 +93,8 @@ struct Entry {
 /// Non-secret facts about a configured profile, safe for templates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileInfo {
+    /// Saved from the Administration screen (can be edited or removed there).
+    pub managed: bool,
     pub id: String,
     pub label: String,
     pub engine: &'static str,
@@ -109,12 +114,46 @@ pub enum Lookup {
 /// manager and closed when idle; the browser selects only by profile id.
 #[derive(Clone)]
 pub struct AppState {
-    entries: Arc<Vec<Entry>>,
+    entries: Arc<RwLock<Vec<Entry>>>,
     default: usize,
+    /// How to build connections at runtime; absent in test states.
+    ctx: Option<Arc<BuildCtx>>,
+    /// Seals saved connection secrets; absent when no `CUADB_SECRET_KEY` is configured.
+    vault: Option<crate::secrets::SecretBox>,
     auth: Option<crate::auth::AuthService>,
     sql: SqlSettings,
     cancels: crate::sql::exec::CancelRegistry,
     txs: crate::sql::exec::TxRegistry,
+}
+
+#[derive(Clone)]
+struct BuildCtx {
+    limits: Limits,
+    sqlite_root: std::path::PathBuf,
+    sql_enabled: bool,
+}
+
+/// Most connections that may exist at once (file-defined plus saved).
+pub const MAX_CONNECTIONS: usize = 16;
+
+/// Why a runtime connection change was refused. Never carries a URL or driver text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ManageError {
+    /// This state cannot build connections (tests) or the id is not a saved connection.
+    Unavailable,
+    Exists,
+    Unknown,
+    TooMany,
+    /// The address, path or options were rejected by the engine's URL validator.
+    Invalid,
+}
+
+/// A saved connection ready to register. The URL is plaintext only inside this call.
+pub struct ManagedInput {
+    pub id: String,
+    pub label: String,
+    pub url: String,
+    pub writable: bool,
 }
 
 /// Operator settings for the SQL workspace; everything is off unless enabled.
@@ -200,7 +239,23 @@ impl AppState {
                 .map(|url| ProfileSet::single(url, config.database_writable))
         };
         let Some(set) = set else {
-            return Ok(Self::disconnected());
+            let mut state = Self::disconnected();
+            state.ctx = Some(Arc::new(BuildCtx {
+                limits: config.limits.clone(),
+                sqlite_root: config.sqlite_root.clone(),
+                sql_enabled: config.sql_workspace,
+            }));
+            state.sql = SqlSettings {
+                enabled: config.sql_workspace,
+                max_rows: config.sql_max_rows,
+                query_timeout: config.limits.query_timeout,
+                tx_ttl: std::time::Duration::from_secs(config.tx_timeout_seconds),
+            };
+            state.vault = config
+                .secret_key
+                .as_ref()
+                .map(crate::secrets::SecretBox::new);
+            return Ok(state);
         };
         // Divide the pool budget so many profiles cannot multiply open connections.
         let mut limits = config.limits.clone();
@@ -215,6 +270,7 @@ impl AppState {
                 None
             };
             entries.push(Entry {
+                managed: false,
                 id: profile.id.clone(),
                 label: profile.label.clone(),
                 catalog: runtime.catalog(),
@@ -223,8 +279,17 @@ impl AppState {
             });
         }
         Ok(Self {
-            entries: Arc::new(entries),
+            entries: Arc::new(RwLock::new(entries)),
             default: set.default,
+            ctx: Some(Arc::new(BuildCtx {
+                limits: config.limits.clone(),
+                sqlite_root: config.sqlite_root.clone(),
+                sql_enabled: config.sql_workspace,
+            })),
+            vault: config
+                .secret_key
+                .as_ref()
+                .map(crate::secrets::SecretBox::new),
             auth: None,
             sql: SqlSettings {
                 enabled: config.sql_workspace,
@@ -239,8 +304,10 @@ impl AppState {
 
     pub fn disconnected() -> Self {
         Self {
-            entries: Arc::new(Vec::new()),
+            entries: Arc::new(RwLock::new(Vec::new())),
+            ctx: None,
             default: 0,
+            vault: None,
             auth: None,
             sql: SqlSettings::default(),
             cancels: Default::default(),
@@ -252,14 +319,17 @@ impl AppState {
     /// It reports no connection runtime, so it never opens a database.
     pub fn with_adapter(adapter: Arc<dyn DatabaseAdapter>) -> Self {
         Self {
-            entries: Arc::new(vec![Entry {
+            ctx: None,
+            entries: Arc::new(RwLock::new(vec![Entry {
+                managed: false,
                 id: crate::profiles::DEFAULT_PROFILE_ID.into(),
                 label: "Default connection".into(),
                 runtime: None,
                 catalog: adapter,
                 workspace: None,
-            }]),
+            }])),
             default: 0,
+            vault: None,
             auth: None,
             sql: SqlSettings::default(),
             cancels: Default::default(),
@@ -270,10 +340,12 @@ impl AppState {
     /// Several fake adapters keyed by profile id, for isolated tests.
     pub fn with_adapters(adapters: Vec<(&str, &str, Arc<dyn DatabaseAdapter>)>) -> Self {
         Self {
-            entries: Arc::new(
+            ctx: None,
+            entries: Arc::new(RwLock::new(
                 adapters
                     .into_iter()
                     .map(|(id, label, catalog)| Entry {
+                        managed: false,
                         id: id.into(),
                         label: label.into(),
                         runtime: None,
@@ -281,8 +353,9 @@ impl AppState {
                         workspace: None,
                     })
                     .collect(),
-            ),
+            )),
             default: 0,
+            vault: None,
             auth: None,
             sql: SqlSettings::default(),
             cancels: Default::default(),
@@ -331,26 +404,13 @@ impl AppState {
 
     /// Test helper: attach a workspace to an existing profile id.
     pub fn with_workspace(
-        mut self,
+        self,
         profile: &str,
         workspace: Arc<dyn crate::sql::exec::Workspace>,
     ) -> Self {
-        let mut entries = Arc::try_unwrap(self.entries).unwrap_or_else(|shared| {
-            shared
-                .iter()
-                .map(|e| Entry {
-                    id: e.id.clone(),
-                    label: e.label.clone(),
-                    runtime: e.runtime.clone(),
-                    catalog: e.catalog.clone(),
-                    workspace: e.workspace.clone(),
-                })
-                .collect()
-        });
-        if let Some(entry) = entries.iter_mut().find(|e| e.id == profile) {
+        if let Some(entry) = self.write().iter_mut().find(|e| e.id == profile) {
             entry.workspace = Some(workspace);
         }
-        self.entries = Arc::new(entries);
         self
     }
 
@@ -395,25 +455,84 @@ impl AppState {
                     .into(),
             ));
         }
-        Ok(self.with_auth(service))
+        let state = self.with_auth(service);
+        state.load_saved_connections().await?;
+        Ok(state)
+    }
+
+    /// Register the connections saved from the Administration screen. Refuses to start
+    /// when they exist but cannot be opened, rather than silently dropping them.
+    async fn load_saved_connections(&self) -> Result<(), StateError> {
+        let Some(auth) = self.auth() else {
+            return Ok(());
+        };
+        let rows = auth
+            .store
+            .list_connections()
+            .await
+            .map_err(|_| StateError::Profiles("saved connections cannot be read".into()))?;
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let Some(vault) = self.vault() else {
+            return Err(StateError::Profiles(
+                "saved connections exist but CUADB_SECRET_KEY is not set".into(),
+            ));
+        };
+        for row in rows {
+            let url = vault
+                .open(&row.id, &row.url_enc)
+                .and_then(|bytes| String::from_utf8(bytes).ok())
+                .ok_or_else(|| {
+                    StateError::Profiles(
+                        "a saved connection cannot be decrypted; check CUADB_SECRET_KEY".into(),
+                    )
+                })?;
+            self.add_managed(&ManagedInput {
+                id: row.id,
+                label: row.label,
+                url,
+                writable: row.writable,
+            })
+            .map_err(|_| StateError::Profiles("a saved connection is no longer valid".into()))?;
+        }
+        Ok(())
+    }
+
+    pub fn vault(&self) -> Option<&crate::secrets::SecretBox> {
+        self.vault.as_ref()
+    }
+
+    /// Test helper: provide a vault without a configuration object.
+    pub fn with_vault(mut self, vault: crate::secrets::SecretBox) -> Self {
+        self.vault = Some(vault);
+        self
     }
 
     /// The profile id a request refers to (`None` means the default profile).
     pub fn effective_profile(&self, profile: Option<&str>) -> String {
         profile
             .map(str::to_string)
-            .or_else(|| self.default_profile_id().map(str::to_string))
+            .or_else(|| self.default_profile_id())
             .unwrap_or_else(|| crate::profiles::DEFAULT_PROFILE_ID.to_string())
     }
 
-    fn default_entry(&self) -> Option<&Entry> {
-        self.entries.get(self.default)
+    fn read(&self) -> std::sync::RwLockReadGuard<'_, Vec<Entry>> {
+        self.entries.read().unwrap_or_else(|p| p.into_inner())
     }
 
-    fn entry(&self, profile: Option<&str>) -> Option<&Entry> {
+    fn write(&self) -> std::sync::RwLockWriteGuard<'_, Vec<Entry>> {
+        self.entries.write().unwrap_or_else(|p| p.into_inner())
+    }
+
+    fn default_entry(&self) -> Option<Entry> {
+        self.read().get(self.default).cloned()
+    }
+
+    fn entry(&self, profile: Option<&str>) -> Option<Entry> {
         match profile {
             None => self.default_entry(),
-            Some(id) => self.entries.iter().find(|entry| entry.id == id),
+            Some(id) => self.read().iter().find(|entry| entry.id == id).cloned(),
         }
     }
 
@@ -461,10 +580,11 @@ impl AppState {
 
     /// Configured profiles in file order. Never includes URLs.
     pub fn profiles(&self) -> Vec<ProfileInfo> {
-        self.entries
+        self.read()
             .iter()
             .enumerate()
             .map(|(index, entry)| ProfileInfo {
+                managed: entry.managed,
                 id: entry.id.clone(),
                 label: entry.label.clone(),
                 engine: entry
@@ -476,13 +596,13 @@ impl AppState {
             .collect()
     }
 
-    pub fn default_profile_id(&self) -> Option<&str> {
-        self.default_entry().map(|entry| entry.id.as_str())
+    pub fn default_profile_id(&self) -> Option<String> {
+        self.default_entry().map(|entry| entry.id)
     }
 
     /// Optional startup probe of the default profile: errors change status, never crash.
     pub fn start_probe(&self) {
-        if let Some(runtime) = self.default_entry().and_then(|e| e.runtime.clone()) {
+        if let Some(runtime) = self.default_entry().and_then(|e| e.runtime) {
             let _task = tokio::spawn(async move {
                 let _ = runtime.snapshot().await;
             });
@@ -490,15 +610,124 @@ impl AppState {
     }
 
     pub async fn close(&self) {
-        for entry in self.entries.iter() {
+        let entries = self.read().clone();
+        for entry in entries {
             if let Some(runtime) = &entry.runtime {
                 runtime.close().await;
             }
         }
     }
 
+    /// Folder SQLite files must live in (None for test states).
+    pub fn sqlite_root(&self) -> Option<std::path::PathBuf> {
+        self.ctx.as_ref().map(|c| c.sqlite_root.clone())
+    }
+
+    /// Whether this state can build connections at runtime.
+    pub fn can_manage(&self) -> bool {
+        self.ctx.is_some()
+    }
+
+    pub fn is_managed(&self, id: &str) -> bool {
+        self.read().iter().any(|e| e.id == id && e.managed)
+    }
+
+    fn build_entry(&self, input: &ManagedInput) -> Result<Entry, ManageError> {
+        let ctx = self.ctx.as_ref().ok_or(ManageError::Unavailable)?;
+        let mut limits = ctx.limits.clone();
+        // A saved connection never takes more than a quarter of the pool budget.
+        limits.max_pool_connections = (limits.max_pool_connections / 4).max(1);
+        let runtime = build_runtime(&input.url, &ctx.sqlite_root, &limits)
+            .map_err(|_| ManageError::Invalid)?;
+        let profile = crate::profiles::Profile {
+            id: input.id.clone(),
+            label: input.label.clone(),
+            url: crate::config::SecretUrl::new(input.url.clone()),
+            writable: input.writable,
+        };
+        let workspace = if ctx.sql_enabled {
+            build_workspace(&runtime, &profile, &limits).map_err(|_| ManageError::Invalid)?
+        } else {
+            None
+        };
+        Ok(Entry {
+            managed: true,
+            id: input.id.clone(),
+            label: input.label.clone(),
+            catalog: runtime.catalog(),
+            runtime: Some(runtime),
+            workspace,
+        })
+    }
+
+    /// Register a saved connection. Pools open lazily, so this never contacts the database.
+    pub fn add_managed(&self, input: &ManagedInput) -> Result<(), ManageError> {
+        let entry = self.build_entry(input)?;
+        let mut entries = self.write();
+        if entries.len() >= MAX_CONNECTIONS {
+            return Err(ManageError::TooMany);
+        }
+        if entries.iter().any(|e| e.id == input.id) {
+            return Err(ManageError::Exists);
+        }
+        entries.push(entry);
+        Ok(())
+    }
+
+    /// Replace a saved connection in place (same id); the old pools are closed.
+    pub async fn replace_managed(&self, input: &ManagedInput) -> Result<(), ManageError> {
+        let entry = self.build_entry(input)?;
+        let old = {
+            let mut entries = self.write();
+            let slot = entries
+                .iter_mut()
+                .find(|e| e.id == input.id && e.managed)
+                .ok_or(ManageError::Unknown)?;
+            std::mem::replace(slot, entry)
+        };
+        if let Some(runtime) = old.runtime {
+            runtime.close().await;
+        }
+        Ok(())
+    }
+
+    /// Remove a saved connection. File-defined connections are never removed.
+    pub async fn remove_managed(&self, id: &str) -> Result<(), ManageError> {
+        let removed = {
+            let mut entries = self.write();
+            let position = entries
+                .iter()
+                .position(|e| e.id == id && e.managed)
+                .ok_or(ManageError::Unknown)?;
+            entries.remove(position)
+        };
+        if let Some(runtime) = removed.runtime {
+            runtime.close().await;
+        }
+        Ok(())
+    }
+
+    /// Open a throw-away connection and report its state, then close it.
+    pub async fn test_url(&self, url: &str) -> Result<(ConnectionSnapshot, u128), ManageError> {
+        let input = ManagedInput {
+            id: "test".into(),
+            label: "test".into(),
+            url: url.to_string(),
+            writable: false,
+        };
+        let entry = self.build_entry(&input)?;
+        let runtime = entry.runtime.ok_or(ManageError::Unavailable)?;
+        let started = std::time::Instant::now();
+        let snapshot = tokio::time::timeout(std::time::Duration::from_secs(10), runtime.snapshot())
+            .await
+            .unwrap_or_else(|_| ConnectionSnapshot::unavailable());
+        let elapsed = started.elapsed().as_millis();
+        runtime.close().await;
+        Ok((snapshot, elapsed))
+    }
+
     pub fn is_configured(&self) -> bool {
-        !self.entries.is_empty()
+        !self.read().is_empty()
     }
 }
 

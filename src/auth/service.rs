@@ -422,4 +422,77 @@ impl AuthService {
     ) -> Result<Vec<StoredEvent>, AuthError> {
         self.store.audit_events(limit, before).await
     }
+
+    pub async fn audit_events_filtered(
+        &self,
+        filter: &crate::auth::store::AuditFilter,
+        limit: i64,
+        before: Option<i64>,
+    ) -> Result<Vec<StoredEvent>, AuthError> {
+        self.store
+            .audit_events_filtered(filter, limit, before)
+            .await
+    }
+
+    /// Change a member's role. Nobody changes their own role, and the last active
+    /// administrator cannot be demoted.
+    pub async fn set_user_role(
+        &self,
+        admin: &Principal,
+        user_id: i64,
+        role: Role,
+    ) -> Result<(), AuthError> {
+        if admin.user_id() == Some(user_id) {
+            return Err(AuthError::Invalid("you cannot change your own role"));
+        }
+        let user = self
+            .store
+            .user_by_id(user_id)
+            .await?
+            .ok_or(AuthError::NotFound)?;
+        if user.role == "admin"
+            && role != Role::Admin
+            && user.active
+            && self.store.active_admin_count().await? <= 1
+        {
+            return Err(AuthError::Invalid(
+                "the last active administrator cannot be demoted",
+            ));
+        }
+        self.store.set_user_role(user_id, role.name()).await?;
+        self.record(
+            AuditEvent::new(kind::USER_ROLE, audit::OK)
+                .actor(admin.user_id(), admin.login())
+                .resource(&user.login)
+                .detail(role.name()),
+        )
+        .await;
+        Ok(())
+    }
+
+    /// Delete a member (sessions and grants go too). Never yourself, never the last
+    /// active administrator.
+    pub async fn delete_user(&self, admin: &Principal, user_id: i64) -> Result<(), AuthError> {
+        if admin.user_id() == Some(user_id) {
+            return Err(AuthError::Invalid("you cannot delete your own account"));
+        }
+        let user = self
+            .store
+            .user_by_id(user_id)
+            .await?
+            .ok_or(AuthError::NotFound)?;
+        if user.role == "admin" && user.active && self.store.active_admin_count().await? <= 1 {
+            return Err(AuthError::Invalid(
+                "the last active administrator cannot be deleted",
+            ));
+        }
+        self.store.delete_user(user_id).await?;
+        self.record(
+            AuditEvent::new(kind::USER_DELETED, audit::OK)
+                .actor(admin.user_id(), admin.login())
+                .resource(&user.login),
+        )
+        .await;
+        Ok(())
+    }
 }
