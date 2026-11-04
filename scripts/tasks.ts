@@ -16,7 +16,7 @@ const tailwindArgs = ['-i', 'assets/css/app.css', '-o', 'public/app.css'];
 const prettierFiles = [
   'assets/css/app.css',
   'assets/js/app.js',
-  'scripts/tasks.ts',
+  'scripts/**/*.ts',
   'package.json',
   'tsconfig.json',
   '.prettierrc.json',
@@ -86,6 +86,7 @@ function test(): void {
   ensureRust();
   ensureFrontend();
   run('cargo', ['test', '--all-targets']);
+  run('bun', ['test', 'scripts/roadmap/spec.test.ts']);
   run(bin('tsc'), ['--noEmit']);
 }
 

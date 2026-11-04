@@ -1,0 +1,113 @@
+import type { DocumentSpec } from './types';
+
+export const documents: DocumentSpec[] = [
+  {
+    key: 'architecture',
+    title: 'CuaDB architecture and adapter boundaries',
+    path: 'docs/architecture.md',
+    body: [
+      '# CuaDB architecture and adapter boundaries',
+      '',
+      '## Product boundary',
+      'CuaDB is a lightweight, read-only database explorer. It is deliberately not a SQL editor, migration system, write-capable client, user administration panel or database server. A single compiled Rust/Axum HTTP service serves Askama HTML, local HTMX, compiled Tailwind CSS and small JavaScript assets. Bun is a development task runner, not a production runtime. A single Docker container publishes one HTTP port on host loopback by default. Databases remain external to the CuaDB runtime.',
+      '',
+      '## Layer ownership',
+      'The HTTP layer parses browser selection requests, validates basic input and returns full HTML pages or scoped HTMX fragments. Templates present typed view models; they never construct database queries. The application layer owns configured connection profiles, bounded pools, error conversion, request cancellation and redaction. The adapter interface describes schema discovery, relation metadata, paged data, statistics and capabilities without assuming a common catalog implementation. Each database adapter owns its driver, identifier rules, SQL generation, type decoding and metadata support.',
+      '',
+      '## Engine support order',
+      'PostgreSQL is first and the default URL scheme. It must work with PostgreSQL 18 and optionally PostGIS 3.6. MySQL/MariaDB and SQLite follow using the same browser-level contracts but independent metadata semantics. Microsoft SQL Server is a post-core expansion only after a driver compatibility decision. PostgreSQL connections target one database; another database is a separate trusted connection profile. MySQL database namespaces and SQLite file locations are represented honestly rather than renamed into fictitious PostgreSQL schemas.',
+      '',
+      '## Query flow',
+      'A browser selects a configured connection, schema, relation, page and sort. The typed route resolves the trusted connection profile, consults the adapter and validates relation identifiers against catalog metadata. The adapter executes only bounded, read-only queries. It returns typed cells and availability-aware metadata. Rust maps this into an Askama view model; HTMX swaps a small HTML fragment. Sensitive rows are never stored in the browser as a durable client cache or exposed through a generic JSON SQL API.',
+      '',
+      '## Evolution rules',
+      'Keep modules small and testable: config, errors, state, web handlers, templates and engine adapters. Avoid complex domain service hierarchies, plugin frameworks and multiple runtime services until measurable needs justify them. The Task workspace in .docs/ remains the single source of truth for execution status; this architecture document records boundaries and decisions, not a parallel task checklist.'
+    ].join('\n')
+  },
+  {
+    key: 'security',
+    title: 'Read-only database and browser security model',
+    path: 'docs/security-model.md',
+    body: [
+      '# Read-only database and browser security model',
+      '',
+      '## Threat assumptions',
+      'CuaDB is local-first but views potentially sensitive records. The default deployment trusts the operator who configures the database URL, not arbitrary browser input. Network exposure beyond host loopback is a separate security decision requiring authentication, TLS, origin controls and access review. Attack surfaces include connection strings, schema/table/column identifiers, sort parameters, cursor tokens, large cell contents, HTML responses, filesystem paths for SQLite and database privileges.',
+      '',
+      '## Database boundaries',
+      'Use dedicated least-privilege reader credentials for every configured engine. Where supported, additionally enforce read-only sessions or transactions; this supplements, rather than replaces, database grants. CuaDB exposes no arbitrary SQL endpoint, mutation API or administrative actions. Values use bind parameters. Dynamic identifiers must be resolved against trusted catalog entries and correctly quoted for the current engine. Query deadlines, pool limits, page caps, cell limits and response-size limits prevent one request from monopolizing a database or the viewer.',
+      '',
+      '## Credentials and network',
+      'Read URLs only from trusted server-side settings or operator-controlled profiles in the initial releases. Do not render connection secrets, append them to URLs, persist them in browser storage, or include them in logs. In Docker, connect to the existing postgis container through a shared user-defined network and internal hostname instead of publishing additional database ports. The Rust server may listen on 0.0.0.0 inside Docker, while Docker publishes 127.0.0.1:4848 on the host by default. For SQLite, only open explicitly configured read-only mounts under approved filesystem roots.',
+      '',
+      '## Browser controls',
+      'Escape all database-provided text in Askama. Use local bundled JavaScript and CSS, a compatible restrictive content security policy, no-store cache headers for database-bearing responses, frame protection and secure content-type settings. Disable HTMX history snapshot caching of row contents and prevent stale asynchronous responses from replacing the active table. No credentials or raw database rows should enter persistent browser preferences. Error fragments must not leak SQL text, driver stack traces or full URLs.',
+      '',
+      '## Verification',
+      'Use negative tests for SQL identifier injection, XSS strings, special names, invalid cursors, unauthorized reads, huge binary/JSON values, connection failures and filesystem traversal. Integration fixtures must be disposable and must never perform setup writes against the developer’s actual data. Document residual risks, especially RLS behavior, views executing privileged functions, metadata visibility and external network deployment.'
+    ].join('\n')
+  },
+  {
+    key: 'frontend',
+    title: 'Server-rendered UI and HTMX interaction contract',
+    path: 'docs/frontend-interactions.md',
+    body: [
+      '# Server-rendered UI and HTMX interaction contract',
+      '',
+      '## Frontend architecture',
+      'Askama renders a single explorer page and reusable HTML fragments. Tailwind provides layout, typography, consistent tokens and responsive states. A small custom grid CSS layer handles sticky headers, horizontal scrolling, high-density rows and resize behavior. HTMX handles browser-to-Rust navigation and partial updates; vanilla JavaScript handles immediate local actions such as sidebar toggling, resizing, copying and keyboard shortcuts. No React, Next.js, JSON-first state store or frontend build server is required.',
+      '',
+      '## Navigation and data contracts',
+      'The sidebar shows trusted connection labels and, within each database, supported schemas or namespaces and relation types. Expanding a schema lazily requests a fragment. Selecting a table loads its first data page, an explicit Structure tab and an Info tab. Every server route validates relation identity, sort, requested columns and bounded page controls before issuing database requests. The URL may preserve non-sensitive navigation context but never connection credentials, cell values or raw SQL.',
+      '',
+      '## Fragment behavior',
+      'Each fragment owns a stable target: connection state, schema subtree, data grid, or inspector content. Fast repeated clicks should cancel or serialize conflicting requests so older results never overwrite the current selection. Every fragment needs an empty, loading, permission-denied, unsupported-capability and timeout state. Server-rendered messages should be accessible and accurately describe what happened. The same view models must support a full-page reload without relying on previously cached JavaScript state.',
+      '',
+      '## Grid rules',
+      'The records grid is semantic HTML and remains read-only. It shows actual column names, typed values, visible NULL markers, sortable headers and previous/next navigation using real continuation state. Display only a bounded page, usually 50 rows, never an entire table. Large JSON, arrays, bytea and spatial values are truncated with a safe detail view; copying a cell is a browser-only action. The UI must distinguish estimated row counts from exact counts and disclose when a table has no stable pagination key.',
+      '',
+      '## Accessibility and verification',
+      'Use visible keyboard focus, aria-sort on active sortable headers, labeled buttons and appropriately announced loading or failure feedback. Test narrow viewports, long column names, Unicode names, many columns, dark/light themes, rapid sorting, stale HTMX responses and large-cell detail interactions. Keep event handlers delegated to persistent elements or explicitly reinitialized after swaps. No browser-only interaction should start a database query unnecessarily.'
+    ].join('\n')
+  },
+  {
+    key: 'testing',
+    title: 'Quality gates, fixtures and integration verification',
+    path: 'docs/testing-and-quality.md',
+    body: [
+      '# Quality gates, fixtures and integration verification',
+      '',
+      '## Always-on developer checks',
+      'Run bun run format:check for Rust formatting and Prettier, bun run check for Cargo compile/type checking, strict Clippy and TypeScript validation, bun run test for unit and HTTP integration tests, and bun run build for a release build. These baseline checks must not require a database. Preserve Cargo.lock and bun.lock for reproducible dependency resolution. A format command may edit files, while check/test must not hide errors or silently rewrite source.',
+      '',
+      '## Test isolation',
+      'Unit tests should cover config parsing, identifier resolution, type conversion, pagination planning, cursor validation and redacted error mapping without opening sockets or databases. Router tests should use a fake adapter to exercise HTML status codes and escaped output. Browser interaction tests should cover HTMX fragments, loading states, keyboard behavior, page-size changes, sorting and response synchronization. Build and static asset tests verify that Rust serves local CSS, JS and HTMX without a CDN.',
+      '',
+      '## Live engine fixtures',
+      'Live PostgreSQL, PostGIS, MySQL, MariaDB and SQLite tests are opt-in and must use disposable fixtures. Seed tables with composite keys, unusual quoted identifiers, NULL values, JSON, large text, timestamps and related relations. Use both a setup role and a restricted viewer role; never mutate a developer’s existing user database. Confirm that catalog visibility, read-only permissions, query timeouts and expected metadata are correct. SQL Server may be added to this matrix after the driver feasibility task.',
+      '',
+      '## Performance and release checks',
+      'Measure server response size, rendering time, database query time, pool utilization, deep-page behavior and wide-grid usability on synthetic datasets. Verify that no implicit COUNT(*) full scan or unrestricted SELECT occurs during initial table browsing. Docker acceptance includes one published loopback UI port, non-root runtime, bundled assets, startup/shutdown behavior and a shared-network connection to an external PostgreSQL container. Record exceptions and unsupported engine features explicitly rather than weakening tests.'
+    ].join('\n')
+  },
+  {
+    key: 'roadmap',
+    title: 'CuaDB execution stages and completion policy',
+    path: 'docs/execution-roadmap.md',
+    body: [
+      '# CuaDB execution stages and completion policy',
+      '',
+      '## Source of truth',
+      'The Task workspace at .docs/ is authoritative for group progress, individual task status, checklist ticks, comments and dependency relationships. This document provides strategic sequencing only; it is not a second TODO list. All task and group records should be created or updated through the Task CLI and validated with task validate. Group goal.md and plan.md files describe their outcomes and risks. The roadmap bootstrap script is used once to seed the initial backlog, after which work must update the generated Task records, not the bootstrap definitions.',
+      '',
+      '## Working stages',
+      'Start with Rust foundation and stable database contracts. Next make PostgreSQL catalog inspection, bounded row retrieval and strict read-only behavior operational. Build the server routes and browser explorer in parallel only after contracts are stable, then complete paginated grids, metadata panels and PostGIS-aware value details. This first milestone is the usable PostgreSQL CuaDB release and should be tested against a disposable fixture as well as the operator’s existing postgis container using read-only credentials.',
+      '',
+      '## Broader compatibility',
+      'After PostgreSQL and the browser experience are reliable, build MySQL/MariaDB and SQLite adapters against the same capability contract. Then introduce multiple trusted server-side connection profiles and complete security, performance, Docker and documentation acceptance. SQL Server is deliberately a post-core extension with a driver feasibility gate. Avoid claiming feature parity for statistics, namespaces and special data types across engines.',
+      '',
+      '## Execution discipline',
+      'For each work session, inspect task list and the exact task, check its dependencies, move it to in-progress, implement only its scope, and run relevant verification. Record findings and decisions in the Task workspace, tick checklist items through task check, and move the task to completed only when its acceptance criteria and checks pass. Keep one small piece of work active at a time and prefer a complete vertical slice to broad untested scaffolding.'
+    ].join('\n')
+  }
+];

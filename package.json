@@ -14,7 +14,10 @@
     "test": "bun scripts/tasks.ts test",
     "assets:build": "bun scripts/tasks.ts assets",
     "docker:build": "docker build -t cuadb:local .",
-    "docker:run": "docker run --rm --name cuadb -p 127.0.0.1:4848:4848 cuadb:local"
+    "docker:run": "docker run --rm --name cuadb -p 127.0.0.1:4848:4848 cuadb:local",
+    "task:preview": "bun scripts/roadmap/seed.ts --preview",
+    "task:seed": "bun scripts/roadmap/seed.ts --seed",
+    "task:verify": "bun scripts/roadmap/seed.ts --verify"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.4",
