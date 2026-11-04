@@ -94,7 +94,14 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
     // operator configured plaintext TLS. Only literal loopback IPs and the
     // exact hostname "localhost" qualify; other DNS names are not trusted.
     let loopback = match url.host() {
-        Some(Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
+        Some(Host::Domain(host)) => {
+            // For non-special URL schemes, the url crate can represent a
+            // numeric IPv4 host as Domain rather than Host::Ipv4. Classify
+            // numeric loopback addresses explicitly instead of assuming that
+            // a Domain variant is never an IP literal.
+            host.eq_ignore_ascii_case("localhost")
+                || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+        },
         Some(Host::Ipv4(address)) => address.is_loopback(),
         Some(Host::Ipv6(address)) => address.is_loopback(),
         None => false,
@@ -222,13 +229,16 @@ mod tests {
 
     #[test]
     fn accepts_passwordless_local_postgres_only() {
-        for raw in [
-            "postgresql://postgres@localhost:5432/postgres",
-            "postgres://postgres@127.0.0.1:5432/postgres",
-            "postgres://postgres@[::1]:5432/postgres",
-            "postgres://postgres:@localhost:5432/postgres",
+        for (case, raw) in [
+            ("hostname", "postgresql://postgres@localhost:5432/postgres"),
+            ("ipv4_loopback", "postgres://postgres@127.0.0.1:5432/postgres"),
+            ("ipv4_loopback_alias", "postgres://postgres@127.0.0.2:5432/postgres"),
+            ("ipv6_loopback", "postgres://postgres@[::1]:5432/postgres"),
+            ("explicit_empty_password", "postgres://postgres:@localhost:5432/postgres"),
         ] {
-            let options = parse(raw).unwrap().into_options();
+            let options = parse(raw)
+                .unwrap_or_else(|error| panic!("{case}: {error}"))
+                .into_options();
             assert_eq!(options.get_username(), "postgres");
             assert_eq!(options.get_database(), Some("postgres"));
             assert!(matches!(

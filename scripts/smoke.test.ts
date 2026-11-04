@@ -85,6 +85,13 @@ test('serves the page, fragment and pure liveness endpoint', async () => {
   const fragment = await fetch(`${address}/fragments/status`);
   expect(fragment.status).toBe(200);
   expect(await fragment.text()).toContain('App shell ready');
+
+  // Catch stale binaries or accidentally dropped connection-status routes.
+  // Smoke launches with no database URL, so this does not touch PostgreSQL.
+  const connection = await fetch(`${address}/connection/status`);
+  expect(connection.status).toBe(200);
+  expect(connection.headers.get('cache-control')).toBe('no-store');
+  expect(await connection.text()).toContain('Not configured');
 });
 
 test('serves locally compiled CSS, HTMX and browser JavaScript', async () => {
