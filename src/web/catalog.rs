@@ -474,7 +474,7 @@ pub async fn structure(
     let mut columns = cols
         .items
         .into_iter()
-        .map(|column| structure_column(column))
+        .map(structure_column)
         .collect::<Vec<_>>();
     columns.sort_by_key(|column| column.position);
     let constraints = constraints

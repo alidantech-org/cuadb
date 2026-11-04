@@ -56,6 +56,9 @@ pub fn sort_supported(native: &str) -> bool {
         && !x.starts_with("tsvector")
 }
 
+// The planner takes each independent, already-validated input explicitly; bundling
+// them would only add a pass-through struct at every call site.
+#[allow(clippy::too_many_arguments)]
 pub fn build(
     schema: &str,
     relation: &str,

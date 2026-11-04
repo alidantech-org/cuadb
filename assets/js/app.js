@@ -24,8 +24,8 @@ document.addEventListener('click', (event) => {
   }
   if (target.closest('[data-columns-all]') || target.closest('[data-columns-none]')) {
     const all = target.closest('[data-columns-all]') !== null;
-    const form = document.querySelector('.row-search');
-    const params = new URLSearchParams(new FormData(form));
+    const form = /** @type {HTMLFormElement | null} */ (document.querySelector('.row-search'));
+    const params = new URLSearchParams(form ? /** @type {any} */ (new FormData(form)) : undefined);
     params.delete('column');
     params.set('pick', '1');
     if (all) {
@@ -45,7 +45,7 @@ document.addEventListener('click', (event) => {
       document
         .querySelectorAll('[data-column-choice]:checked')
         .forEach((item) => params.append('column', item.getAttribute('data-column-choice') ?? ''));
-    window.htmx?.ajax('GET', `/catalog/data?${params.toString()}`, {
+    /** @type {any} */ (window).htmx?.ajax('GET', `/catalog/data?${params.toString()}`, {
       target: '#catalog-panel',
       swap: 'outerHTML',
     });
@@ -96,12 +96,12 @@ document.addEventListener('keydown', (event) => {
     (event.key === 'Enter' || event.key === ' ')
   ) {
     event.preventDefault();
-    window.htmx?.trigger(status, 'click');
+    /** @type {any} */ (window).htmx?.trigger(status, 'click');
   }
 });
 
 document.addEventListener('htmx:beforeSwap', (event) => {
-  const detail = event.detail;
+  const detail = /** @type {CustomEvent} */ (event).detail;
   if (detail.xhr.status >= 400 && detail.xhr.responseText.includes('class="cuadb-error"')) {
     detail.shouldSwap = true;
     detail.isError = false;
@@ -112,8 +112,8 @@ document.addEventListener('htmx:beforeSwap', (event) => {
 document.addEventListener('input', (event) => {
   const input = event.target;
   if (input instanceof HTMLInputElement && input.matches('[data-column-choice]')) {
-    const form = document.querySelector('.row-search');
-    const params = new URLSearchParams(new FormData(form));
+    const form = /** @type {HTMLFormElement | null} */ (document.querySelector('.row-search'));
+    const params = new URLSearchParams(form ? /** @type {any} */ (new FormData(form)) : undefined);
     params.delete('column');
     params.set('pick', '1');
     params.delete('page');
@@ -121,7 +121,7 @@ document.addEventListener('input', (event) => {
     document
       .querySelectorAll('[data-column-choice]:checked')
       .forEach((item) => params.append('column', item.getAttribute('data-column-choice') ?? ''));
-    window.htmx?.ajax('GET', `/catalog/data?${params.toString()}`, {
+    /** @type {any} */ (window).htmx?.ajax('GET', `/catalog/data?${params.toString()}`, {
       target: '#catalog-panel',
       swap: 'outerHTML',
     });
@@ -192,7 +192,9 @@ document.addEventListener('click', async (event) => {
   }
 });
 
+/** @type {ReturnType<typeof setTimeout> | undefined} */
 let toastTimeout;
+/** @param {string} message */
 function showToast(message) {
   const toast = document.getElementById('toast');
   if (!toast) return;
