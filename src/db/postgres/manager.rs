@@ -28,6 +28,7 @@ pub struct PgManager {
     limits: Limits,
     cache: Arc<RwLock<Cache>>,
     probe_gate: Arc<Mutex<()>>,
+    cursor_store: Arc<std::sync::Mutex<super::row_cursor::CursorStore>>,
 }
 
 struct Cache {
@@ -81,6 +82,9 @@ impl PgManager {
                 checked_at: None,
             })),
             probe_gate: Arc::new(Mutex::new(())),
+            cursor_store: Arc::new(std::sync::Mutex::new(
+                super::row_cursor::CursorStore::default(),
+            )),
         })
     }
 
@@ -183,6 +187,8 @@ impl PgManager {
         super::catalog::PgCatalog {
             pool: self.pool.clone(),
             deadline: self.limits.query_timeout,
+            max_page_size: self.limits.max_page_size,
+            cursor_store: Arc::clone(&self.cursor_store),
         }
     }
 

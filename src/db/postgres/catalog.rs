@@ -30,6 +30,8 @@ const MAX_OVERVIEW: i64 = 20;
 pub struct PgCatalog {
     pub(super) pool: PgPool,
     pub(super) deadline: Duration,
+    pub(super) max_page_size: usize,
+    pub(super) cursor_store: std::sync::Arc<std::sync::Mutex<super::row_cursor::CursorStore>>,
 }
 
 fn internal(_: sqlx::Error) -> DbError {
@@ -84,7 +86,7 @@ impl PgCatalog {
 
     /// Resolve a schema-qualified identifier without ever quoting or
     /// interpolating names into SQL. Missing/invisible objects are indistinct.
-    async fn relation_oid(&self, id: &RelationId) -> Result<i64, DbError> {
+    pub(super) async fn relation_oid(&self, id: &RelationId) -> Result<i64, DbError> {
         Self::user_schema(&id.namespace)?;
         let row = self
             .bounded(
@@ -698,9 +700,10 @@ impl DatabaseAdapter for PgCatalog {
     async fn overview(&self) -> Result<Overview, DbError> {
         self.advanced_overview().await
     }
-    async fn rows(&self, _: &RelationId, _: PageRequest) -> Result<RowPage, DbError> {
-        Err(DbError::new(DbErrorKind::Unsupported))
-    }
+    async fn page(&self,id:&RelationId,opts:crate::db::types::RowOptions)
+        -> Result<RowPage,DbError> { self.fetch_rows(id,opts).await }
+    async fn rows(&self,id:&RelationId,opts:PageRequest)
+        -> Result<RowPage,DbError> { self.offset_page(id,opts).await }
 }
 
 #[cfg(test)]

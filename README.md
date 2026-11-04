@@ -2,7 +2,7 @@
 
 **CuaDB** is a fast, local-first, **read-only database explorer** for the browser. The goal is to connect to a database, browse schemas and tables, and inspect paginated records, column types, indexes and storage details—without a SQL runner or a bulky administration UI.
 
-> **Current status: PostgreSQL catalog foundation (Group 03).** The Rust/Askama/HTMX server supports read-only schema, relation, column, key, index, partition, advanced-object and statistics inspection through a bounded SQLx PostgreSQL pool. **Actual data rows, sorting, export and the final canonical explorer UI are not implemented yet.** The data grid remains a placeholder. Catalog endpoints require an operator-configured database.
+> **Current status: safe PostgreSQL row paging (Group 04).** The Axum/Askama/HTMX server now includes bounded row pages, optional catalog-validated column selection, sorting and indexed keyset navigation for eligible integer keys. **Whole-table exports and full canonical grid UI are not enabled yet.** Real row pages require the operator-configured PostgreSQL connection and a SELECT-only role. Fedora compilation and disposable fixture verification remain outstanding.
 
 ## Catalog inspection (Group 03)
 
@@ -24,9 +24,18 @@ bounded overview:
 
 No endpoint accepts arbitrary SQL or a connection URL. System schemas are
 not navigable, source identifiers are parameter-bound, catalog sizes are
-bounded and truncation is visible. Row retrieval is deliberately unsupported
-in this wave. Full SQL/permissions/fixture details: [PostgreSQL catalog
+bounded and truncation is visible. Row retrieval is provided separately by Group 04. Full SQL/permissions/fixture details: [PostgreSQL catalog
 discovery](docs/postgresql-catalog.md).
+
+## Safe row retrieval (Group 04)
+
+Use `/catalog/data?schema=public&relation=example` to read bounded pages.
+Request `size=25|50|100`, `page=N`, `sort=column&direction=asc|desc`,
+or repeated `column=name` for column selection. Rows are permission-scoped,
+never writable, and value previews are capped. Appropriate integer unique
+keys receive opaque next/previous cursor tokens; otherwise bounded offset
+pagination is used. See [the row-query contract](docs/postgresql-rows.md)
+for caps, limitations, fixture tests and export policy.
 
 ## Canonical frontend UI reference
 

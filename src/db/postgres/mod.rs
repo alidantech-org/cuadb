@@ -1,6 +1,9 @@
 //! PostgreSQL-only URL validation, connections and introspection safety.
 pub mod catalog;
 pub mod manager;
+pub mod row_query;
+pub mod row_cursor;
+pub mod rows;
 pub mod url;
 
 pub use catalog::PgCatalog;

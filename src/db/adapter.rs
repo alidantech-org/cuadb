@@ -6,7 +6,7 @@
 use super::types::{
     Capability, CatalogList, CatalogObject, Column, ColumnDetail, Constraint, DbError, Engine,
     Index, Namespace, Overview, PageRequest, PartitionLink, Relation, RelationId, RelationStats,
-    RowPage,
+    RowOptions, RowPage,
 };
 use std::future::Future;
 
@@ -58,6 +58,11 @@ pub trait DatabaseAdapter: Send + Sync {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
     fn overview(&self) -> impl Future<Output = Result<Overview, DbError>> + Send {
+        async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
+    }
+    /// Extended paging, optional on other database engines.
+    fn page(&self, _: &RelationId, _: RowOptions)
+        -> impl Future<Output = Result<RowPage, DbError>> + Send {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
     fn rows(

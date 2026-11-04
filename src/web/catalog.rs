@@ -226,6 +226,7 @@ pub async fn structure(
     .map_err(err)?;
     let truncated = cols.truncated || constraints.truncated || partitions.truncated;
     let mut rows = vec![
+        row("Data", "Bounded, read-only row pages", relation_url("data",&id)),
         row(
             "Indexes",
             "Unique, primary and expression indexes",

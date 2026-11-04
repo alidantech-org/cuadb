@@ -186,7 +186,36 @@ pub enum Cell {
     Decimal(String),
     Text(String),
     Bytes(Vec<u8>),
+    Truncated { preview: String, type_name: String },
     Unsupported { type_name: String },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortDirection { Asc, Desc }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SortSpec { pub column: String, pub direction: SortDirection }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowOptions {
+    pub limit: u32,
+    pub page: u32,
+    pub selected_columns: Vec<String>,
+    pub sort: Option<SortSpec>,
+    pub cursor: Option<String>,
+}
+impl Default for RowOptions {
+    fn default() -> Self {
+        Self { limit: 25, page: 0, selected_columns: vec![], sort: None, cursor: None }
+    }
+}
+
+/// An explicit preview marker prevents displaying truncated data as complete.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RowPreview {
+    pub text: String,
+    pub truncated: bool,
+    pub type_name: String,
 }
 
 /// Server-enforced limits are independent of client-provided paging choices.
@@ -202,6 +231,15 @@ pub struct RowPage {
     pub rows: Vec<Vec<Cell>>,
     pub has_more: bool,
     pub approximate_total: Availability<i64>,
+    pub previews: Vec<Vec<RowPreview>>,
+    pub has_previous: bool,
+    pub next_cursor: Option<String>,
+    pub previous_cursor: Option<String>,
+    pub stable_order: bool,
+    pub keyset_enabled: bool,
+    pub page: u32,
+    pub offset: u64,
+    pub truncated_columns: bool,
 }
 
 /// No driver error strings are stored or displayed in this error type.

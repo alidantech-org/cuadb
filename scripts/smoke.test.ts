@@ -97,6 +97,9 @@ test('serves the page, fragment and pure liveness endpoint', async () => {
   const catalog = await fetch(`${address}/catalog/schemas`);
   expect(catalog.status).toBe(200);
   expect(await catalog.text()).toContain('Not configured.');
+
+  const rows = await fetch(`${address}/catalog/data?schema=public&relation=orders`);
+  expect(rows.status).toBe(503);
 });
 
 test('serves locally compiled CSS, HTMX and browser JavaScript', async () => {
