@@ -10,7 +10,8 @@ use tower::ServiceExt;
 async fn response(path: &str) -> (StatusCode, String) {
     let response = app::router()
         .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
     let status = response.status();
     let body = to_bytes(response.into_body(), 16_384).await.unwrap();
     (status, String::from_utf8(body.to_vec()).unwrap())
@@ -18,14 +19,14 @@ async fn response(path: &str) -> (StatusCode, String) {
 
 #[tokio::test]
 async fn disconnected_catalog_is_helpful_without_database() {
-    let (status,html) = response("/catalog/schemas").await;
-    assert_eq!(status,StatusCode::OK);
+    let (status, html) = response("/catalog/schemas").await;
+    assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Not configured."));
     assert!(html.contains("No visible objects."));
     assert!(!html.contains("postgresql://"));
 
-    let (status,_) = response("/catalog/overview").await;
-    assert_eq!(status,StatusCode::SERVICE_UNAVAILABLE);
+    let (status, _) = response("/catalog/overview").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
 }
 
 #[tokio::test]
@@ -38,8 +39,8 @@ async fn rejects_duplicate_unknown_and_unbounded_identifier_params() {
         "/catalog/structure?schema=public&relation=x&relation=y",
         "/catalog/structure?schema=%00&relation=x",
     ] {
-        let (status,html) = response(path).await;
-        assert_eq!(status,StatusCode::BAD_REQUEST,"{path}");
+        let (status, html) = response(path).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{path}");
         assert!(!html.contains("example.com"));
     }
 }

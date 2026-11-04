@@ -27,28 +27,37 @@ pub trait DatabaseAdapter: Send + Sync {
         relation: &RelationId,
     ) -> impl Future<Output = Result<RelationStats, DbError>> + Send;
     /// Optional extended metadata. Other engines explicitly return Unsupported.
-    fn column_details(&self, _: &RelationId)
-        -> impl Future<Output = Result<CatalogList<ColumnDetail>, DbError>> + Send {
+    fn column_details(
+        &self,
+        _: &RelationId,
+    ) -> impl Future<Output = Result<CatalogList<ColumnDetail>, DbError>> + Send {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
-    fn constraints(&self, _: &RelationId)
-        -> impl Future<Output = Result<CatalogList<Constraint>, DbError>> + Send {
+    fn constraints(
+        &self,
+        _: &RelationId,
+    ) -> impl Future<Output = Result<CatalogList<Constraint>, DbError>> + Send {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
-    fn indexes(&self, _: &RelationId)
-        -> impl Future<Output = Result<CatalogList<Index>, DbError>> + Send {
+    fn indexes(
+        &self,
+        _: &RelationId,
+    ) -> impl Future<Output = Result<CatalogList<Index>, DbError>> + Send {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
-    fn partitions(&self, _: &RelationId)
-        -> impl Future<Output = Result<CatalogList<PartitionLink>, DbError>> + Send {
+    fn partitions(
+        &self,
+        _: &RelationId,
+    ) -> impl Future<Output = Result<CatalogList<PartitionLink>, DbError>> + Send {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
-    fn advanced_objects(&self, _: &str)
-        -> impl Future<Output = Result<CatalogList<CatalogObject>, DbError>> + Send {
+    fn advanced_objects(
+        &self,
+        _: &str,
+    ) -> impl Future<Output = Result<CatalogList<CatalogObject>, DbError>> + Send {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
-    fn overview(&self)
-        -> impl Future<Output = Result<Overview, DbError>> + Send {
+    fn overview(&self) -> impl Future<Output = Result<Overview, DbError>> + Send {
         async { Err(DbError::new(super::types::DbErrorKind::Unsupported)) }
     }
     fn rows(

@@ -11,9 +11,9 @@ use crate::db::{
     adapter::DatabaseAdapter,
     types::{
         Availability, Capability, CatalogList, CatalogObject, CatalogObjectKind, Column,
-        ColumnDetail, Constraint, ConstraintKind, DbError, DbErrorKind, Engine, Index,
-        Namespace, Overview, PageRequest, PartitionLink, Relation, RelationId, RelationKind,
-        RelationStats, RowPage, SchemaSize,
+        ColumnDetail, Constraint, ConstraintKind, DbError, DbErrorKind, Engine, Index, Namespace,
+        Overview, PageRequest, PartitionLink, Relation, RelationId, RelationKind, RelationStats,
+        RowPage, SchemaSize,
     },
 };
 
@@ -86,15 +86,22 @@ impl PgCatalog {
     /// interpolating names into SQL. Missing/invisible objects are indistinct.
     async fn relation_oid(&self, id: &RelationId) -> Result<i64, DbError> {
         Self::user_schema(&id.namespace)?;
-        let row = self.bounded(sqlx::query(
-            r#"SELECT c.oid::bigint AS oid
+        let row = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT c.oid::bigint AS oid
                 FROM pg_catalog.pg_class c
                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                 WHERE n.nspname = $1 AND c.relname = $2
                   AND c.relkind IN ('r','p','v','m','f')
                   AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
-                  AND pg_catalog.has_table_privilege(c.oid, 'SELECT')"#
-        ).bind(&id.namespace).bind(&id.name).fetch_optional(&self.pool)).await?;
+                  AND pg_catalog.has_table_privilege(c.oid, 'SELECT')"#,
+                )
+                .bind(&id.namespace)
+                .bind(&id.name)
+                .fetch_optional(&self.pool),
+            )
+            .await?;
         match row {
             Some(row) => get(&row, "oid"),
             None => Err(DbError::new(DbErrorKind::InvalidIdentifier)),
@@ -102,23 +109,39 @@ impl PgCatalog {
     }
 
     pub async fn list_schemas(&self) -> Result<CatalogList<Namespace>, DbError> {
-        let rows = self.bounded(sqlx::query(
-            r#"SELECT n.nspname::text AS name
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT n.nspname::text AS name
                 FROM pg_catalog.pg_namespace n
                 WHERE left(n.nspname,3) <> 'pg_'
                   AND n.nspname <> 'information_schema'
                   AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
                 ORDER BY n.nspname COLLATE "C"
-                LIMIT $1"#
-        ).bind(MAX_SCHEMAS + 1).fetch_all(&self.pool)).await?;
-        Ok(capped(rows.iter().map(|r| Ok(Namespace { name: get(r, "name")? }))
-            .collect::<Result<Vec<_>, DbError>>()?, MAX_SCHEMAS))
+                LIMIT $1"#,
+                )
+                .bind(MAX_SCHEMAS + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        Ok(capped(
+            rows.iter()
+                .map(|r| {
+                    Ok(Namespace {
+                        name: get(r, "name")?,
+                    })
+                })
+                .collect::<Result<Vec<_>, DbError>>()?,
+            MAX_SCHEMAS,
+        ))
     }
 
     pub async fn list_relations(&self, namespace: &str) -> Result<CatalogList<Relation>, DbError> {
         Self::user_schema(namespace)?;
-        let rows = self.bounded(sqlx::query(
-            r#"SELECT c.relname::text AS name, c.relkind::text AS kind,
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT c.relname::text AS name, c.relkind::text AS kind,
                       c.relispartition AS partition
                 FROM pg_catalog.pg_class c
                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -128,23 +151,40 @@ impl PgCatalog {
                   AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
                   AND pg_catalog.has_table_privilege(c.oid, 'SELECT')
                 ORDER BY c.relname COLLATE "C", c.oid
-                LIMIT $2"#
-        ).bind(namespace).bind(MAX_RELATIONS + 1).fetch_all(&self.pool)).await?;
-        Ok(capped(rows.iter().map(|r| {
-            let kind: String = get(r, "kind")?;
-            let partition = get(r, "partition")?;
-            Ok(Relation { id: RelationId {
-                namespace: namespace.to_string(), name: get(r, "name")?,
-            }, kind: supported(&kind, partition)? })
-        }).collect::<Result<Vec<_>, DbError>>()?, MAX_RELATIONS))
+                LIMIT $2"#,
+                )
+                .bind(namespace)
+                .bind(MAX_RELATIONS + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        Ok(capped(
+            rows.iter()
+                .map(|r| {
+                    let kind: String = get(r, "kind")?;
+                    let partition = get(r, "partition")?;
+                    Ok(Relation {
+                        id: RelationId {
+                            namespace: namespace.to_string(),
+                            name: get(r, "name")?,
+                        },
+                        kind: supported(&kind, partition)?,
+                    })
+                })
+                .collect::<Result<Vec<_>, DbError>>()?,
+            MAX_RELATIONS,
+        ))
     }
 
-    pub async fn describe_columns(&self, id: &RelationId)
-        -> Result<CatalogList<ColumnDetail>, DbError>
-    {
+    pub async fn describe_columns(
+        &self,
+        id: &RelationId,
+    ) -> Result<CatalogList<ColumnDetail>, DbError> {
         let oid = self.relation_oid(id).await?;
-        let rows = self.bounded(sqlx::query(
-            r#"SELECT a.attnum::int2 AS position, a.attname::text AS name,
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT a.attnum::int2 AS position, a.attname::text AS name,
                       pg_catalog.format_type(a.atttypid, a.atttypmod) AS native_type,
                       NOT a.attnotnull AS nullable,
                       pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS default_expression,
@@ -167,30 +207,48 @@ impl PgCatalog {
                 LEFT JOIN pg_catalog.pg_attrdef def
                      ON def.adrelid=a.attrelid AND def.adnum=a.attnum
                 WHERE a.attrelid::bigint=$1 AND a.attnum>0 AND NOT a.attisdropped
-                ORDER BY a.attnum LIMIT $2"#
-        ).bind(oid).bind(MAX_COLUMNS + 1).fetch_all(&self.pool)).await?;
-        Ok(capped(rows.iter().map(|r| {
-            let enum_values: Option<Vec<String>> = get(r, "enum_values")?;
-            Ok(ColumnDetail {
-                column: Column {
-                    name: get(r, "name")?, native_type: get(r, "native_type")?,
-                    nullable: get(r, "nullable")?, primary_key: get(r, "primary_key")?,
-                    default_expression: get(r, "default_expression")?,
-                },
-                position: get(r, "position")?, unique_key: get(r, "unique_key")?,
-                identity: get(r, "identity")?, generated: get(r, "generated")?,
-                domain: get(r, "domain")?,
-                enum_values: enum_values.map_or(Availability::Unavailable, Availability::Available),
-            })
-        }).collect::<Result<Vec<_>,DbError>>()?, MAX_COLUMNS))
+                ORDER BY a.attnum LIMIT $2"#,
+                )
+                .bind(oid)
+                .bind(MAX_COLUMNS + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        Ok(capped(
+            rows.iter()
+                .map(|r| {
+                    let enum_values: Option<Vec<String>> = get(r, "enum_values")?;
+                    Ok(ColumnDetail {
+                        column: Column {
+                            name: get(r, "name")?,
+                            native_type: get(r, "native_type")?,
+                            nullable: get(r, "nullable")?,
+                            primary_key: get(r, "primary_key")?,
+                            default_expression: get(r, "default_expression")?,
+                        },
+                        position: get(r, "position")?,
+                        unique_key: get(r, "unique_key")?,
+                        identity: get(r, "identity")?,
+                        generated: get(r, "generated")?,
+                        domain: get(r, "domain")?,
+                        enum_values: enum_values
+                            .map_or(Availability::Unavailable, Availability::Available),
+                    })
+                })
+                .collect::<Result<Vec<_>, DbError>>()?,
+            MAX_COLUMNS,
+        ))
     }
 
-    pub async fn list_constraints(&self, id: &RelationId)
-        -> Result<CatalogList<Constraint>, DbError>
-    {
+    pub async fn list_constraints(
+        &self,
+        id: &RelationId,
+    ) -> Result<CatalogList<Constraint>, DbError> {
         let oid = self.relation_oid(id).await?;
-        let rows = self.bounded(sqlx::query(
-            r#"SELECT con.conname::text AS name, con.contype::text AS kind,
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT con.conname::text AS name, con.contype::text AS kind,
                       pg_catalog.pg_get_constraintdef(con.oid, true) AS definition,
                       ARRAY(SELECT a.attname::text
                             FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, pos)
@@ -219,44 +277,57 @@ impl PgCatalog {
                 LEFT JOIN pg_catalog.pg_namespace tns ON tns.oid=target.relnamespace
                 WHERE con.conrelid::bigint=$1
                   AND con.contype IN ('p','u','f','c','x')
-                ORDER BY con.conname COLLATE "C" LIMIT $2"#
-        ).bind(oid).bind(MAX_DETAILS + 1).fetch_all(&self.pool)).await?;
-        Ok(capped(rows.iter().map(|r| {
-            let kind: String = get(r, "kind")?;
-            let kind = match kind.as_str() {
-                "p" => ConstraintKind::Primary,
-                "u" => ConstraintKind::Unique,
-                "f" => ConstraintKind::ForeignKey,
-                "c" => ConstraintKind::Check,
-                "x" => ConstraintKind::Exclusion,
-                _ => return Err(DbError::new(DbErrorKind::Unsupported)),
-            };
-            let target_schema: Option<String> = get(r, "target_schema")?;
-            let target_name: Option<String> = get(r, "target_name")?;
-            let target_visible = target_schema.is_some() && target_name.is_some();
-            // pg_get_constraintdef can include an otherwise inaccessible
-            // referenced table name. Do not render that raw definition.
-            let definition = if kind == ConstraintKind::ForeignKey && !target_visible {
-                "Foreign key references a relation not visible to this role".to_string()
-            } else {
-                get(r,"definition")?
-            };
-            Ok(Constraint {
-                name: get(r,"name")?, kind,
-                columns: get(r,"columns")?,
-                references: target_schema.zip(target_name).map(|(namespace,name)| RelationId {
-                    namespace,name
-                }),
-                referenced_columns: get(r, "target_columns")?,
-                definition,
-            })
-        }).collect::<Result<Vec<_>, DbError>>()?, MAX_DETAILS))
+                ORDER BY con.conname COLLATE "C" LIMIT $2"#,
+                )
+                .bind(oid)
+                .bind(MAX_DETAILS + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        Ok(capped(
+            rows.iter()
+                .map(|r| {
+                    let kind: String = get(r, "kind")?;
+                    let kind = match kind.as_str() {
+                        "p" => ConstraintKind::Primary,
+                        "u" => ConstraintKind::Unique,
+                        "f" => ConstraintKind::ForeignKey,
+                        "c" => ConstraintKind::Check,
+                        "x" => ConstraintKind::Exclusion,
+                        _ => return Err(DbError::new(DbErrorKind::Unsupported)),
+                    };
+                    let target_schema: Option<String> = get(r, "target_schema")?;
+                    let target_name: Option<String> = get(r, "target_name")?;
+                    let target_visible = target_schema.is_some() && target_name.is_some();
+                    // pg_get_constraintdef can include an otherwise inaccessible
+                    // referenced table name. Do not render that raw definition.
+                    let definition = if kind == ConstraintKind::ForeignKey && !target_visible {
+                        "Foreign key references a relation not visible to this role".to_string()
+                    } else {
+                        get(r, "definition")?
+                    };
+                    Ok(Constraint {
+                        name: get(r, "name")?,
+                        kind,
+                        columns: get(r, "columns")?,
+                        references: target_schema
+                            .zip(target_name)
+                            .map(|(namespace, name)| RelationId { namespace, name }),
+                        referenced_columns: get(r, "target_columns")?,
+                        definition,
+                    })
+                })
+                .collect::<Result<Vec<_>, DbError>>()?,
+            MAX_DETAILS,
+        ))
     }
 
     pub async fn list_indexes(&self, id: &RelationId) -> Result<CatalogList<Index>, DbError> {
         let oid = self.relation_oid(id).await?;
-        let rows = self.bounded(sqlx::query(
-            r#"SELECT idx.relname::text AS name, i.indisunique AS unique_flag,
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT idx.relname::text AS name, i.indisunique AS unique_flag,
                       i.indisprimary AS primary_flag, i.indisvalid AS valid,
                       pg_catalog.pg_get_indexdef(i.indexrelid) AS definition,
                       pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS predicate,
@@ -266,22 +337,40 @@ impl PgCatalog {
                 FROM pg_catalog.pg_index i
                 JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid
                 WHERE i.indrelid::bigint=$1
-                ORDER BY idx.relname COLLATE "C" LIMIT $2"#
-        ).bind(oid).bind(MAX_DETAILS + 1).fetch_all(&self.pool)).await?;
-        Ok(capped(rows.iter().map(|r| Ok(Index {
-            name: get(r,"name")?, unique: get(r,"unique_flag")?,
-            primary: get(r,"primary_flag")?, valid: get(r,"valid")?,
-            predicate: get(r,"predicate")?, definition: get(r,"definition")?,
-            columns_or_expressions: get(r,"columns")?,
-        })).collect::<Result<Vec<_>,DbError>>()?, MAX_DETAILS))
+                ORDER BY idx.relname COLLATE "C" LIMIT $2"#,
+                )
+                .bind(oid)
+                .bind(MAX_DETAILS + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        Ok(capped(
+            rows.iter()
+                .map(|r| {
+                    Ok(Index {
+                        name: get(r, "name")?,
+                        unique: get(r, "unique_flag")?,
+                        primary: get(r, "primary_flag")?,
+                        valid: get(r, "valid")?,
+                        predicate: get(r, "predicate")?,
+                        definition: get(r, "definition")?,
+                        columns_or_expressions: get(r, "columns")?,
+                    })
+                })
+                .collect::<Result<Vec<_>, DbError>>()?,
+            MAX_DETAILS,
+        ))
     }
 
-    pub async fn list_partitions(&self, id: &RelationId)
-        -> Result<CatalogList<PartitionLink>, DbError>
-    {
+    pub async fn list_partitions(
+        &self,
+        id: &RelationId,
+    ) -> Result<CatalogList<PartitionLink>, DbError> {
         let oid = self.relation_oid(id).await?;
-        let rows = self.bounded(sqlx::query(
-            r#"SELECT pn.nspname::text AS parent_schema, p.relname::text AS parent_name,
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT pn.nspname::text AS parent_schema, p.relname::text AS parent_name,
                       cn.nspname::text AS child_schema, c.relname::text AS child_name,
                       pg_catalog.pg_get_expr(c.relpartbound,c.oid,true) AS bound
                 FROM pg_catalog.pg_inherits inh
@@ -295,21 +384,39 @@ impl PgCatalog {
                   AND pg_catalog.has_schema_privilege(cn.oid,'USAGE')
                   AND pg_catalog.has_table_privilege(p.oid,'SELECT')
                   AND pg_catalog.has_table_privilege(c.oid,'SELECT')
-                ORDER BY pn.nspname, p.relname, cn.nspname, c.relname LIMIT $2"#
-        ).bind(oid).bind(MAX_DETAILS + 1).fetch_all(&self.pool)).await?;
-        Ok(capped(rows.iter().map(|r| Ok(PartitionLink {
-            parent: RelationId { namespace: get(r,"parent_schema")?, name: get(r,"parent_name")? },
-            child: RelationId { namespace: get(r,"child_schema")?, name: get(r,"child_name")? },
-            bound: get(r,"bound")?,
-        })).collect::<Result<Vec<_>, DbError>>()?, MAX_DETAILS))
+                ORDER BY pn.nspname, p.relname, cn.nspname, c.relname LIMIT $2"#,
+                )
+                .bind(oid)
+                .bind(MAX_DETAILS + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        Ok(capped(
+            rows.iter()
+                .map(|r| {
+                    Ok(PartitionLink {
+                        parent: RelationId {
+                            namespace: get(r, "parent_schema")?,
+                            name: get(r, "parent_name")?,
+                        },
+                        child: RelationId {
+                            namespace: get(r, "child_schema")?,
+                            name: get(r, "child_name")?,
+                        },
+                        bound: get(r, "bound")?,
+                    })
+                })
+                .collect::<Result<Vec<_>, DbError>>()?,
+            MAX_DETAILS,
+        ))
     }
 
-    pub async fn relation_statistics(&self, id: &RelationId)
-        -> Result<RelationStats, DbError>
-    {
+    pub async fn relation_statistics(&self, id: &RelationId) -> Result<RelationStats, DbError> {
         let oid = self.relation_oid(id).await?;
-        let row = self.bounded(sqlx::query(
-            r#"SELECT CASE WHEN c.relkind IN ('r','m') AND c.reltuples>=0
+        let row = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT CASE WHEN c.relkind IN ('r','m') AND c.reltuples>=0
                          THEN c.reltuples::bigint ELSE NULL END AS rows_estimate,
                       CASE WHEN c.relkind IN ('r','m')
                          THEN pg_catalog.pg_table_size(c.oid) ELSE NULL END AS table_bytes,
@@ -318,27 +425,34 @@ impl PgCatalog {
                       CASE WHEN c.relkind IN ('r','m')
                          THEN pg_catalog.pg_total_relation_size(c.oid)
                          ELSE NULL END AS total_bytes
-                FROM pg_catalog.pg_class c WHERE c.oid::bigint=$1"#
-        ).bind(oid).fetch_one(&self.pool)).await?;
-        let estimate: Option<i64> = get(&row,"rows_estimate")?;
+                FROM pg_catalog.pg_class c WHERE c.oid::bigint=$1"#,
+                )
+                .bind(oid)
+                .fetch_one(&self.pool),
+            )
+            .await?;
+        let estimate: Option<i64> = get(&row, "rows_estimate")?;
         Ok(RelationStats {
             estimated_rows: estimate.map_or(Availability::Unavailable, Availability::Available),
-            table_bytes: available_bytes(get(&row,"table_bytes")?),
-            index_bytes: available_bytes(get(&row,"index_bytes")?),
-            total_bytes: available_bytes(get(&row,"total_bytes")?),
+            table_bytes: available_bytes(get(&row, "table_bytes")?),
+            index_bytes: available_bytes(get(&row, "index_bytes")?),
+            total_bytes: available_bytes(get(&row, "total_bytes")?),
         })
     }
 
     /// Metadata only. Never invoke routines or read sequence values.
-    pub async fn list_advanced(&self, namespace: &str)
-        -> Result<CatalogList<CatalogObject>, DbError>
-    {
+    pub async fn list_advanced(
+        &self,
+        namespace: &str,
+    ) -> Result<CatalogList<CatalogObject>, DbError> {
         Self::user_schema(namespace)?;
         // Select at most 501 visible object OIDs before decompiling
         // procedure/trigger bodies. This bounds expensive source retrieval
         // even when PostGIS installs thousands of public functions.
-        let rows = self.bounded(sqlx::query(
-            r#"WITH visible AS (
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    r#"WITH visible AS (
                 SELECT CASE p.prokind WHEN 'p' THEN 'procedure'
                        ELSE 'function' END::text AS kind,
                        n.nspname::text AS namespace,
@@ -388,24 +502,36 @@ impl PgCatalog {
                 SELECT kind,namespace,name,object_oid FROM visible
                 ORDER BY kind,name COLLATE "C" LIMIT $2
             ) chosen
-            ORDER BY chosen.kind,chosen.name COLLATE "C""#
-        ).bind(namespace).bind(MAX_RELATIONS+1).fetch_all(&self.pool)).await?;
-        Ok(capped(rows.iter().map(|r| {
-            let kind: String = get(r,"kind")?;
-            let kind = match kind.as_str() {
-                "function" => CatalogObjectKind::Function,
-                "procedure" => CatalogObjectKind::Procedure,
-                "sequence" => CatalogObjectKind::Sequence,
-                "type" => CatalogObjectKind::UserType,
-                "trigger" => CatalogObjectKind::Trigger,
-                _ => return Err(DbError::new(DbErrorKind::Unsupported)),
-            };
-            let def: Option<String> = get(r,"definition")?;
-            Ok(CatalogObject {
-                kind, namespace: get(r,"namespace")?, name: get(r,"name")?,
-                definition: def.map_or(Availability::Unavailable, Availability::Available),
-            })
-        }).collect::<Result<Vec<_>,DbError>>()?, MAX_RELATIONS))
+            ORDER BY chosen.kind,chosen.name COLLATE "C""#,
+                )
+                .bind(namespace)
+                .bind(MAX_RELATIONS + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        Ok(capped(
+            rows.iter()
+                .map(|r| {
+                    let kind: String = get(r, "kind")?;
+                    let kind = match kind.as_str() {
+                        "function" => CatalogObjectKind::Function,
+                        "procedure" => CatalogObjectKind::Procedure,
+                        "sequence" => CatalogObjectKind::Sequence,
+                        "type" => CatalogObjectKind::UserType,
+                        "trigger" => CatalogObjectKind::Trigger,
+                        _ => return Err(DbError::new(DbErrorKind::Unsupported)),
+                    };
+                    let def: Option<String> = get(r, "definition")?;
+                    Ok(CatalogObject {
+                        kind,
+                        namespace: get(r, "namespace")?,
+                        name: get(r, "name")?,
+                        definition: def.map_or(Availability::Unavailable, Availability::Available),
+                    })
+                })
+                .collect::<Result<Vec<_>, DbError>>()?,
+            MAX_RELATIONS,
+        ))
     }
 
     /// Estimated overview sizes (relpages * block_size). No table-wide scans.
@@ -416,8 +542,10 @@ impl PgCatalog {
         ).fetch_all(&self.pool)).await?
             .iter().take(64).map(|r| get(r,"name"))
             .collect::<Result<Vec<String>,DbError>>()?;
-        let largest = self.bounded(sqlx::query(
-            r#"SELECT n.nspname::text AS namespace, c.relname::text AS name,
+        let largest = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT n.nspname::text AS namespace, c.relname::text AS name,
                       GREATEST(c.relpages::bigint,0)
                         * pg_catalog.current_setting('block_size')::bigint AS bytes_estimate
                 FROM pg_catalog.pg_class c
@@ -428,12 +556,27 @@ impl PgCatalog {
                   AND pg_catalog.has_schema_privilege(n.oid,'USAGE')
                   AND pg_catalog.has_table_privilege(c.oid,'SELECT')
                 ORDER BY bytes_estimate DESC, n.nspname, c.relname
-                LIMIT $1"#
-        ).bind(MAX_OVERVIEW+1).fetch_all(&self.pool)).await?;
-        let largest = capped(largest.iter().map(|r| Ok((
-            RelationId { namespace: get(r,"namespace")?, name: get(r,"name")? },
-            available_bytes(get(r,"bytes_estimate")?)
-        ))).collect::<Result<Vec<_>,DbError>>()?, MAX_OVERVIEW);
+                LIMIT $1"#,
+                )
+                .bind(MAX_OVERVIEW + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        let largest = capped(
+            largest
+                .iter()
+                .map(|r| {
+                    Ok((
+                        RelationId {
+                            namespace: get(r, "namespace")?,
+                            name: get(r, "name")?,
+                        },
+                        available_bytes(get(r, "bytes_estimate")?),
+                    ))
+                })
+                .collect::<Result<Vec<_>, DbError>>()?,
+            MAX_OVERVIEW,
+        );
         let sizes = self.bounded(sqlx::query(
             r#"SELECT n.nspname::text AS namespace,
                       SUM(GREATEST(c.relpages::bigint,0)
@@ -448,13 +591,23 @@ impl PgCatalog {
                 GROUP BY n.nspname
                 ORDER BY bytes_estimate DESC, n.nspname LIMIT $1"#
         ).bind(MAX_SCHEMAS+1).fetch_all(&self.pool)).await?;
-        let sizes = capped(sizes.iter().map(|r| Ok(SchemaSize {
-            namespace: get(r,"namespace")?,
-            estimated_bytes: available_bytes(get(r,"bytes_estimate")?),
-        })).collect::<Result<Vec<_>,DbError>>()?, MAX_SCHEMAS);
+        let sizes = capped(
+            sizes
+                .iter()
+                .map(|r| {
+                    Ok(SchemaSize {
+                        namespace: get(r, "namespace")?,
+                        estimated_bytes: available_bytes(get(r, "bytes_estimate")?),
+                    })
+                })
+                .collect::<Result<Vec<_>, DbError>>()?,
+            MAX_SCHEMAS,
+        );
         // One bounded catalog count, never an N+1 query per schema.
-        let visible = self.bounded(sqlx::query(
-            r#"SELECT c.oid::bigint AS oid
+        let visible = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT c.oid::bigint AS oid
                 FROM pg_catalog.pg_class c
                 JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
                 WHERE c.relkind IN ('r','p','v','m','f')
@@ -462,27 +615,49 @@ impl PgCatalog {
                   AND n.nspname <> 'information_schema'
                   AND pg_catalog.has_schema_privilege(n.oid,'USAGE')
                   AND pg_catalog.has_table_privilege(c.oid,'SELECT')
-                LIMIT 5001"#
-        ).fetch_all(&self.pool)).await?;
+                LIMIT 5001"#,
+                )
+                .fetch_all(&self.pool),
+            )
+            .await?;
         let visible_relation_count = visible.len().min(5000);
-        let truncated = schemas.truncated || sizes.truncated || largest.truncated ||
-            visible.len() > 5000 || extensions.len() == 64;
+        let truncated = schemas.truncated
+            || sizes.truncated
+            || largest.truncated
+            || visible.len() > 5000
+            || extensions.len() == 64;
         Ok(Overview {
-            extensions, schema_sizes: sizes, largest_relations: largest,
-            visible_relation_count, visible_schema_count: schemas.items.len(), truncated,
+            extensions,
+            schema_sizes: sizes,
+            largest_relations: largest,
+            visible_relation_count,
+            visible_schema_count: schemas.items.len(),
+            truncated,
         })
     }
 }
 
 // RPITIT: consumers of the engine-neutral interface never access pg_catalog SQL.
 impl DatabaseAdapter for PgCatalog {
-    fn engine(&self) -> Engine { Engine::PostgreSql }
+    fn engine(&self) -> Engine {
+        Engine::PostgreSql
+    }
     fn supports(&self, capability: Capability) -> bool {
-        matches!(capability,
-            Capability::Schemas | Capability::Views | Capability::MaterializedViews |
-            Capability::Indexes | Capability::ForeignKeys | Capability::EstimatedRows |
-            Capability::StorageSizes | Capability::Routines | Capability::Sequences |
-            Capability::UserTypes | Capability::Triggers | Capability::PartitionHierarchy)
+        matches!(
+            capability,
+            Capability::Schemas
+                | Capability::Views
+                | Capability::MaterializedViews
+                | Capability::Indexes
+                | Capability::ForeignKeys
+                | Capability::EstimatedRows
+                | Capability::StorageSizes
+                | Capability::Routines
+                | Capability::Sequences
+                | Capability::UserTypes
+                | Capability::Triggers
+                | Capability::PartitionHierarchy
+        )
     }
     async fn namespaces(&self) -> Result<Vec<Namespace>, DbError> {
         Ok(self.list_schemas().await?.items)
@@ -491,22 +666,38 @@ impl DatabaseAdapter for PgCatalog {
         Ok(self.list_relations(namespace).await?.items)
     }
     async fn columns(&self, id: &RelationId) -> Result<Vec<Column>, DbError> {
-        Ok(self.describe_columns(id).await?.items.into_iter().map(|d| d.column).collect())
+        Ok(self
+            .describe_columns(id)
+            .await?
+            .items
+            .into_iter()
+            .map(|d| d.column)
+            .collect())
     }
     async fn statistics(&self, id: &RelationId) -> Result<RelationStats, DbError> {
         self.relation_statistics(id).await
     }
-    async fn column_details(&self, id: &RelationId)
-        -> Result<CatalogList<ColumnDetail>,DbError> { self.describe_columns(id).await }
-    async fn constraints(&self, id: &RelationId)
-        -> Result<CatalogList<Constraint>,DbError> { self.list_constraints(id).await }
-    async fn indexes(&self, id: &RelationId)
-        -> Result<CatalogList<Index>,DbError> { self.list_indexes(id).await }
-    async fn partitions(&self, id: &RelationId)
-        -> Result<CatalogList<PartitionLink>,DbError> { self.list_partitions(id).await }
-    async fn advanced_objects(&self, namespace: &str)
-        -> Result<CatalogList<CatalogObject>,DbError> { self.list_advanced(namespace).await }
-    async fn overview(&self) -> Result<Overview,DbError> { self.advanced_overview().await }
+    async fn column_details(&self, id: &RelationId) -> Result<CatalogList<ColumnDetail>, DbError> {
+        self.describe_columns(id).await
+    }
+    async fn constraints(&self, id: &RelationId) -> Result<CatalogList<Constraint>, DbError> {
+        self.list_constraints(id).await
+    }
+    async fn indexes(&self, id: &RelationId) -> Result<CatalogList<Index>, DbError> {
+        self.list_indexes(id).await
+    }
+    async fn partitions(&self, id: &RelationId) -> Result<CatalogList<PartitionLink>, DbError> {
+        self.list_partitions(id).await
+    }
+    async fn advanced_objects(
+        &self,
+        namespace: &str,
+    ) -> Result<CatalogList<CatalogObject>, DbError> {
+        self.list_advanced(namespace).await
+    }
+    async fn overview(&self) -> Result<Overview, DbError> {
+        self.advanced_overview().await
+    }
     async fn rows(&self, _: &RelationId, _: PageRequest) -> Result<RowPage, DbError> {
         Err(DbError::new(DbErrorKind::Unsupported))
     }
@@ -517,11 +708,17 @@ mod tests {
     use super::*;
     #[test]
     fn relation_kinds_preserve_partitions_and_views() {
-        assert_eq!(supported("p",false).unwrap(), RelationKind::PartitionedTable);
-        assert_eq!(supported("r",true).unwrap(), RelationKind::Partition);
-        assert_eq!(supported("m",false).unwrap(), RelationKind::MaterializedView);
-        assert_eq!(supported("f",false).unwrap(), RelationKind::ForeignTable);
-        assert!(supported("S",false).is_err());
+        assert_eq!(
+            supported("p", false).unwrap(),
+            RelationKind::PartitionedTable
+        );
+        assert_eq!(supported("r", true).unwrap(), RelationKind::Partition);
+        assert_eq!(
+            supported("m", false).unwrap(),
+            RelationKind::MaterializedView
+        );
+        assert_eq!(supported("f", false).unwrap(), RelationKind::ForeignTable);
+        assert!(supported("S", false).is_err());
     }
     #[test]
     fn system_schemas_are_never_navigable() {
@@ -533,7 +730,13 @@ mod tests {
     }
     #[test]
     fn truncation_is_explicit_and_stable() {
-        assert_eq!(capped(vec![1,2,3],2), CatalogList { items: vec![1,2], truncated: true });
+        assert_eq!(
+            capped(vec![1, 2, 3], 2),
+            CatalogList {
+                items: vec![1, 2],
+                truncated: true
+            }
+        );
         assert_eq!(available_bytes(None), Availability::Unavailable);
         assert_eq!(available_bytes(Some(-1)), Availability::Unavailable);
         assert_eq!(available_bytes(Some(0)), Availability::Available(0));
