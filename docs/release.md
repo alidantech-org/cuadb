@@ -16,7 +16,7 @@
 | Live evidence | `tests/*_live_http`, `rich_live_http`, `export_live`, `adapter_contract`, `performance_live` | `mysql_live_http` + shared | `mysql_live_http` + shared | `sqlite_live` + shared |
 | Not verified | PostgreSQL without PostGIS, TLS to a remote server, password auth via the test role | TLS, old versions | TLS, 5.7 | WAL with a live writer on a `:ro` mount |
 
-SQL Server: no adapter (see Group 13 notes). MariaDB and MySQL are tested separately; neither result is claimed for the other.
+The supported engine scope is PostgreSQL, MySQL, MariaDB and SQLite. MariaDB and MySQL are tested separately; neither result is claimed for the other. Do not add another engine until the current feature roadmap is complete.
 
 ## Connecting
 - Single server: `CUADB_DATABASE_URL`; several: `CUADB_PROFILES_FILE` (see README, *Connection profiles*). Examples: `postgresql://viewer:***@host:5432/db`, `mysql://...`, `mariadb://...`, `sqlite:////data/app.db`.
