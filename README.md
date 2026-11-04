@@ -98,7 +98,7 @@ CuaDB validates typed settings before binding its HTTP listener. Errors identify
 | --- | --- | --- | --- |
 | `CUADB_HOST` | `127.0.0.1` | IPv4 or IPv6 literal | HTTP listener |
 | `CUADB_PORT` | `4848` | 1–65535 | HTTP listener |
-| `CUADB_DATABASE_URL` | Unset | Explicit PostgreSQL URL with trusted hostname, user/password, database and approved TLS options | Validated and used by the PostgreSQL pool |
+| `CUADB_DATABASE_URL` | Unset | PostgreSQL URL with host/user/database, plus password unless the host is loopback | Validated and used by the PostgreSQL pool |
 | `CUADB_CONNECTION_TIMEOUT_MS` | `5000` | 100–60000 | SQLx pool acquisition/connection deadline |
 | `CUADB_QUERY_TIMEOUT_MS` | `15000` | 100–120000 | PostgreSQL statement/lock timeouts and status probe |
 | `CUADB_REQUEST_TIMEOUT_MS` | `30000` | 500–180000 | Future HTTP request bounds |
@@ -106,7 +106,7 @@ CuaDB validates typed settings before binding its HTTP listener. Errors identify
 | `CUADB_MAX_PAGE_SIZE` | `100` | 1–500 | Future grid |
 | `CUADB_MAX_POOL_CONNECTIONS` | `4` | 1–32 | Maximum SQLx pooled connections |
 
-The default page size reduces automatically when only the maximum is lowered; an explicitly configured default above the maximum is rejected. The PostgreSQL adapter checks URL structure, disallows arbitrary driver parameters, requires an explicit host/user/password/database, and defaults to certificate- and hostname-verified TLS (`sslmode=verify-full`); an explicit `sslmode=disable` is permitted for trusted private local networks. A configured URL triggers a background connection probe, but does not enable table browsing yet. See [PostgreSQL connection and security guide](docs/postgresql-connections.md).
+The default page size reduces automatically when only the maximum is lowered; an explicitly configured default above the maximum is rejected. The PostgreSQL adapter checks URL structure, disallows arbitrary driver parameters, requires an explicit host/user/database and a password for non-loopback hosts. Passwordless URLs are accepted only for localhost/loopback development, where TLS defaults to disabled; remote connections still default to certificate- and hostname-verified TLS (`sslmode=verify-full`). An explicit `sslmode=disable` is permitted on other trusted private networks when using a password. A configured URL triggers a background connection probe, but does not enable table browsing yet. See [PostgreSQL connection and security guide](docs/postgresql-connections.md).
 
 To change the local port:
 

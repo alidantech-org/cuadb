@@ -64,7 +64,29 @@ postgresql://username:percent-encoded-password@host:5432/database?sslmode=requir
 postgres://username:percent-encoded-password@host:5432/database?sslmode=verify-full
 ```
 
-Host, username, password and database are **required**. `sslmode` supports:
+Host, username and database are **required**. A password is mandatory for
+non-loopback hosts. **Only** `localhost`, loopback IPv4 addresses (127.0.0.0/8)
+and IPv6 `::1` may omit the password, for trusted local development.
+For example, a PostgreSQL installation using local trust authentication may
+use exactly:
+
+```text
+postgresql://postgres@localhost:5432/postgres
+```
+
+For a passwordless loopback URL, the default is `sslmode=disable` because
+local test servers commonly lack trusted TLS certificates. This exception
+does **not** apply to Docker hostname `postgis`, LAN IPs, or remote
+connections. Those still require passwords and default to `verify-full`.
+Passwordless access is allowed by PostgreSQL's server-side authentication
+configuration, not enabled by CuaDB.
+
+**Security:** The PostgreSQL `postgres` role is normally a superuser. Use
+this URL only with a trusted local/throwaway database, and use a dedicated
+least-privilege reader for normal CuaDB deployments. Never configure
+PostgreSQL to accept passwordless access from arbitrary network clients.
+
+`sslmode` supports:
 `require`, `verify-ca`, `verify-full`, and **explicit local-network-only**
 `disable`. **`verify-full` is the default** when omitted; it verifies the
 server hostname and certificate chain. `require` only encrypts traffic and
@@ -160,3 +182,41 @@ INSERT, UPDATE, DELETE, DDL, or schema creation.
 Do not point these tests at the existing personal `postgis` database.
 Run live fixtures separately from unit tests; the database catalog and
 paged row tests are upcoming tasks.
+
+## Diagnosing a 404 from the connection status route
+
+If `/health` returns 200 but `/connection/status` returns 404, that is a
+strong sign an **older CuaDB binary or another HTTP process** is still
+listening on port 4848. A live PostgreSQL connection is not required for the
+route to exist.
+
+```bash
+ss -ltnp '( sport = :4848 )'
+# Stop the process identified above (Ctrl+C if running via bun run dev).
+# Verify the old listener exits before launching another CuaDB instance.
+git pull --ff-only origin main
+bun run dev
+```
+
+With a configured database URL, run the following in a second terminal:
+
+```bash
+curl -i http://127.0.0.1:4848/health
+curl -i http://127.0.0.1:4848/connection/status
+```
+
+Both paths should return HTTP 200. The second should contain a safe
+connection label such as `Connected`, `Unavailable`, or `Not configured`.
+An error reaching the database must not turn this route into a 404.
+
+For a **read-only** live check of a localhost trust-auth installation:
+
+```bash
+CUADB_TEST_LOCAL_TRUST_URL='postgresql://postgres@localhost:5432/postgres' \\
+  cargo test --locked --test postgres_connection local_passwordless_postgres
+```
+
+If authentication fails, inspect the PostgreSQL server's `pg_hba.conf` and
+the network address that CuaDB actually reaches. A URL with `localhost`
+from inside Docker points to the CuaDB container itself, not the host or the
+separate `postgis` container.

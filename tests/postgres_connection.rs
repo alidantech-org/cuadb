@@ -84,6 +84,22 @@ async fn configured_but_unreachable_database_does_not_break_health() {
     state.close().await;
 }
 
+/// Opt-in read-only verification for a localhost PostgreSQL installation
+/// using trust authentication. This executes only connection bootstrap and
+/// SELECT checks; it does not create or modify database objects.
+#[tokio::test]
+async fn local_passwordless_postgres_can_pass_the_read_only_probe() {
+    let Ok(url) = std::env::var("CUADB_TEST_LOCAL_TRUST_URL") else {
+        return;
+    };
+    let config = Config::from_values(&[]).unwrap();
+    let manager = PgManager::new(&url, &config.limits).unwrap();
+    let snapshot = manager.snapshot().await;
+    assert_eq!(snapshot.status, ConnectionStatus::Ready);
+    assert!(manager.read_only_session_verified().await.unwrap());
+    manager.close().await;
+}
+
 /// Only runs against a disposable PostgreSQL database with a SELECT-only role.
 /// The test itself never creates, modifies, truncates or deletes any data.
 #[tokio::test]

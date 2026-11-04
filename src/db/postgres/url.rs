@@ -1,8 +1,9 @@
 //! Strict parsing of operator-controlled PostgreSQL connection URLs.
 //!
 //! SQLx has liberal libpq defaults (including PG* environment and pgpass).
-//! CuaDB deliberately requires an explicit network host, user, password and
-//! database, and allows only a small TLS query-option set.
+//! CuaDB requires an explicit host, user and database. Passwords are required
+//! outside loopback; a local trust-auth fixture may omit one. TLS and URL
+//! parameters remain restricted, and connection settings never enter HTML.
 
 use std::{fmt, str::FromStr};
 
@@ -10,7 +11,7 @@ use sqlx::{
     ConnectOptions,
     postgres::{PgConnectOptions, PgSslMode},
 };
-use url::Url;
+use url::{Host, Url};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UrlError {
@@ -32,7 +33,7 @@ impl fmt::Display for UrlError {
             Self::Scheme => "must begin with postgres:// or postgresql://",
             Self::Host => "must specify one TCP hostname or IP address",
             Self::Username => "must specify a username",
-            Self::Password => "must specify a password in the operator configuration",
+            Self::Password => "must supply a password except for local loopback connections",
             Self::Database => "must specify one nonempty database name",
             Self::Encoding => "contains an invalid percent-encoded character",
             Self::Parameter => "contains an unsupported or duplicate connection parameter",
@@ -88,7 +89,18 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
     if url.username().is_empty() {
         return Err(UrlError::Username);
     }
-    if url.password().is_none_or(str::is_empty) {
+    // Trust authentication is useful for a single-user development machine.
+    // Never permit an omitted/empty password for remote targets, even if the
+    // operator configured plaintext TLS. Only literal loopback IPs and the
+    // exact hostname "localhost" qualify; other DNS names are not trusted.
+    let loopback = match url.host() {
+        Some(Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
+        Some(Host::Ipv4(address)) => address.is_loopback(),
+        Some(Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    };
+    let passwordless = url.password().is_none_or(str::is_empty);
+    if passwordless && !loopback {
         return Err(UrlError::Password);
     }
 
@@ -103,7 +115,10 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
         return Err(UrlError::Database);
     }
 
-    let mut mode = PgSslMode::VerifyFull;
+    // Local trust-auth PostgreSQL commonly has no TLS certificate. Remote
+    // targets still require verified TLS unless the operator explicitly opts
+    // into another supported mode.
+    let mut mode = if passwordless { PgSslMode::Disable } else { PgSslMode::VerifyFull };
     let mut seen_mode = false;
     let mut seen_cert = false;
     for (key, value) in url.query_pairs() {
@@ -131,10 +146,26 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
         return Err(UrlError::TlsMode);
     }
 
-    let mut options = PgConnectOptions::from_str(raw).map_err(|_| UrlError::Malformed)?;
-    if !seen_mode {
-        options = options.ssl_mode(mode);
+    // SQLx 0.8.x loads libpq environment defaults and .pgpass during parsing.
+    // Explicitly set an empty password in the URL before it reaches SQLx to
+    // prevent .pgpass fallback for a passwordless loopback connection.
+    let mut driver_url = url;
+    if passwordless && driver_url.password().is_none() {
+        driver_url
+            .set_password(Some(""))
+            .map_err(|_| UrlError::Malformed)?;
     }
+    let mut options =
+        PgConnectOptions::from_str(driver_url.as_str()).map_err(|_| UrlError::Malformed)?;
+    if passwordless {
+        options = options.password("");
+    }
+    // An inherited PGOPTIONS value could alter startup/session behavior.
+    // Reject it; trusted URLs cannot enable arbitrary connection options.
+    if options.get_options().is_some() {
+        return Err(UrlError::Parameter);
+    }
+    options = options.ssl_mode(mode).port(driver_url.port().unwrap_or(5432));
     // Credentials and SQL are never passed to SQLx's query logger.
     options = options
         .application_name("cuadb")
@@ -187,6 +218,57 @@ mod tests {
         ] {
             assert_eq!(parse(url).unwrap_err(), expected);
         }
+    }
+
+    #[test]
+    fn accepts_passwordless_local_postgres_only() {
+        for raw in [
+            "postgresql://postgres@localhost:5432/postgres",
+            "postgres://postgres@127.0.0.1:5432/postgres",
+            "postgres://postgres@[::1]:5432/postgres",
+            "postgres://postgres:@localhost:5432/postgres",
+        ] {
+            let options = parse(raw).unwrap().into_options();
+            assert_eq!(options.get_username(), "postgres");
+            assert_eq!(options.get_database(), Some("postgres"));
+            assert!(matches!(
+                options.get_ssl_mode(),
+                sqlx::postgres::PgSslMode::Disable
+            ));
+        }
+    }
+
+    #[test]
+    fn rejects_passwordless_non_loopback_hosts() {
+        for raw in [
+            "postgresql://postgres@db:5432/postgres",
+            "postgresql://postgres@postgis:5432/postgres?sslmode=disable",
+            "postgresql://postgres@192.168.1.2:5432/postgres",
+            "postgresql://postgres:@example.com:5432/postgres",
+        ] {
+            assert_eq!(parse(raw).unwrap_err(), UrlError::Password);
+        }
+    }
+
+    #[test]
+    fn explicit_tls_settings_override_loopback_defaults() {
+        let options = parse(
+            "postgresql://postgres@localhost:5432/postgres?sslmode=verify-full",
+        )
+        .unwrap()
+        .into_options();
+        assert!(matches!(
+            options.get_ssl_mode(),
+            sqlx::postgres::PgSslMode::VerifyFull
+        ));
+
+        let remote = parse("postgresql://viewer:secret@remote-db:5432/appdb")
+            .unwrap()
+            .into_options();
+        assert!(matches!(
+            remote.get_ssl_mode(),
+            sqlx::postgres::PgSslMode::VerifyFull
+        ));
     }
 
     #[test]
