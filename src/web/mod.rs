@@ -1,6 +1,7 @@
 //! HTML endpoints: full pages and reusable fragments rendered by Askama.
 
 pub mod catalog;
+pub mod export;
 pub mod rows;
 
 use askama::Template;

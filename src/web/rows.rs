@@ -74,7 +74,7 @@ struct ColumnView {
 fn invalid() -> AppError {
     AppError::new(ErrorKind::InvalidInput)
 }
-fn classified(db: DbError) -> AppError {
+pub(super) fn classified(db: DbError) -> AppError {
     AppError::new(match db.kind {
         DbErrorKind::InvalidIdentifier => ErrorKind::InvalidInput,
         DbErrorKind::PermissionDenied => ErrorKind::Forbidden,
@@ -112,7 +112,7 @@ fn value_class(native_type: &str) -> &'static str {
         ""
     }
 }
-fn detail_value(cell: &crate::db::types::Cell, native_type: &str) -> String {
+pub(super) fn detail_value(cell: &crate::db::types::Cell, native_type: &str) -> String {
     use crate::db::types::Cell;
     match cell {
         Cell::Text(text) | Cell::Decimal(text) => {
@@ -141,28 +141,28 @@ fn detail_value(cell: &crate::db::types::Cell, native_type: &str) -> String {
     }
 }
 #[derive(Clone)]
-struct Navigation {
-    id: RelationId,
-    options: RowOptions,
+pub(super) struct Navigation {
+    pub(super) id: RelationId,
+    pub(super) options: RowOptions,
 }
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DataQuery {
-    schema: String,
-    relation: String,
-    size: Option<u32>,
-    page: Option<u32>,
-    sort: Option<String>,
-    direction: Option<String>,
-    cursor: Option<String>,
-    filter: Option<String>,
-    spatial: Option<String>,
-    pick: Option<String>,
+    pub(super) schema: String,
+    pub(super) relation: String,
+    pub(super) size: Option<u32>,
+    pub(super) page: Option<u32>,
+    pub(super) sort: Option<String>,
+    pub(super) direction: Option<String>,
+    pub(super) cursor: Option<String>,
+    pub(super) filter: Option<String>,
+    pub(super) spatial: Option<String>,
+    pub(super) pick: Option<String>,
     #[serde(default)]
-    column: Vec<String>,
+    pub(super) column: Vec<String>,
 }
 
-fn parse(query: DataQuery) -> Result<Navigation, AppError> {
+pub(super) fn parse(query: DataQuery) -> Result<Navigation, AppError> {
     if query.column.len() > 24
         || query
             .filter

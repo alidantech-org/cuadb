@@ -12,8 +12,8 @@ use cuadb::{
     db::{
         adapter::DatabaseAdapter,
         types::{
-            Capability, Column, DbError, DbErrorKind, Engine, Namespace, PageRequest, Relation,
-            RelationId, RelationKind, RelationStats, RowPage,
+            Availability, Capability, Cell, Column, DbError, DbErrorKind, Engine, Namespace,
+            PageRequest, Relation, RelationId, RelationKind, RelationStats, RowOptions, RowPage,
         },
     },
     state::AppState,
@@ -66,6 +66,39 @@ impl DatabaseAdapter for Fake {
     }
     async fn statistics(&self, _: &RelationId) -> Result<RelationStats, DbError> {
         Err(DbError::new(DbErrorKind::Unsupported))
+    }
+    async fn page(&self, _: &RelationId, options: RowOptions) -> Result<RowPage, DbError> {
+        if matches!(self.0, Mode::Denied) {
+            return Err(DbError::new(DbErrorKind::PermissionDenied));
+        }
+        // 250 rows in pages of options.limit, addressed by page number.
+        let start = (options.page as usize) * options.limit as usize;
+        let end = (start + options.limit as usize).min(250);
+        let col = |name: &str| Column {
+            name: name.into(),
+            native_type: "text".into(),
+            nullable: true,
+            primary_key: false,
+            default_expression: None,
+        };
+        Ok(RowPage {
+            available_columns: vec![col("id"), col("note")],
+            columns: vec![col("id"), col("note")],
+            rows: (start..end)
+                .map(|i| vec![Cell::Integer(i as i64), Cell::Text(format!("=cmd{i}"))])
+                .collect(),
+            has_more: end < 250,
+            approximate_total: Availability::Unavailable,
+            previews: vec![],
+            has_previous: start > 0,
+            next_cursor: None,
+            previous_cursor: None,
+            stable_order: true,
+            keyset_enabled: false,
+            page: options.page,
+            offset: start as u64,
+            truncated_columns: false,
+        })
     }
     async fn rows(&self, _: &RelationId, _: PageRequest) -> Result<RowPage, DbError> {
         Err(DbError::new(DbErrorKind::Unsupported))
@@ -125,4 +158,78 @@ async fn slow_adapter_is_cut_off_by_the_request_timeout() {
             || status == StatusCode::SERVICE_UNAVAILABLE,
         "{status}"
     );
+}
+
+#[tokio::test]
+async fn csv_export_of_one_page_is_bounded_and_formula_safe() {
+    let (status, body) = get(
+        Mode::Healthy,
+        "/catalog/export?schema=main&relation=t&format=csv&size=3",
+        2000,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let lines: Vec<&str> = body.trim_end().split("\r\n").collect();
+    assert_eq!(lines[0], "id,note");
+    assert_eq!(lines.len(), 4);
+    assert_eq!(lines[1], "0,\"'=cmd0\"");
+}
+
+#[tokio::test]
+async fn relation_scope_walks_pages_and_json_reports_completeness() {
+    let (status, body) = get(
+        Mode::Healthy,
+        "/catalog/export?schema=main&relation=t&format=json&scope=relation",
+        5000,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let doc: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(doc["rows"].as_array().unwrap().len(), 250);
+    assert_eq!(doc["truncated"], false);
+}
+
+#[tokio::test]
+async fn export_rejects_unknown_formats_scopes_and_browser_supplied_targets() {
+    for path in [
+        "/catalog/export?schema=main&relation=t&format=xml",
+        "/catalog/export?schema=main&relation=t&format=csv&scope=all",
+        "/catalog/export?schema=main&relation=t&format=csv&scope=relation&page=1",
+        "/catalog/export?schema=main&relation=t&format=csv&size=101",
+        "/catalog/export?schema=main&relation=t&format=csv&sql=select+1",
+        "/catalog/export?schema=main&relation=t&format=csv&url=postgres://x",
+    ] {
+        let (status, _) = get(Mode::Healthy, path, 2000).await;
+        assert!(status.is_client_error(), "{path} -> {status}");
+    }
+}
+
+#[tokio::test]
+async fn export_headers_are_attachment_no_store_and_permission_errors_are_403() {
+    let config = Config::from_values(&[]).unwrap();
+    let app = router_with_state(
+        &config.limits,
+        AppState::with_adapter(Arc::new(Fake(Mode::Healthy))),
+    );
+    let r = app
+        .oneshot(
+            Request::get("/catalog/export?schema=a%22b&relation=t&format=csv")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(r.headers()["cache-control"], "no-store");
+    assert_eq!(r.headers()["content-type"], "text/csv; charset=utf-8");
+    assert_eq!(
+        r.headers()["content-disposition"],
+        "attachment; filename=\"a_b_t.csv\""
+    );
+    let (status, _) = get(
+        Mode::Denied,
+        "/catalog/export?schema=main&relation=t&format=csv",
+        2000,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
 }

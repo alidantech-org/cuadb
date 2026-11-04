@@ -43,3 +43,7 @@ Implemented Axum GET contracts with typed serde query models for catalog and row
 ### 2026-11-04T13:12:04.840Z · PETER IRUNGU
 
 Item 5 verified: tests/router_fake_adapter.rs drives the real router with an in-memory adapter (AppState::with_adapter): escaping, relation listing, permission-denied (403/in-region fragment), no driver text leak, slow adapter cut off by request timeout. Items 7-8 remain open (export routes not implemented; state preservation is UI).
+
+### 2026-11-04T13:14:12.788Z · PETER IRUNGU
+
+Item 7 PARTIAL: bounded CSV/JSON export route /catalog/export implemented (row 10k/byte 16MiB caps, formula-safe CSV, attachment+no-store, timeout cancellation, tests in router_fake_adapter.rs, documented in README). Linked-table ZIP not implemented; walk not yet verified against a live adapter. Item stays open.

@@ -37,6 +37,16 @@ keys receive opaque next/previous cursor tokens; otherwise bounded offset
 pagination is used. See [the row-query contract](docs/postgresql-rows.md)
 for caps, limitations, fixture tests and export policy.
 
+## Bounded export (Group 05)
+
+`GET /catalog/export?schema=&relation=&format=csv|json[&scope=page|relation][&size=&page=&sort=&direction=&filter=&column=]`
+
+- Rows come from the same validated, SELECT-scoped adapter paging as the grid; no SQL or connection target is accepted.
+- `scope=page` (default) exports the requested page (size ≤ 100). `scope=relation` walks pages until the end or a cap: 10,000 rows and 16 MiB. Hitting a cap, a truncated cell or truncated columns sets `x-cuadb-export-truncated: true` (JSON also has a `truncated` field).
+- CSV neutralizes formula-leading text cells (`= + - @`, tab, CR) with a leading `'`. Responses are `attachment`, `no-store`, with an ASCII-safe filename.
+- The request timeout cancels a running export. Output is buffered within the byte cap, not streamed.
+- Linked-table ZIP export is **not implemented**.
+
 ## Canonical frontend UI reference
 
 The committed [CuaDB UI demo](assets/cuadb-ui-demo.html) is the **mandatory visual and interaction reference** for implementation, not a loose example. The final Rust/Askama/HTMX frontend must faithfully reproduce the demo's compact sidebar, resizer, Simple/Advanced explorer, Data/Structure/Indexes switcher, dense grid, row inspector, bottom connection/settings controls, themes and export menus. Compare against the standalone HTML at matching desktop/mobile viewports before completing frontend tasks.

@@ -71,6 +71,7 @@ pub fn router_with_limits(limits: &Limits) -> Router {
         .route("/catalog/advanced", get(web::catalog::advanced))
         .route("/catalog/overview", get(web::catalog::overview))
         .route("/catalog/data", get(web::rows::data))
+        .route("/catalog/export", get(web::export::export))
         .nest_service("/static", ServeDir::new("public"));
 
     apply_policy(
@@ -94,6 +95,7 @@ pub fn router_with_state(limits: &Limits, state: crate::state::AppState) -> Rout
         .route("/catalog/advanced", get(web::catalog::advanced))
         .route("/catalog/overview", get(web::catalog::overview))
         .route("/catalog/data", get(web::rows::data))
+        .route("/catalog/export", get(web::export::export))
         .nest_service("/static", ServeDir::new("public"))
         .with_state(state);
     apply_policy(routes, RequestPolicy::from_limits(limits))
