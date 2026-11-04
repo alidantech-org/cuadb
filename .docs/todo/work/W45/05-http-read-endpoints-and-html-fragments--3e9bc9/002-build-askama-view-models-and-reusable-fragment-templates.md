@@ -27,9 +27,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 **Mandatory reference:** `assets/cuadb-ui-demo.html`, with the complete interaction and visual contract in `.docs/docs/frontend-interactions.md`. Reproduce the exact applicable layout and behaviors rather than designing a new interface. The HTML file uses fake records; the actual implementation must render verified database-backed content with safe Rust endpoints and HTMX swaps. This requirement is part of task completion, not a future polish option.
 
 ### Reference-specific acceptance
-- [ ] Map Askama pages/fragments directly to demo regions: #side/#tree, bottom #cbtn/#spop, #rs splitter, #mainbody, .bar toolbar, .gw grid, #insp detail panel and .foot footer.
+- [x] Map Askama pages/fragments directly to demo regions: #side/#tree, bottom #cbtn/#spop, #rs splitter, #mainbody, .bar toolbar, .gw grid, #insp detail panel and .foot footer.
 - [ ] Render both Simple and Advanced explorer layouts and the database Overview, table Data/Structure/Indexes and read-only metadata object detail screens with the demo's compact component hierarchy.
-- [ ] Retain the demo's visual layout instead of introducing an unrelated global header, generic dashboard or alternate navigation model.
+- [x] Retain the demo's visual layout instead of introducing an unrelated global header, generic dashboard or alternate navigation model.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
@@ -39,7 +39,7 @@ The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switche
 
 ### Amendment acceptance
 - [ ] Every full page and fragment receives a principal view model (display name, role, local-or-authenticated mode, CSRF token, SQL-workspace and write capability flags) and shared popover, modal and toast partials exist.
-- [ ] No template emits `style=` attributes or inline handlers; bar widths, swatches and density use classes, `data-*` attributes or CSS variables set from bundled JS.
+- [x] No template emits `style=` attributes or inline handlers; bar widths, swatches and density use classes, `data-*` attributes or CSS variables set from bundled JS.
 - [ ] Fragments for the new surfaces (account block, database switcher, connection modal, admin tabs, row editor, SQL workspace) are Askama partials, each with empty, loading, denied and error states.
 
 ## Comments
@@ -51,3 +51,7 @@ Introduced reusable escaped catalog fragments and compact app shell regions for 
 ### 2026-11-04T13:50:13.631Z · PETER IRUNGU
 
 Item 2 PARTIAL: Data/Structure/Indexes tab nav extracted to templates/components/relation_tabs.html (structure + indexes pages). catalog.html and data_page.html still carry their own nav markup (data_page differs: Data is a button). Items 6-8 are UI (Phase B).
+
+### 2026-11-04T23:31:43.029Z · PETER IRUNGU
+
+Phase 2 progress (2026-11-05): explorer.html, schema_tree, relation_tree, data_page, structure_page, indexes_page, catalog, profile_list, settings and login now emit the demo regions (#side/#tree, #cbtn/#spop, #rs, #mainbody, .bar, .gw, #insp, .foot) with no global header, and tests assert no inline style or script. Still open: item 2 (some components still duplicated), item 7 (Advanced Overview and metadata object pages need the new backend metadata in Group 15), item 9 (principal view model reaches only the explorer and login pages) and item 11 (new-surface partials).
