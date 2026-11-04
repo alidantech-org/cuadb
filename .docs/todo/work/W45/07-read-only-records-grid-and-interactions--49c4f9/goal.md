@@ -22,3 +22,7 @@ Every listed result must be supported by tests, safe failure handling, and updat
 
 ## Boundaries
 Do not implement adjacent groups speculatively. Keep changes modular, add tests that can run without a live database when possible, and document any fixture-only validation explicitly. Preserve the existing Bun root commands and localhost deployment assumptions. Record decisions and unexpected compatibility limits in the Task workspace.
+
+## Mandatory visual acceptance
+
+The canonical frontend specification for this group is `assets/cuadb-ui-demo.html`, reinforced by `.docs/docs/frontend-interactions.md`. It is a binding acceptance baseline for all related tasks, not an alternative design sketch. Completion means a data-backed grid visually and behaviorally matching the demonstration: type-annotated sticky headers, row rail, status pills, dense rows, sorting cycle, 25/50/100 pagination, column visibility, row inspector, foreign-key navigation, copy actions, menus, toasts and permitted exports. Include Advanced linked-table ZIP selection using a secure streaming or bounded export strategy; never copy the prototype's unbounded in-memory full-table reads into production. All relevant tasks must pass a side-by-side comparison against the same browser viewport, mode and selected object state, and must not be marked complete based on a different layout.

@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Support full-page requests and HTMX fragment responses where appropriate.
 - [ ] Add isolated router tests with a fake adapter rather than requiring a live database.
 
+## Canonical UI fidelity
+
+**Mandatory reference:** `assets/cuadb-ui-demo.html`, with the complete interaction and visual contract in `.docs/docs/frontend-interactions.md`. Reproduce the exact applicable layout and behaviors rather than designing a new interface. The HTML file uses fake records; the actual implementation must render verified database-backed content with safe Rust endpoints and HTMX swaps. This requirement is part of task completion, not a future polish option.
+
+### Reference-specific acceptance
+- [ ] Expose typed read-only routes for the demo's sidebar tree, selected-object toolbar, Data/Structure/Indexes segment, Overview and advanced metadata screens, with all relation identifiers and options checked server-side.
+- [ ] Specify secure, cancellable, resource-bounded backend routes for the demo's CSV/JSON exports and linked-table ZIP; do not implement its unbounded JavaScript whole-table export against real data.
+- [ ] Preserve the selected connection, relation, row filter, column visibility, sort and page state across the same on-screen controls shown in the reference.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

@@ -15,3 +15,7 @@ Work through the tasks in their listed order unless dependencies or test evidenc
 
 ## Deliverables
 The group is accepted when its linked tasks are completed with evidence, its README or architecture documentation accurately reflects the implemented features, and the app remains usable with the existing shell and single Docker container constraints.
+
+## Demo fidelity implementation plan
+
+**Required reference:** `assets/cuadb-ui-demo.html` and `.docs/docs/frontend-interactions.md`. Define server routes and view models that correspond exactly to the HTML demo's distinct sections before implementing interactions. Treat each HTMX fragment as part of the existing shell, preserve stable swap targets and keep context navigation when server-side data changes. Document safe exports as server-driven data transfer rather than browser-side full-table memory snapshots. At least 1440×900 and 390×844 comparisons must be recorded with light/dark states where applicable. The demo's example values are fixture data only; deliver server-backed, permission-aware read-only functionality. Any material visual exception must be documented and approved before group completion.

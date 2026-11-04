@@ -22,5 +22,13 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Keep ordinary unit tests runnable offline without Docker or databases.
 - [ ] Document fixture cleanup, local commands and any optional test dependencies.
 
+## UI-demo backend support
+
+The real frontend must match the canonical committed `assets/cuadb-ui-demo.html`. This backend/release task must expose the safe metadata or data behavior required by the reference rather than forcing the frontend to fake its controls. The complete cross-layer fidelity contract is `.docs/docs/frontend-interactions.md`.
+
+### Demo-related acceptance
+- [ ] Add visual-regression acceptance against assets/cuadb-ui-demo.html at 1440×900, 1280×800 and 390×844, covering light/dark, Simple/Advanced, Data/Structure/Indexes, Overview, inspector and popovers with deterministic fixtures.
+- [ ] Exercise every reference interaction, including search/sort/page, connection switch, settings persistence, safe CSV/JSON and linked ZIP exports, mobile menu, theme changes and Ctrl/Cmd+K/Escape behavior.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

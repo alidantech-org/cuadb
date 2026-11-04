@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Test special characters, case sensitivity and large table lists.
 - [ ] Keep search requests bounded and debounce remote requests when used.
 
+## Canonical UI fidelity
+
+**Mandatory visual specification:** `assets/cuadb-ui-demo.html` (see `.docs/docs/frontend-interactions.md`). Its sidebar, interactions, state patterns and typography are required, not decorative inspiration. Recreate the reference with Askama/HTMX, Tailwind and minimal JavaScript using actual database data; do not replace the interface with a conventional dashboard. Safety and accessible real-data states may adapt the underlying mechanism, not silently redesign the appearance.
+
+### Reference-specific acceptance
+- [ ] Place the 'Search tables…' field and optional selection control exactly as in the demo sidebar; filter matching schema/relation names with the same compact 'Nothing matches' state.
+- [ ] Keep the demo's schema-qualified table name in the small main toolbar rather than adding a new breadcrumb navigation strip.
+- [ ] Support Ctrl/Cmd+K to reveal/focus/select the sidebar search and retain expansion/selection state during searches and relation changes.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

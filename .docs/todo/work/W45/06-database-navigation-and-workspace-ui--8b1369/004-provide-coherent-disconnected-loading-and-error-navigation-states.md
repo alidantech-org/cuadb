@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Prevent stale navigation fragments after fast table switching.
 - [ ] Test accessibility announcements and focus retention during HTMX swaps.
 
+## Canonical UI fidelity
+
+**Mandatory visual specification:** `assets/cuadb-ui-demo.html` (see `.docs/docs/frontend-interactions.md`). Its sidebar, interactions, state patterns and typography are required, not decorative inspiration. Recreate the reference with Askama/HTMX, Tailwind and minimal JavaScript using actual database data; do not replace the interface with a conventional dashboard. Safety and accessible real-data states may adapt the underlying mechanism, not silently redesign the appearance.
+
+### Reference-specific acceptance
+- [ ] Use the same demo shell to show disconnected, connecting, offline and forbidden database states without displaying the demo's synthetic sample records as live content.
+- [ ] Use compact connection badges, empty grid/sidebar regions and toast feedback instead of visually unrelated full-screen status cards.
+- [ ] Preserve the mobile sidebar toggle and row inspector positioning, including recovery when the selected table or connection becomes unavailable.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

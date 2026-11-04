@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Test empty, partitioned, foreign and permission-restricted fixture scenarios.
 - [ ] Use the same capability flags that other database adapters will expose.
 
+## Canonical UI fidelity
+
+The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/frontend-interactions.md`. Match its actual visible control labels, compact placement and selected-object behavior. In particular, the source uses **Data / Structure / Indexes** in its table toolbar and a separate Advanced **Overview**, so the older plan's independent `Info` tab terminology is superseded. The production UI uses safe real metadata rather than hard-coded statistics. User approval is required for material visual changes.
+
+### Reference-specific acceptance
+- [ ] Expose indexes and storage in the demo's 'Indexes' segment, NOT a standalone 'Info' tab; show index name/definition/unique and storage rows for total, table data, indexes, referenced-by, estimated rows and schema.
+- [ ] Match the Advanced-mode database Overview cards, schema size bars, largest tables and extension list, using available and permission-safe real metadata.
+- [ ] Label estimates, empty sizes and unsupported metrics truthfully; do not perform unbounded full scans merely to reproduce example demo numbers.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Render explicit empty and inaccessible states with clear next actions.
 - [ ] Keep template code free of direct driver calls or raw SQL statements.
 
+## Canonical UI fidelity
+
+**Mandatory reference:** `assets/cuadb-ui-demo.html`, with the complete interaction and visual contract in `.docs/docs/frontend-interactions.md`. Reproduce the exact applicable layout and behaviors rather than designing a new interface. The HTML file uses fake records; the actual implementation must render verified database-backed content with safe Rust endpoints and HTMX swaps. This requirement is part of task completion, not a future polish option.
+
+### Reference-specific acceptance
+- [ ] Map Askama pages/fragments directly to demo regions: #side/#tree, bottom #cbtn/#spop, #rs splitter, #mainbody, .bar toolbar, .gw grid, #insp detail panel and .foot footer.
+- [ ] Render both Simple and Advanced explorer layouts and the database Overview, table Data/Structure/Indexes and read-only metadata object detail screens with the demo's compact component hierarchy.
+- [ ] Retain the demo's visual layout instead of introducing an unrelated global header, generic dashboard or alternate navigation model.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

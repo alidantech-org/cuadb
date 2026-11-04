@@ -21,3 +21,7 @@ Every listed result must be supported by tests, safe failure handling, and updat
 
 ## Boundaries
 Do not implement adjacent groups speculatively. Keep changes modular, add tests that can run without a live database when possible, and document any fixture-only validation explicitly. Preserve the existing Bun root commands and localhost deployment assumptions. Record decisions and unexpected compatibility limits in the Task workspace.
+
+## Mandatory visual acceptance
+
+The canonical frontend specification for this group is `assets/cuadb-ui-demo.html`, reinforced by `.docs/docs/frontend-interactions.md`. It is a binding acceptance baseline for all related tasks, not an alternative design sketch. Completion requires the demonstration's inline Data / Structure / Indexes mode switcher, with structure column details, indexes and storage together, and a separate Advanced Overview. The visual style, compact cards, size bars, object details and selected-row inspector must follow the demo. When an engine lacks specific metadata, display an honest unsupported state in the same design instead of inventing values or using a different page layout. All relevant tasks must pass a side-by-side comparison against the same browser viewport, mode and selected object state, and must not be marked complete based on a different layout.

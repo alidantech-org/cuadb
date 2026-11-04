@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Render a safe error and restore usable controls when a sort is rejected or timed out.
 - [ ] Test sort transitions, NULL-heavy fixtures and fast repeated header clicks.
 
+## Canonical UI fidelity
+
+The **required frontend specification** is `assets/cuadb-ui-demo.html` and the comparison contract in `.docs/docs/frontend-interactions.md`. Match the demo's visible interface, controls and applicable interactions accurately, using real database data and safe read-only backend pagination/export behavior instead of the prototype's synthetic arrays. No generic table-grid replacement or materially different layout is acceptable without user-approved documentation.
+
+### Reference-specific acceptance
+- [ ] Make each table header click cycle ascending, descending and unsorted just like the demo, with the same small arrow next to the active column.
+- [ ] Sort the full selected relation through a validated backend query, not merely the loaded page; preserve page-size and reset continuation state correctly.
+- [ ] Keep column type annotations, compact hover/focus styles and accessible aria-sort consistent with the reference across repeated HTMX requests.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

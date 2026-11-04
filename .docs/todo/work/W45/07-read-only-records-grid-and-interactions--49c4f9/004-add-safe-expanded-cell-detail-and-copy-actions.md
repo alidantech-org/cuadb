@@ -22,5 +22,15 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Implement local copy actions without exposing credentials or unsafe HTML.
 - [ ] Test large JSON, control characters, Unicode and missing-key row scenarios.
 
+## Canonical UI fidelity
+
+The **required frontend specification** is `assets/cuadb-ui-demo.html` and the comparison contract in `.docs/docs/frontend-interactions.md`. Match the demo's visible interface, controls and applicable interactions accurately, using real database data and safe read-only backend pagination/export behavior instead of the prototype's synthetic arrays. No generic table-grid replacement or materially different layout is acceptable without user-approved documentation.
+
+### Reference-specific acceptance
+- [ ] On row click open the demo's 310px right-side inspector with sticky heading, close action, every column/type/value and readable multiline structured values; adapt to a mobile overlay at the reference breakpoint.
+- [ ] Make foreign-key values navigable to permitted related tables and support double-click-to-copy cell values with demo-style toast feedback.
+- [ ] Match every reference Export popover option: download current-view CSV, whole-table CSV, whole-table JSON, copy as CSV and Advanced-mode linked-table ZIP with an include-related-tables switch.
+- [ ] Whole-table or linked exports must use permission-checked, cancellable and bounded server-side streaming or explicit approved limits; they must not materialize a large database table into browser memory as the demo does.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

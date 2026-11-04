@@ -15,3 +15,7 @@ Work through the tasks in their listed order unless dependencies or test evidenc
 
 ## Deliverables
 The group is accepted when its linked tasks are completed with evidence, its README or architecture documentation accurately reflects the implemented features, and the app remains usable with the existing shell and single Docker container constraints.
+
+## Demo fidelity implementation plan
+
+**Required reference:** `assets/cuadb-ui-demo.html` and `.docs/docs/frontend-interactions.md`. Reproduce the demo's grid and toolbar in a static real-template fixture first, then connect row paging, sort, selection, column toggles, inspector and exports to server responses. Use the prototype's specific control placements and densities but replace its simulated full-table operations with bounded Rust logic. Confirm screenshot parity and keyboard parity on several selected table states. At least 1440×900 and 390×844 comparisons must be recorded with light/dark states where applicable. The demo's example values are fixture data only; deliver server-backed, permission-aware read-only functionality. Any material visual exception must be documented and approved before group completion.

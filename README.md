@@ -4,6 +4,12 @@
 
 > **Current status: runnable application shell (milestone 0).** The Rust HTTP server, Askama page, Tailwind styling, HTMX fragment and Bun commands are scaffolded. **No database connection, table discovery or row queries are implemented yet.** The UI's preview is intentionally a placeholder.
 
+## Canonical frontend UI reference
+
+The committed [CuaDB UI demo](assets/cuadb-ui-demo.html) is the **mandatory visual and interaction reference** for implementation, not a loose example. The final Rust/Askama/HTMX frontend must faithfully reproduce the demo's compact sidebar, resizer, Simple/Advanced explorer, Data/Structure/Indexes switcher, dense grid, row inspector, bottom connection/settings controls, themes and export menus. Compare against the standalone HTML at matching desktop/mobile viewports before completing frontend tasks.
+
+The HTML demo uses simulated connection names, data, statistics and client-side exports. The real application must keep the same UI but source values from safe read-only database adapters and implement heavy data operations through bounded or streamed Rust routes. Security and accessibility adaptations must be documented and reviewed, not silently used to redesign the interface. The shared frontend specification and screenshot acceptance matrix live in `.docs/docs/frontend-interactions.md` and are linked from the existing Task records.
+
 ## Stack
 
 - **Rust + Axum**: HTTP server (one port).

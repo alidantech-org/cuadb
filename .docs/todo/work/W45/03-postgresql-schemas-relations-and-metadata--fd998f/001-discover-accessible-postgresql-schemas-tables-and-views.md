@@ -22,5 +22,13 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Test denied permissions, quoted names, system schemas and table type distinctions.
 - [ ] Expose stable typed objects through the adapter instead of direct template SQL.
 
+## UI-demo backend support
+
+The real frontend must match the canonical committed `assets/cuadb-ui-demo.html`. This backend/release task must expose the safe metadata or data behavior required by the reference rather than forcing the frontend to fake its controls. The complete cross-layer fidelity contract is `.docs/docs/frontend-interactions.md`.
+
+### Demo-related acceptance
+- [ ] Provide optional, capability-aware discovery for Advanced-mode read-only Functions, Procedures, Sequences, Types and Triggers tree groups and metadata-only detail screens from assets/cuadb-ui-demo.html; never execute functions or procedures.
+- [ ] Expose schema-qualified object names, definitions and counts only when visible to the connected database role, and provide a clear unavailable state on unsupported engines.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

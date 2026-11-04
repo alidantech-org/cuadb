@@ -22,5 +22,15 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Add visible focus and dark/light theme primitives with adequate contrast.
 - [ ] Verify final build uses only bundled CSS and JS assets.
 
+## Canonical UI fidelity
+
+**Mandatory visual specification:** `assets/cuadb-ui-demo.html` (see `.docs/docs/frontend-interactions.md`). Its sidebar, interactions, state patterns and typography are required, not decorative inspiration. Recreate the reference with Askama/HTMX, Tailwind and minimal JavaScript using actual database data; do not replace the interface with a conventional dashboard. Safety and accessible real-data states may adapt the underlying mechanism, not silently redesign the appearance.
+
+### Reference-specific acceptance
+- [ ] Match the demo's full-height workspace composition with no separate global header: default 264px sidebar, 5px splitter, bottom connection/settings row, compact main toolbar and dense content grid.
+- [ ] Use the demo's light/dark neutral surfaces and teal accent, 12.5px default font, 6px corner radius, subtle 26px controls and CSS color/density tokens instead of arbitrary Tailwind defaults.
+- [ ] Implement 180–520px draggable sidebar with double-click reset to 264px and responsive sidebar and inspector treatment at or below 760px.
+- [ ] Capture matched reference-versus-app screenshots at 1440×900, 1280×800 and 390×844 in light and dark themes; request approval for any material visual deviation.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

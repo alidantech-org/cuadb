@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Test Structure tab with a complex fixture containing composite keys and defaults.
 - [ ] Keep the tab responsive through HTMX fragment updates without page reloads.
 
+## Canonical UI fidelity
+
+The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/frontend-interactions.md`. Match its actual visible control labels, compact placement and selected-object behavior. In particular, the source uses **Data / Structure / Indexes** in its table toolbar and a separate Advanced **Overview**, so the older plan's independent `Info` tab terminology is superseded. The production UI uses safe real metadata rather than hard-coded statistics. User approval is required for material visual changes.
+
+### Reference-specific acceptance
+- [ ] Match the demo's inline Data / Structure / Indexes segmented toolbar, where 'Structure' is a mode within the existing main panel rather than a separate page or redesigned tab.
+- [ ] Render Structure fields in the reference order and styling: #, Column, Type, Nullable, Key, References, with accurate schema metadata.
+- [ ] Keep the schema-qualified header and compact table styling identical while distinguishing views and unavailable attributes honestly.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

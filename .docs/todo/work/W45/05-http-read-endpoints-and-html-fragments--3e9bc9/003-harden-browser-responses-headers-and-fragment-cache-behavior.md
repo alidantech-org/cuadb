@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Verify that unsafe origins or methods cannot trigger unauthorized future state changes.
 - [ ] Add response security regression tests and document local-only deployment assumptions.
 
+## Canonical UI fidelity
+
+**Mandatory reference:** `assets/cuadb-ui-demo.html`, with the complete interaction and visual contract in `.docs/docs/frontend-interactions.md`. Reproduce the exact applicable layout and behaviors rather than designing a new interface. The HTML file uses fake records; the actual implementation must render verified database-backed content with safe Rust endpoints and HTMX swaps. This requirement is part of task completion, not a future polish option.
+
+### Reference-specific acceptance
+- [ ] Keep database-bearing HTML no-store and disable sensitive HTMX history snapshots without breaking the demo's interaction pattern, visual states, popovers or row inspector.
+- [ ] Allow local persistence only for non-sensitive demo settings and per-table sort/hidden-column names; never save cell values, raw SQL, connection credentials or URLs.
+- [ ] Serve all CSS, HTMX and browser JavaScript from the Rust app with content security headers that do not break supported popup, copy, search or preference behavior.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

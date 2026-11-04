@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Do not introduce map rendering or expensive bulk geometry conversion by default.
 - [ ] Test on both PostGIS-enabled and plain PostgreSQL fixture databases.
 
+## Canonical UI fidelity
+
+The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/frontend-interactions.md`. Match its actual visible control labels, compact placement and selected-object behavior. In particular, the source uses **Data / Structure / Indexes** in its table toolbar and a separate Advanced **Overview**, so the older plan's independent `Info` tab terminology is superseded. The production UI uses safe real metadata rather than hard-coded statistics. User approval is required for material visual changes.
+
+### Reference-specific acceptance
+- [ ] Surface geometry/geography types and bounded type, SRID and GeoJSON content within the demo's existing grid and right-side row inspector, not in a separate map-oriented page.
+- [ ] Retain the demo's Data/Structure/Indexes header and compact table layout when PostGIS is installed or absent.
+- [ ] Compare the spatial-data inspector presentation to the demo's row-detail style, recording safety and capability exceptions explicitly.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

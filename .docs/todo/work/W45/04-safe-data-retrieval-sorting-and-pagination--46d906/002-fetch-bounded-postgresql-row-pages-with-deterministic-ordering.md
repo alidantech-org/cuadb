@@ -22,5 +22,13 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Add tests for 0, 1, 50 and more than 50 rows with deterministic order assertions.
 - [ ] Record safe slow-query diagnostics without logging cell values or secrets.
 
+## UI-demo backend support
+
+The real frontend must match the canonical committed `assets/cuadb-ui-demo.html`. This backend/release task must expose the safe metadata or data behavior required by the reference rather than forcing the frontend to fake its controls. The complete cross-layer fidelity contract is `.docs/docs/frontend-interactions.md`.
+
+### Demo-related acceptance
+- [ ] Define an independently bounded, permission-scoped export read path for current-view CSV, complete CSV/JSON and related-table ZIP requested by the demo UI; use streaming or explicit resource caps rather than accumulating an entire database table in memory.
+- [ ] Enforce query timeout/cancellation and restrict exported schemas, relations and linked-table traversal to the same safe catalog allowlists as normal paged reads.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

@@ -22,5 +22,14 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Test rapid switching and inaccessible databases for stale response leakage.
 - [ ] Document the connection selection behavior in the README.
 
+## Canonical UI fidelity
+
+The committed `assets/cuadb-ui-demo.html` is the binding reference. Implement the exact applicable control positions, popup states, theme/size options and behavior as required by `.docs/docs/frontend-interactions.md`. Demo profiles and records are illustrative only; real credentials stay server-side and real data is fetched by safe, read-only Rust endpoints. Do not treat visual similarity alone as completion if an existing demo control does not work.
+
+### Reference-specific acceptance
+- [ ] Match the demo's bottom-of-sidebar connection dropdown position, selectable rows, active checkmark, disabled 'New connection' placeholder (until securely supported), and transient feedback toast.
+- [ ] When switching trusted profiles, update sidebar, schema-qualified heading, selected relation, pagination and inspector without leaking stale rows from another connection.
+- [ ] Preserve the demo's responsive dropdown and click-away behavior, rejecting unknown profiles or arbitrary browser connection URLs.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

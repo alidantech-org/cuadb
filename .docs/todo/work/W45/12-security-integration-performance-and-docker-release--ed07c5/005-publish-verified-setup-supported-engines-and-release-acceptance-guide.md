@@ -22,5 +22,13 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Include a release checklist that exercises check, test, build and container smoke flows.
 - [ ] Record how Task groups were completed, validated and handed off without duplicating task records.
 
+## UI-demo backend support
+
+The real frontend must match the canonical committed `assets/cuadb-ui-demo.html`. This backend/release task must expose the safe metadata or data behavior required by the reference rather than forcing the frontend to fake its controls. The complete cross-layer fidelity contract is `.docs/docs/frontend-interactions.md`.
+
+### Demo-related acceptance
+- [ ] Document assets/cuadb-ui-demo.html as the mandatory visual/interaction baseline; show how release reviewers perform same-viewport screenshot and functional comparisons.
+- [ ] State any approved deviations required by data permissions, limits or accessibility and confirm no fake demo content is presented as live database results.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.

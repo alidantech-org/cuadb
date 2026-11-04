@@ -20,3 +20,7 @@ Every listed result must be supported by tests, safe failure handling, and updat
 
 ## Boundaries
 Do not implement adjacent groups speculatively. Keep changes modular, add tests that can run without a live database when possible, and document any fixture-only validation explicitly. Preserve the existing Bun root commands and localhost deployment assumptions. Record decisions and unexpected compatibility limits in the Task workspace.
+
+## Mandatory visual acceptance
+
+The canonical frontend specification for this group is `assets/cuadb-ui-demo.html`, reinforced by `.docs/docs/frontend-interactions.md`. It is a binding acceptance baseline for all related tasks, not an alternative design sketch. Completion requires the precise sidebar-bottom connection picker, account label/select/checkmark patterns, settings gear/popover, Simple/Advanced switch, theme/palette/accent/corner/font/density preferences, per-table remembered state and reset controls shown in the demonstration. Real profiles must be operator configured; the demo's fake connection names and states must not ship as live data. Persist only non-sensitive preferences and keep all controls accessible. All relevant tasks must pass a side-by-side comparison against the same browser viewport, mode and selected object state, and must not be marked complete based on a different layout.

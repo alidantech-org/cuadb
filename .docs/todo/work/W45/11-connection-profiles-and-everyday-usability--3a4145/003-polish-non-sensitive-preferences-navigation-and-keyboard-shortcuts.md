@@ -22,5 +22,15 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [ ] Test across page reloads, HTMX swaps and keyboard-only navigation.
 - [ ] Verify that no secrets, row snapshots or connection URLs enter persisted settings.
 
+## Canonical UI fidelity
+
+The committed `assets/cuadb-ui-demo.html` is the binding reference. Implement the exact applicable control positions, popup states, theme/size options and behavior as required by `.docs/docs/frontend-interactions.md`. Demo profiles and records are illustrative only; real credentials stay server-side and real data is fetched by safe, read-only Rust endpoints. Do not treat visual similarity alone as completion if an existing demo control does not work.
+
+### Reference-specific acceptance
+- [ ] Reproduce every existing demo settings control: Simple/Advanced; Auto/Light/Dark; Mist/Slate/Sand/Mono; accent presets/custom color; Sharp/Soft/Round corners; text S/M/L and Sans/Serif/Mono and monospace data.
+- [ ] Reproduce Grid choices XS/S/M/L, Rows/Grid/None lines, NULL/∅/Blank, row numbers, type labels, striped rows, wrapping and thousands separators; Sidebar icon mode, rows/size counts and unit; and per-table sort/hidden-column memory.
+- [ ] Match the demo's grouped compact settings popover with segmented controls, toggles, reset-this-table/reset-all and immediate visual application with non-sensitive persistence.
+- [ ] Keep settings, Escape and Ctrl/Cmd+K navigation functional after HTMX swaps with no additional frontend framework.
+
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
