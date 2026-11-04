@@ -100,8 +100,10 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
             // numeric loopback addresses explicitly instead of assuming that
             // a Domain variant is never an IP literal.
             host.eq_ignore_ascii_case("localhost")
-                || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
-        },
+                || host
+                    .parse::<std::net::IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        }
         Some(Host::Ipv4(address)) => address.is_loopback(),
         Some(Host::Ipv6(address)) => address.is_loopback(),
         None => false,
@@ -125,7 +127,11 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
     // Local trust-auth PostgreSQL commonly has no TLS certificate. Remote
     // targets still require verified TLS unless the operator explicitly opts
     // into another supported mode.
-    let mut mode = if passwordless { PgSslMode::Disable } else { PgSslMode::VerifyFull };
+    let mut mode = if passwordless {
+        PgSslMode::Disable
+    } else {
+        PgSslMode::VerifyFull
+    };
     let mut seen_mode = false;
     let mut seen_cert = false;
     for (key, value) in url.query_pairs() {
@@ -172,7 +178,9 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
     if options.get_options().is_some() {
         return Err(UrlError::Parameter);
     }
-    options = options.ssl_mode(mode).port(driver_url.port().unwrap_or(5432));
+    options = options
+        .ssl_mode(mode)
+        .port(driver_url.port().unwrap_or(5432));
     // Credentials and SQL are never passed to SQLx's query logger.
     options = options
         .application_name("cuadb")
@@ -231,10 +239,19 @@ mod tests {
     fn accepts_passwordless_local_postgres_only() {
         for (case, raw) in [
             ("hostname", "postgresql://postgres@localhost:5432/postgres"),
-            ("ipv4_loopback", "postgres://postgres@127.0.0.1:5432/postgres"),
-            ("ipv4_loopback_alias", "postgres://postgres@127.0.0.2:5432/postgres"),
+            (
+                "ipv4_loopback",
+                "postgres://postgres@127.0.0.1:5432/postgres",
+            ),
+            (
+                "ipv4_loopback_alias",
+                "postgres://postgres@127.0.0.2:5432/postgres",
+            ),
             ("ipv6_loopback", "postgres://postgres@[::1]:5432/postgres"),
-            ("explicit_empty_password", "postgres://postgres:@localhost:5432/postgres"),
+            (
+                "explicit_empty_password",
+                "postgres://postgres:@localhost:5432/postgres",
+            ),
         ] {
             let options = parse(raw)
                 .unwrap_or_else(|error| panic!("{case}: {error}"))
@@ -262,11 +279,9 @@ mod tests {
 
     #[test]
     fn explicit_tls_settings_override_loopback_defaults() {
-        let options = parse(
-            "postgresql://postgres@localhost:5432/postgres?sslmode=verify-full",
-        )
-        .unwrap()
-        .into_options();
+        let options = parse("postgresql://postgres@localhost:5432/postgres?sslmode=verify-full")
+            .unwrap()
+            .into_options();
         assert!(matches!(
             options.get_ssl_mode(),
             sqlx::postgres::PgSslMode::VerifyFull
