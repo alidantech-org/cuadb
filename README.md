@@ -281,7 +281,7 @@ cuadb/
 
 1. **PostgreSQL MVP:** parse a PostgreSQL URL (default driver), connect read-only, discover schemas/tables/views, browse paginated and sortable rows, show columns, indexes and table sizes.
 2. **PostgreSQL value rendering:** JSON/JSONB, arrays, nullable values, and PostGIS geometry inspection.
-3. **Database adapters:** MySQL/MariaDB and SQLite with engine-specific metadata/capability handling; evaluate SQL Server later.
+3. **Database adapters:** MySQL/MariaDB and SQLite with engine-specific metadata/capability handling. No additional database engine is planned until the existing product features are complete.
 4. **Usability:** multiple saved connection profiles (no password storage in browser), polished grids, safe large-cell inspection, and optimized keyset pagination where possible.
 
 CuaDB is intentionally **not** a SQL console, migration system, editor or full database administrator. Every database adapter should use constrained, read-only access and safe SQL identifier handling; metadata not supported by an engine must be indicated as unavailable.
@@ -301,7 +301,7 @@ CuaDB is intentionally **not** a SQL console, migration system, editor or full d
 
 The project uses [Task / taskcode](https://github.com/alidantech-org/task) to manage implementation. **The active Task workspace is `.docs/`**, as configured in the root `task.yaml`; the generic Task-managed instructions below may refer to `tasks/`, but `task.yaml` is authoritative. The Task workspace has already been initialized; **do not run `task init` again**.
 
-A one-time, idempotent bootstrap in `scripts/roadmap/` prepares a full dependency-ordered implementation roadmap: **13 groups, 55 detailed tasks, and 5 architecture/design/test documents**. The bootstrap is source input only; after creation, the generated Markdown under `.docs/` is the **single source of truth**. Never change task IDs, status history or status manually, and never maintain a parallel TODO list.
+A one-time, idempotent bootstrap in `scripts/roadmap/` prepares the original dependency-ordered implementation roadmap: **12 active groups, 52 detailed tasks, and 5 architecture/design/test documents**. The mistaken SQL Server expansion has been retired; the supported engine scope is PostgreSQL, MySQL, MariaDB and SQLite. The bootstrap is source input only; after creation, the generated Markdown under `.docs/` is the **single source of truth**. Never change task IDs, status history or status manually, and never maintain a parallel TODO list.
 
 ### Preview and create the real Task records
 
@@ -353,7 +353,7 @@ task update <TSK-ID> --status completed
 task validate
 ```
 
-Group plans describe purpose, order, risks and completion criteria; blocking task links prevent starting dependent work without checking prerequisites. The seeded groups cover Rust foundations, secure database connections, PostgreSQL catalogs and paging, HTTP/HTMX, explorer navigation, data grid, inspector/PostGIS support, MySQL/MariaDB, SQLite, trusted connection profiles, release quality, and later SQL Server compatibility.
+Group plans describe purpose, order, risks and completion criteria; blocking task links prevent starting dependent work without checking prerequisites. The seeded groups cover Rust foundations, secure database connections, PostgreSQL catalogs and paging, HTTP/HTMX, explorer navigation, data grid, inspector/PostGIS support, MySQL/MariaDB, SQLite, trusted connection profiles, release quality, and release quality for the supported engines.
 
 The root `bun run test` includes Task roadmap definition tests; `bun run format` and `bun run format:check` include the roadmap scripts. Task-managed Markdown is **not** automatically reformatted because its tool owns the frontmatter and status fields.
 
