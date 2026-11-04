@@ -478,3 +478,18 @@ async fn repeated_column_parameters_are_accepted_but_other_duplicates_are_not() 
         assert_eq!(status, StatusCode::BAD_REQUEST, "{path}");
     }
 }
+
+/// Regression: the status fragment replaces itself (`outerHTML`). If it also
+/// triggered on `load`, every swap would request /connection/status again, forever.
+#[tokio::test]
+async fn status_fragment_never_retriggers_itself_on_load() {
+    let (status, body) = get(Mode::Healthy, "/connection/status", 2000).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.contains(r#"hx-trigger="click""#));
+    assert!(
+        !body.contains("load"),
+        "a self-replacing fragment must not trigger on load"
+    );
+    let (_, page) = get(Mode::Healthy, "/", 2000).await;
+    assert!(page.matches(r#"hx-trigger="load""#).count() >= 1);
+}
