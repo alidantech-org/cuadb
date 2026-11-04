@@ -103,10 +103,9 @@ impl IntoResponse for AppError {
             self.kind.message()
         );
         let mut response = (self.kind.status(), Html(body)).into_response();
-        response.headers_mut().insert(
-            "x-cuadb-error",
-            HeaderValue::from_static(self.kind.code()),
-        );
+        response
+            .headers_mut()
+            .insert("x-cuadb-error", HeaderValue::from_static(self.kind.code()));
         response
     }
 }

@@ -85,7 +85,11 @@ async fn bound_request(
     next: Next,
 ) -> Response {
     if let Some(header_value) = request.headers().get(header::CONTENT_LENGTH) {
-        match header_value.to_str().ok().and_then(|s| s.parse::<u64>().ok()) {
+        match header_value
+            .to_str()
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+        {
             Some(size) if size <= policy.max_body_bytes as u64 => {}
             Some(_) => return AppError::new(ErrorKind::PayloadTooLarge).into_response(),
             None => return AppError::new(ErrorKind::InvalidInput).into_response(),
@@ -223,13 +227,10 @@ mod tests {
     async fn rejects_overloaded_requests_without_waiting() {
         let policy = policy(Duration::from_secs(1));
         let permit = policy.in_flight.clone().try_acquire_owned().unwrap();
-        let response = apply_policy(
-            Router::new().route("/read", get(|| async { "ok" })),
-            policy,
-        )
-        .oneshot(Request::builder().uri("/read").body(Body::empty()).unwrap())
-        .await
-        .unwrap();
+        let response = apply_policy(Router::new().route("/read", get(|| async { "ok" })), policy)
+            .oneshot(Request::builder().uri("/read").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         drop(permit);
     }
