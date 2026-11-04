@@ -6,7 +6,10 @@
 
 use std::{fmt, str::FromStr};
 
-use sqlx::{ConnectOptions, postgres::{PgConnectOptions, PgSslMode}};
+use sqlx::{
+    ConnectOptions,
+    postgres::{PgConnectOptions, PgSslMode},
+};
 use url::Url;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,8 +72,8 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
     // url::Url may normalize malformed '%' syntax; reject it ourselves.
     let bytes = raw.as_bytes();
     for (offset, byte) in bytes.iter().enumerate() {
-        if *byte == b'%' &&
-            (offset + 2 >= bytes.len()
+        if *byte == b'%'
+            && (offset + 2 >= bytes.len()
                 || !bytes[offset + 1].is_ascii_hexdigit()
                 || !bytes[offset + 2].is_ascii_hexdigit())
         {
@@ -89,13 +92,8 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
         return Err(UrlError::Password);
     }
 
-    let segments: Vec<_> = url
-        .path_segments()
-        .ok_or(UrlError::Database)?
-        .collect();
-    if segments.len() != 1 || segments[0].is_empty() ||
-        segments[0] == "." || segments[0] == ".."
-    {
+    let segments: Vec<_> = url.path_segments().ok_or(UrlError::Database)?.collect();
+    if segments.len() != 1 || segments[0].is_empty() || segments[0] == "." || segments[0] == ".." {
         return Err(UrlError::Database);
     }
     // PostgreSQL identifiers may be encoded, but NUL and slash do not make
@@ -138,13 +136,15 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
         options = options.ssl_mode(mode);
     }
     // Credentials and SQL are never passed to SQLx's query logger.
-    options = options.application_name("cuadb").disable_statement_logging();
+    options = options
+        .application_name("cuadb")
+        .disable_statement_logging();
     Ok(ValidatedPgUrl { options })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parse, UrlError};
+    use super::{UrlError, parse};
 
     #[test]
     fn accepts_strict_explicit_urls_and_encoded_passwords() {
@@ -166,14 +166,23 @@ mod tests {
             ("postgres://viewer@db/test", UrlError::Password),
             ("postgres://viewer:pass@db/", UrlError::Database),
             ("postgres://viewer:pass@db/db/other", UrlError::Database),
-            ("postgres://viewer:pass@db/db?options=-c%20default_transaction_read_only%3Doff",
-                UrlError::Parameter),
-            ("postgres://viewer:pass@db/db?sslmode=prefer", UrlError::TlsMode),
-            ("postgres://viewer:pass@db/db?sslmode=disable&sslrootcert=ca.crt",
-                UrlError::TlsMode),
+            (
+                "postgres://viewer:pass@db/db?options=-c%20default_transaction_read_only%3Doff",
+                UrlError::Parameter,
+            ),
+            (
+                "postgres://viewer:pass@db/db?sslmode=prefer",
+                UrlError::TlsMode,
+            ),
+            (
+                "postgres://viewer:pass@db/db?sslmode=disable&sslrootcert=ca.crt",
+                UrlError::TlsMode,
+            ),
             ("postgres://viewer:p%XX@db/db", UrlError::Encoding),
-            ("postgres://viewer:pass@db/db?sslmode=require&sslmode=disable",
-                UrlError::Parameter),
+            (
+                "postgres://viewer:pass@db/db?sslmode=require&sslmode=disable",
+                UrlError::Parameter,
+            ),
             ("postgres://viewer:pass@db/db#fragment", UrlError::Malformed),
         ] {
             assert_eq!(parse(url).unwrap_err(), expected);

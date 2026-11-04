@@ -45,7 +45,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     // Close checked-out connection resources after the listener has drained.
-    if tokio::time::timeout(Duration::from_secs(2), state.close()).await.is_err() {
+    if tokio::time::timeout(Duration::from_secs(2), state.close())
+        .await
+        .is_err()
+    {
         eprintln!("level=warn event=database_pool_close code=deadline_exceeded");
     }
     Ok(())

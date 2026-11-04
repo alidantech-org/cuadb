@@ -229,7 +229,9 @@ function main(): void {
       buildAssets(true);
       break;
     default:
-      console.error('Usage: bun run <setup|deps:sync|dev|check|build|start|format|format:check|test|smoke>');
+      console.error(
+        'Usage: bun run <setup|deps:sync|dev|check|build|start|format|format:check|test|smoke>',
+      );
       process.exit(1);
   }
 }

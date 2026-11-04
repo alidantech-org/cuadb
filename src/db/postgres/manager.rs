@@ -90,7 +90,10 @@ impl PgManager {
         const RECHECK_AFTER: Duration = Duration::from_secs(8);
         {
             let state = self.cache.read().await;
-            if state.checked_at.is_some_and(|at| at.elapsed() < RECHECK_AFTER) {
+            if state
+                .checked_at
+                .is_some_and(|at| at.elapsed() < RECHECK_AFTER)
+            {
                 return state.snapshot;
             }
         }
@@ -98,7 +101,10 @@ impl PgManager {
         let _gate = self.probe_gate.lock().await;
         {
             let state = self.cache.read().await;
-            if state.checked_at.is_some_and(|at| at.elapsed() < RECHECK_AFTER) {
+            if state
+                .checked_at
+                .is_some_and(|at| at.elapsed() < RECHECK_AFTER)
+            {
                 return state.snapshot;
             }
         }
@@ -135,12 +141,11 @@ impl PgManager {
         let budget = self.limits.connection_timeout + self.limits.query_timeout;
         let result = timeout(budget, async {
             let mut connection = self.pool.acquire().await.map_err(classify)?;
-            let mode: String = sqlx::query_scalar(
-                "SELECT pg_catalog.current_setting('transaction_read_only')"
-            )
-            .fetch_one(&mut *connection)
-            .await
-            .map_err(classify)?;
+            let mode: String =
+                sqlx::query_scalar("SELECT pg_catalog.current_setting('transaction_read_only')")
+                    .fetch_one(&mut *connection)
+                    .await
+                    .map_err(classify)?;
 
             if mode != "on" {
                 return Err(DbError::new(DbErrorKind::PermissionDenied));
@@ -152,7 +157,7 @@ impl PgManager {
                 "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_namespace n \
                  WHERE n.nspname NOT LIKE 'pg_%' \
                  AND n.nspname <> 'information_schema' \
-                 AND pg_catalog.has_schema_privilege(n.oid, 'USAGE'))"
+                 AND pg_catalog.has_schema_privilege(n.oid, 'USAGE'))",
             )
             .fetch_one(&mut *connection)
             .await
@@ -162,7 +167,8 @@ impl PgManager {
                 return Err(DbError::new(DbErrorKind::PermissionDenied));
             }
             Ok(())
-        }).await;
+        })
+        .await;
 
         result.map_err(|_| DbError::new(DbErrorKind::TimedOut))?
     }
@@ -176,14 +182,13 @@ impl PgManager {
     /// transaction read-only settings. Only constant SELECT queries are used.
     pub async fn read_only_session_verified(&self) -> Result<bool, DbError> {
         let mut conn = self.pool.acquire().await.map_err(classify)?;
-        let current: String = sqlx::query_scalar(
-            "SELECT pg_catalog.current_setting('transaction_read_only')"
-        )
-        .fetch_one(&mut *conn)
-        .await
-        .map_err(classify)?;
+        let current: String =
+            sqlx::query_scalar("SELECT pg_catalog.current_setting('transaction_read_only')")
+                .fetch_one(&mut *conn)
+                .await
+                .map_err(classify)?;
         let default: String = sqlx::query_scalar(
-            "SELECT pg_catalog.current_setting('default_transaction_read_only')"
+            "SELECT pg_catalog.current_setting('default_transaction_read_only')",
         )
         .fetch_one(&mut *conn)
         .await
@@ -216,8 +221,9 @@ mod tests {
         let config = crate::config::Config::from_values(&[]).unwrap();
         let manager = PgManager::new(
             "postgresql://viewer:secret@127.0.0.1:1/no_db?sslmode=disable",
-            &config.limits
-        ).unwrap();
+            &config.limits,
+        )
+        .unwrap();
         assert_eq!(manager.pool.size(), 0);
     }
 

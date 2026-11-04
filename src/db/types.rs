@@ -191,7 +191,10 @@ mod tests {
         };
         assert_eq!(id.namespace, "sales");
         assert_eq!(RelationKind::View, RelationKind::View);
-        assert_eq!(ConnectionSnapshot::disconnected().status, ConnectionStatus::Disconnected);
+        assert_eq!(
+            ConnectionSnapshot::disconnected().status,
+            ConnectionStatus::Disconnected
+        );
     }
 
     #[test]

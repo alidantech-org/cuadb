@@ -65,9 +65,8 @@ pub async fn connection_status(State(state): State<AppState>) -> Result<Response
         ready: snapshot.is_ready(),
     };
     let mut response = html(view)?.into_response();
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("no-store"),
-    );
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
 }

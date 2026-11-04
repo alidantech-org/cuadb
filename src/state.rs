@@ -40,7 +40,9 @@ impl AppState {
     pub fn start_probe(&self) {
         if let Some(manager) = &self.postgres {
             let manager = Arc::clone(manager);
-            let _task = tokio::spawn(async move { let _ = manager.snapshot().await; });
+            let _task = tokio::spawn(async move {
+                let _ = manager.snapshot().await;
+            });
         }
     }
 
@@ -93,7 +95,10 @@ mod tests {
         let config = Config::from_values(&[]).unwrap();
         let state = AppState::from_config(&config).unwrap();
         assert!(!state.is_configured());
-        assert_eq!(state.connection_snapshot().await.status, ConnectionStatus::Disconnected);
+        assert_eq!(
+            state.connection_snapshot().await.status,
+            ConnectionStatus::Disconnected
+        );
         state.close().await;
     }
 
@@ -101,8 +106,9 @@ mod tests {
     fn malformed_connection_url_fails_at_startup_without_echoing_password() {
         let config = Config::from_values(&[(
             "CUADB_DATABASE_URL",
-            "postgresql://viewer:secret@db/db?options=-c+bad"
-        )]).unwrap();
+            "postgresql://viewer:secret@db/db?options=-c+bad",
+        )])
+        .unwrap();
         let outcome = AppState::from_config(&config).err().unwrap();
         assert!(!format!("{outcome:?}").contains("secret"));
     }
