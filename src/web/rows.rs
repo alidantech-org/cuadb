@@ -21,6 +21,12 @@ struct Header {
     is_descending: bool,
     sortable: bool,
     numeric: bool,
+    pk: bool,
+    nullable: bool,
+    /// Must be supplied when inserting (no default, not nullable).
+    required: bool,
+    /// Simple scalar types the row editor can safely write as text.
+    editable: bool,
 }
 #[derive(Clone)]
 struct Value {
@@ -67,6 +73,8 @@ struct PageTemplate {
     export_all_csv: String,
     export_all_json: String,
     stable: bool,
+    /// The caller may insert, update and delete rows here (grant, writable profile, key).
+    can_edit: bool,
     truncated_columns: bool,
     shown_from: u64,
     shown_to: u64,
@@ -437,6 +445,19 @@ pub async fn data(
                 native_type: c.native_type.clone(),
                 sortable: catalog.sort_supported(&c.native_type),
                 numeric: value_class(&c.native_type) == "numeric",
+                pk: c.primary_key,
+                nullable: c.nullable,
+                required: !c.nullable && c.default_expression.is_none(),
+                editable: !matches!(
+                    value_class(&c.native_type),
+                    "json-value" | "array-value" | "binary-value"
+                ) && {
+                    let native = c.native_type.to_ascii_lowercase();
+                    !native.starts_with("geometry")
+                        && !native.starts_with("geography")
+                        && !native.contains("tsvector")
+                        && !native.contains("xml")
+                },
                 asc: {
                     let clear = nav.options.sort.as_ref().is_some_and(|sort| {
                         sort.column == c.name && sort.direction == SortDirection::Asc
@@ -566,7 +587,18 @@ pub async fn data(
     let mut geojson_nav = nav.clone();
     geojson_nav.options.spatial_geojson = !nav.options.spatial_geojson;
     let geojson_url = link(&geojson_nav, 0, None, geojson_nav.options.sort.clone());
+    let can_edit = !auth.0.is_open()
+        && state.sql_settings().enabled
+        && state
+            .workspace_for(nav.profile.as_deref())
+            .is_some_and(|w| w.writable())
+        && auth.0.allows(
+            crate::auth::Action::Edit,
+            &crate::auth::Resource::relation(&pid, &nav.id.namespace, &nav.id.name),
+        )
+        && page.columns.iter().any(|c| c.primary_key);
     let view = PageTemplate {
+        can_edit,
         profile: nav.profile.clone().unwrap_or_default(),
         profile_arg: nav
             .profile

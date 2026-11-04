@@ -1470,3 +1470,57 @@ async fn the_sidebar_entry_appears_only_for_users_who_may_run_sql() {
     let (_, off_shell) = get(&off.router, &off.admin, "/").await;
     assert!(!off_shell.contains(r#"id="sqlb""#), "operator switch off");
 }
+
+#[tokio::test]
+async fn the_grid_offers_editing_only_where_the_user_may_edit_and_a_key_exists() {
+    let w = world("gridedit", "read-write", true).await;
+    let (_, admin) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/data?schema=main&relation=items",
+    )
+    .await;
+    assert!(
+        admin.contains(r#"data-edit="1""#)
+            && admin.contains("+ Add row")
+            && admin.contains("can edit")
+    );
+    assert!(admin.contains(r#"data-pk="1""#) && admin.contains(r#"data-nullable="1""#));
+    // Generated columns are listed, and the page carries what the browser needs to post.
+    assert!(admin.contains(r#"data-schema="main""#) && admin.contains(r#"data-relation="items""#));
+    // A table without any key cannot be updated or deleted by key: no editor.
+    let (_, keyless) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/data?schema=main&relation=keyless",
+    )
+    .await;
+    assert!(!keyless.contains(r#"data-edit="1""#) && keyless.contains("read only"));
+    // A reader (view only), and everyone while the operator switch is off, sees a read-only grid.
+    let reader = user(&w, "ria", Role::Editor, &[("default", "", "", 1)]).await;
+    let (_, view_only) = get(
+        &w.router,
+        &reader,
+        "/catalog/data?schema=main&relation=items",
+    )
+    .await;
+    assert!(!view_only.contains(r#"data-edit="1""#) && !view_only.contains("+ Add row"));
+    assert!(view_only.contains("read only"));
+    let off = world("gridoff", "read-write", false).await;
+    let (_, disabled) = get(
+        &off.router,
+        &off.admin,
+        "/catalog/data?schema=main&relation=items",
+    )
+    .await;
+    assert!(!disabled.contains(r#"data-edit="1""#));
+    // A read-only profile never offers editing, even to an administrator.
+    let ro = world("gridro", "read-only", true).await;
+    let (_, readonly_profile) = get(
+        &ro.router,
+        &ro.admin,
+        "/catalog/data?schema=main&relation=items",
+    )
+    .await;
+    assert!(!readonly_profile.contains(r#"data-edit="1""#));
+}

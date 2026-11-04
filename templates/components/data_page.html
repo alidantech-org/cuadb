@@ -1,4 +1,4 @@
-<section id="catalog-panel" class="panel" aria-label="Table data" hx-history="false" hx-sync="this:replace" data-table="{{ schema_name }}.{{ relation_name }}">
+<section id="catalog-panel" class="panel" aria-label="Table data" hx-history="false" hx-sync="this:replace" data-table="{{ schema_name }}.{{ relation_name }}" data-schema="{{ schema_name }}" data-relation="{{ relation_name }}" data-prof="{{ profile }}"{% if can_edit %} data-edit="1"{% endif %}>
   <header class="bar">
     <h1><i class="ic-slot" data-ic="relation" data-name="{{ relation_name }}" aria-hidden="true"></i><span>{{ schema_name }}.</span>{{ relation_name }}</h1>
     <span class="meta">{{ shown_from }}–{{ shown_to }}{% if approximate_total != "unavailable" %} · ~{{ approximate_total }} rows{% endif %}</span>
@@ -13,6 +13,7 @@
       {% for column in selected_columns %}<input type="hidden" name="column" value="{{ column }}">{% endfor %}
       <input class="inp" name="filter" id="q" value="{{ filter }}" maxlength="128" placeholder="Search rows…" aria-label="Search rows">
     </form>
+    {% if can_edit %}<button class="btn on" type="button" data-row-add>+ Add row</button>{% endif %}
     <button class="btn" type="button" data-pop="colpop" aria-controls="colpop" aria-expanded="false">Columns</button>
     <button class="btn" type="button" id="dn" data-density aria-label="Toggle compact rows">Compact</button>
     <button class="btn" type="button" data-pop="exppop" aria-controls="exppop" aria-expanded="false">Export ▾</button>
@@ -41,8 +42,8 @@
       <table class="grid">
         <thead><tr><th class="rn" scope="col">#</th>
           {% for col in headers %}
-          <th scope="col" class="{% if col.numeric %}num{% endif %}" data-col="{{ col.name }}" data-type="{{ col.native_type }}" aria-sort="{% match col.sort_direction %}{% when Some with (direction) %}{{ direction }}{% when None %}none{% endmatch %}">
-            {% if col.sortable %}<a class="sortlink" href="{% if col.is_ascending %}{{ col.desc }}{% else if col.is_descending %}{{ col.asc }}{% else %}{{ col.asc }}{% endif %}" hx-get="{% if col.is_ascending %}{{ col.desc }}{% else if col.is_descending %}{{ col.asc }}{% else %}{{ col.asc }}{% endif %}" hx-target="#catalog-panel" hx-swap="outerHTML" title="Sort by {{ col.name }}">{{ col.name }}</a>{% else %}<span title="Sorting is not supported for {{ col.native_type }}">{{ col.name }}</span>{% endif %}<small>{{ col.native_type }}</small>{% if col.is_ascending %}<span class="s">↑</span>{% else if col.is_descending %}<span class="s">↓</span>{% endif %}
+          <th scope="col" class="{% if col.numeric %}num{% endif %}" data-col="{{ col.name }}" data-type="{{ col.native_type }}"{% if col.pk %} data-pk="1"{% endif %}{% if col.nullable %} data-nullable="1"{% endif %}{% if col.required %} data-required="1"{% endif %}{% if col.editable %} data-editable="1"{% endif %} aria-sort="{% match col.sort_direction %}{% when Some with (direction) %}{{ direction }}{% when None %}none{% endmatch %}">
+            {% if col.pk %}<span class="pk" title="Primary key">●</span> {% endif %}{% if col.sortable %}<a class="sortlink" href="{% if col.is_ascending %}{{ col.desc }}{% else if col.is_descending %}{{ col.asc }}{% else %}{{ col.asc }}{% endif %}" hx-get="{% if col.is_ascending %}{{ col.desc }}{% else if col.is_descending %}{{ col.asc }}{% else %}{{ col.asc }}{% endif %}" hx-target="#catalog-panel" hx-swap="outerHTML" title="Sort by {{ col.name }}">{{ col.name }}</a>{% else %}<span title="Sorting is not supported for {{ col.native_type }}">{{ col.name }}</span>{% endif %}<small>{{ col.native_type }}</small>{% if col.is_ascending %}<span class="s">↑</span>{% else if col.is_descending %}<span class="s">↓</span>{% endif %}
           </th>
           {% endfor %}
         </tr></thead>
@@ -73,6 +74,6 @@
       <a class="{% if page_size == 100 %}on{% endif %}" href="{{ size_100 }}" hx-get="{{ size_100 }}" hx-target="#catalog-panel" hx-swap="outerHTML">100</a>
     </nav>
     <span>rows/page</span>
-    <span class="tag ro">SELECT only</span>
+    {% if can_edit %}<span class="tag m-write">can edit</span>{% else %}<span class="tag ro">read only</span>{% endif %}
   </footer>
 </section>

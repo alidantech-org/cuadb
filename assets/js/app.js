@@ -266,8 +266,25 @@ function openInspector(/** @type {HTMLTableRowElement} */ row) {
   close.setAttribute('data-close-insp', '');
   close.setAttribute('aria-label', 'Close row details');
   close.textContent = '×';
-  title.append(label, close);
+  const actions = document.createElement('span');
+  actions.className = 'ia';
+  if (document.getElementById('catalog-panel')?.dataset.edit === '1') {
+    for (const [attr, text, danger] of [
+      ['data-row-edit', 'Edit', false],
+      ['data-row-delete', 'Delete', true],
+    ]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = danger ? 'btn dg' : 'btn';
+      button.setAttribute(String(attr), '');
+      button.textContent = String(text);
+      actions.append(button);
+    }
+  }
+  actions.append(close);
+  title.append(label, actions);
   panel.append(title);
+  win.cuadbRow = row;
   heads.forEach((head, index) => {
     const cell = /** @type {HTMLElement | undefined} */ (cells[index]);
     const kv = document.createElement('div');
@@ -286,8 +303,273 @@ function openInspector(/** @type {HTMLTableRowElement} */ row) {
   panel.classList.add('show');
 }
 function closeInspector() {
+  win.cuadbEditing = false;
   document.getElementById('insp')?.classList.remove('show');
   $$('tr.sel').forEach((el) => el.classList.remove('sel'));
+}
+
+/* ------------------------------------------------------------ row editor */
+/** The grid's columns as the editor needs them. */
+function gridColumns() {
+  return Array.from(document.querySelectorAll('#catalog-panel table.grid thead th[data-col]')).map(
+    (node) => {
+      const th = /** @type {HTMLElement} */ (node);
+      return {
+        name: th.dataset.col ?? '',
+        type: (th.dataset.type ?? '').toLowerCase(),
+        pk: th.dataset.pk === '1',
+        nullable: th.dataset.nullable === '1',
+        required: th.dataset.required === '1',
+        editable: th.dataset.editable === '1',
+      };
+    },
+  );
+}
+
+/** Values of a grid row, keyed by column. `null` marks SQL NULL. */
+function rowValues(/** @type {HTMLTableRowElement} */ row) {
+  /** @type {Record<string, {value: string | null, big: boolean}>} */
+  const out = {};
+  const cols = gridColumns();
+  Array.from(row.querySelectorAll('td:not(.rn)')).forEach((node, index) => {
+    const cell = /** @type {HTMLElement} */ (node);
+    const col = cols[index];
+    if (!col) return;
+    out[col.name] = {
+      value: cell.querySelector('[data-null]') ? null : (cell.dataset.detail ?? ''),
+      big: !!cell.querySelector('.truncation'),
+    };
+  });
+  return out;
+}
+
+function fieldControl(
+  /** @type {ReturnType<typeof gridColumns>[number]} */ col,
+  /** @type {string} */ value,
+) {
+  const isBool = col.type === 'boolean' || col.type === 'bool';
+  /** @type {HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement} */
+  let control;
+  if (isBool) {
+    control = document.createElement('select');
+    for (const option of ['true', 'false']) {
+      const o = document.createElement('option');
+      o.value = option;
+      o.textContent = option;
+      control.append(o);
+    }
+    control.value = ['true', 't', '1'].includes(value.toLowerCase()) ? 'true' : 'false';
+  } else if (value.length > 80 || value.includes('\n')) {
+    control = document.createElement('textarea');
+    control.rows = 4;
+    control.value = value;
+  } else {
+    control = document.createElement('input');
+    control.value = value;
+    if (/int|numeric|decimal|real|double|float/.test(col.type)) control.inputMode = 'decimal';
+  }
+  control.className = 'inp';
+  control.name = col.name;
+  control.setAttribute('autocomplete', 'off');
+  return control;
+}
+
+/** Show the editor in the inspector panel: a row to edit, or null for a new row. */
+function openEditor(/** @type {HTMLTableRowElement | null} */ row) {
+  const panel = document.getElementById('insp');
+  if (!panel) return;
+  const insert = row === null;
+  const cols = gridColumns();
+  const values = row ? rowValues(row) : {};
+  panel.replaceChildren();
+  const title = document.createElement('h3');
+  const label = document.createElement('span');
+  label.textContent = insert ? 'New row' : `Edit row ${row?.dataset.row ?? ''}`;
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.setAttribute('data-close-insp', '');
+  close.setAttribute('aria-label', 'Close editor');
+  close.textContent = '×';
+  title.append(label, close);
+  const form = document.createElement('form');
+  form.className = 'ed';
+  form.id = 'row-form';
+  form.dataset.mode = insert ? 'insert' : 'update';
+  for (const col of cols) {
+    const current = values[col.name];
+    const field = document.createElement('div');
+    field.className = 'fl';
+    const caption = document.createElement('span');
+    caption.textContent = `${col.name} · ${col.type}${col.pk ? ' · key' : ''}`;
+    const line = document.createElement('div');
+    line.className = 'row2';
+    const readOnly = !col.editable || (!insert && (col.pk || current?.big));
+    if (readOnly) {
+      const shown = document.createElement('input');
+      shown.className = 'inp';
+      shown.readOnly = true;
+      shown.value = insert ? '' : current?.value === null ? 'NULL' : (current?.value ?? '');
+      shown.placeholder = col.editable ? '' : 'not editable here';
+      shown.setAttribute('aria-label', col.name);
+      line.append(shown);
+    } else {
+      const control = fieldControl(col, insert ? '' : (current?.value ?? ''));
+      if (insert) {
+        if (!(control instanceof HTMLSelectElement))
+          control.placeholder = col.pk || !col.required ? 'default' : 'required';
+        if (control instanceof HTMLSelectElement) {
+          const blank = document.createElement('option');
+          blank.value = '';
+          blank.textContent = 'default';
+          control.prepend(blank);
+          control.value = '';
+        }
+      }
+      control.setAttribute('aria-label', col.name);
+      line.append(control);
+      if (col.nullable) {
+        const wrap = document.createElement('label');
+        wrap.className = 'nlt';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.dataset.nullFor = col.name;
+        box.checked = !insert && current?.value === null;
+        const text = document.createElement('span');
+        text.textContent = 'NULL';
+        wrap.append(box, text);
+        line.append(wrap);
+        control.disabled = box.checked;
+      }
+    }
+    field.append(caption, line);
+    form.append(field);
+  }
+  const foot = document.createElement('div');
+  foot.className = 'ef';
+  const message = document.createElement('div');
+  message.id = 'eerr';
+  message.setAttribute('role', 'status');
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn';
+  cancel.setAttribute('data-close-insp', '');
+  cancel.textContent = 'Cancel';
+  const save = document.createElement('button');
+  save.type = 'submit';
+  save.className = 'btn on';
+  save.textContent = insert ? 'Insert row' : 'Save changes';
+  foot.append(message, cancel, save);
+  form.append(foot);
+  panel.append(title, form);
+  panel.classList.add('show');
+  win.cuadbEditing = true;
+  /** @type {HTMLElement | null} */ (
+    form.querySelector('input:not([readonly]):not(:disabled),select,textarea')
+  )?.focus();
+}
+
+function editorMessage(/** @type {string} */ text) {
+  const el = document.getElementById('eerr');
+  if (el) el.textContent = text;
+}
+
+/** Send the editor's changes; the server validates, authorizes and audits everything. */
+function submitEditor(/** @type {HTMLFormElement} */ form) {
+  const panel = document.getElementById('catalog-panel');
+  if (!panel) return;
+  const insert = form.dataset.mode === 'insert';
+  const cols = gridColumns();
+  const row = /** @type {HTMLTableRowElement | undefined} */ (win.cuadbRow);
+  const old = row && !insert ? rowValues(row) : {};
+  /** @type {Record<string, string>} */
+  const values = { schema: panel.dataset.schema ?? '', relation: panel.dataset.relation ?? '' };
+  if (panel.dataset.prof) values.profile = panel.dataset.prof;
+  let changed = 0;
+  for (const col of cols) {
+    const control =
+      /** @type {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null} */ (
+        form.querySelector(`[name="${CSS.escape(col.name)}"]`)
+      );
+    const nullBox = /** @type {HTMLInputElement | null} */ (
+      form.querySelector(`[data-null-for="${CSS.escape(col.name)}"]`)
+    );
+    if (!insert && col.pk) {
+      const keyValue = old[col.name]?.value;
+      if (keyValue === null || keyValue === undefined)
+        return editorMessage('This row has no usable key.');
+      values[`key.${col.name}`] = keyValue;
+      continue;
+    }
+    if (!control) continue;
+    const before = old[col.name]?.value ?? null;
+    const wantsNull = !!nullBox?.checked;
+    const now = control.value;
+    if (insert) {
+      if (wantsNull) values[`null.${col.name}`] = '1';
+      else if (now !== '') values[`col.${col.name}`] = now;
+      else if (col.required && !col.pk) return editorMessage(`${col.name} is required.`);
+      changed += 1;
+      continue;
+    }
+    if (wantsNull ? before === null : before === now) continue;
+    changed += 1;
+    if (wantsNull) values[`null.${col.name}`] = '1';
+    else values[`col.${col.name}`] = now;
+    if (before === null) values[`oldnull.${col.name}`] = '1';
+    else values[`old.${col.name}`] = before;
+  }
+  if (!changed) return editorMessage('No changes to save.');
+  editorMessage('Saving…');
+  win.htmx?.ajax('POST', insert ? '/data/insert' : '/data/update', {
+    target: '#eerr',
+    swap: 'innerHTML',
+    values,
+  });
+}
+
+function askDelete() {
+  const panel = document.getElementById('insp');
+  const row = /** @type {HTMLTableRowElement | undefined} */ (win.cuadbRow);
+  if (!panel || !row) return;
+  panel.querySelector('.ef')?.remove();
+  const foot = document.createElement('div');
+  foot.className = 'ef';
+  const message = document.createElement('div');
+  message.id = 'eerr';
+  message.setAttribute('role', 'status');
+  message.textContent = 'Delete this row? This cannot be undone. It is recorded in the audit log.';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn';
+  cancel.setAttribute('data-close-insp', '');
+  cancel.textContent = 'Cancel';
+  const confirm = document.createElement('button');
+  confirm.type = 'button';
+  confirm.className = 'btn dg on';
+  confirm.setAttribute('data-row-delete-confirm', '');
+  confirm.textContent = 'Delete row';
+  foot.append(message, cancel, confirm);
+  panel.append(foot);
+}
+
+function deleteRow() {
+  const panel = document.getElementById('catalog-panel');
+  const row = /** @type {HTMLTableRowElement | undefined} */ (win.cuadbRow);
+  if (!panel || !row) return;
+  const old = rowValues(row);
+  /** @type {Record<string, string>} */
+  const values = {
+    schema: panel.dataset.schema ?? '',
+    relation: panel.dataset.relation ?? '',
+    confirm: `${panel.dataset.schema}.${panel.dataset.relation}`,
+  };
+  if (panel.dataset.prof) values.profile = panel.dataset.prof;
+  for (const col of gridColumns().filter((c) => c.pk)) {
+    const value = old[col.name]?.value;
+    if (value === null || value === undefined) return editorMessage('This row has no usable key.');
+    values[`key.${col.name}`] = value;
+  }
+  win.htmx?.ajax('POST', '/data/delete', { target: '#eerr', swap: 'innerHTML', values });
 }
 
 /* ------------------------------------------------------------ sidebar tree */
@@ -468,6 +750,22 @@ document.addEventListener('click', (event) => {
     applyPrefs();
     return;
   }
+  if (target.closest('[data-row-add]')) {
+    openEditor(null);
+    return;
+  }
+  if (target.closest('[data-row-edit]')) {
+    if (win.cuadbRow) openEditor(win.cuadbRow);
+    return;
+  }
+  if (target.closest('[data-row-delete]')) {
+    askDelete();
+    return;
+  }
+  if (target.closest('[data-row-delete-confirm]')) {
+    deleteRow();
+    return;
+  }
   if (target.closest('[data-close-insp]')) {
     closeInspector();
     return;
@@ -505,6 +803,14 @@ document.addEventListener('click', (event) => {
   }
 });
 
+document.addEventListener('submit', (event) => {
+  const form = event.target;
+  if (form instanceof HTMLFormElement && form.id === 'row-form') {
+    event.preventDefault();
+    submitEditor(form);
+  }
+});
+
 document.addEventListener('dblclick', (event) => {
   const cell = event.target instanceof Element ? event.target.closest('td:not(.rn)') : null;
   if (cell instanceof HTMLElement && cell.closest('table.grid')) {
@@ -520,6 +826,12 @@ document.addEventListener('change', (event) => {
   }
   const el = event.target;
   if (!(el instanceof HTMLInputElement)) return;
+  if (el.dataset.nullFor !== undefined) {
+    const control = el.closest('.fl')?.querySelector('input:not([type=checkbox]),select,textarea');
+    if (control instanceof HTMLElement)
+      /** @type {HTMLInputElement} */ (control).disabled = el.checked;
+    return;
+  }
   if (el.dataset.tg) {
     S[el.dataset.tg] = el.checked;
     applyPrefs();
@@ -626,6 +938,8 @@ document.addEventListener('htmx:afterRequest', (event) => {
   const detail = /** @type {Any} */ (event).detail;
   const path = String(detail.pathInfo?.requestPath ?? '');
   const cancel = document.getElementById('sql-cancel');
+  if (path.startsWith('/catalog/data'))
+    win.cuadbDataUrl = String(detail.pathInfo?.finalRequestPath ?? path);
   if (path.startsWith('/sql/execute')) {
     if (cancel) cancel.hidden = true;
     if (win.cuadbTx)
@@ -642,6 +956,18 @@ document.addEventListener('htmx:beforeRequest', (event) => {
 });
 // A successful admin change: say so, then refresh the list it altered.
 document.addEventListener('cuadb:changed', () => {
+  // htmx fires response-header events before it swaps the body in; wait for the swap.
+  setTimeout(afterChange, 80);
+});
+function afterChange() {
+  if (win.cuadbEditing && document.getElementById('eerr')) {
+    const text = document.getElementById('eerr')?.textContent?.trim();
+    win.cuadbEditing = false;
+    closeInspector();
+    toast(text && text !== 'Saving…' ? text : 'Saved');
+    if (win.cuadbDataUrl) fetchInto(win.cuadbDataUrl, '#catalog-panel');
+    return;
+  }
   const inModal = document.getElementById('modal')?.classList.contains('show');
   const message = (
     inModal ? document.querySelector('#modal-msg') : document.querySelector('#adm-msg')
@@ -650,7 +976,7 @@ document.addEventListener('cuadb:changed', () => {
   if (message) toast(message);
   const src = document.querySelector('#admin-body [data-src]')?.getAttribute('data-src');
   if (src) fetchInto(src, '#admin-body', 'innerHTML');
-});
+}
 
 document.addEventListener('htmx:afterSettle', (event) => {
   if (event.target instanceof Element && event.target.id === 'tree') autoOpenSchema();
