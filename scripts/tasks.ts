@@ -121,14 +121,31 @@ function listDirectories(directory: string): string[] {
   ];
 }
 
-function terminate(child: ChildProcess): void {
+function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   if (!child.pid) return;
   try {
-    if (process.platform === 'win32') child.kill('SIGTERM');
-    else process.kill(-child.pid, 'SIGTERM');
+    if (process.platform === 'win32') child.kill(signal);
+    else process.kill(-child.pid, signal);
   } catch {
     // An already exited child does not require cleanup.
   }
+}
+
+function terminate(child: ChildProcess): void {
+  signalGroup(child, 'SIGTERM');
+}
+
+/** SIGTERM the child's process group, wait for it to exit, SIGKILL after `graceMs`. */
+function stopAndWait(child: ChildProcess, graceMs = 3000): Promise<void> {
+  return new Promise((resolveStop) => {
+    if (child.exitCode !== null || child.signalCode !== null) return resolveStop();
+    const force = setTimeout(() => signalGroup(child, 'SIGKILL'), graceMs);
+    child.once('exit', () => {
+      clearTimeout(force);
+      resolveStop();
+    });
+    terminate(child);
+  });
 }
 
 /** Hot-reload Rust and Askama files; Tailwind watches styles independently. */
@@ -149,17 +166,23 @@ function dev(): void {
       cwd: root,
       stdio: 'inherit',
       detached: process.platform !== 'win32',
-      env: process.env,
+      // A short drain keeps restarts and Ctrl+C from leaving the old server on the port.
+      env: { CUADB_SHUTDOWN_GRACE_MS: '500', ...process.env },
     });
   let rust = launchRust();
   let pending: ReturnType<typeof setTimeout> | undefined;
+  let restarting = false;
 
   const restart = () => {
     if (pending) clearTimeout(pending);
-    pending = setTimeout(() => {
+    pending = setTimeout(async () => {
+      if (restarting) return restart();
+      restarting = true;
       console.log('Restarting Rust server after source change…');
-      terminate(rust);
+      // The old server must release the port before the new one binds it.
+      await stopAndWait(rust);
       rust = launchRust();
+      restarting = false;
     }, 350);
   };
   const watchers: FSWatcher[] = listDirectories(path('src'))
@@ -172,15 +195,22 @@ function dev(): void {
     }),
   );
 
-  const shutdown = () => {
+  let closing = false;
+  const shutdown = async () => {
+    if (closing) return;
+    closing = true;
     if (pending) clearTimeout(pending);
     watchers.forEach((watcher) => watcher.close());
-    terminate(css);
-    terminate(rust);
+    await Promise.all([stopAndWait(css, 1500), stopAndWait(rust)]);
     process.exit(0);
   };
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
+  // Ctrl+C, kill, and a closed terminal must all release the port.
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(signal, shutdown);
+  // Last resort if this script is leaving for another reason.
+  process.on('exit', () => {
+    signalGroup(rust, 'SIGKILL');
+    signalGroup(css, 'SIGKILL');
+  });
 }
 
 function start(): void {

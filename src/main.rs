@@ -34,7 +34,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         _ = termination_signal() => {
             eprintln!("level=info event=server_shutdown phase=drain");
             let _ = shutdown_tx.send(());
-            match tokio::time::timeout(Duration::from_secs(8), &mut server).await {
+            // A second Ctrl+C / SIGTERM during the drain exits immediately.
+            tokio::spawn(async {
+                termination_signal().await;
+                eprintln!("level=warn event=server_shutdown phase=forced");
+                std::process::exit(130);
+            });
+            match tokio::time::timeout(shutdown_grace(), &mut server).await {
                 Ok(result) => { result??; }
                 Err(_) => {
                     server.abort();
@@ -52,6 +58,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         eprintln!("level=warn event=database_pool_close code=deadline_exceeded");
     }
     Ok(())
+}
+
+/// How long in-flight and keep-alive connections may delay shutdown. Defaults to
+/// 8 s (Docker's 10 s stop budget); `CUADB_SHUTDOWN_GRACE_MS` (100-30000) lowers it,
+/// which the dev script uses so a restart never leaves the old process holding the port.
+fn shutdown_grace() -> Duration {
+    let millis = std::env::var("CUADB_SHUTDOWN_GRACE_MS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .map_or(8_000, |value| value.clamp(100, 30_000));
+    Duration::from_millis(millis)
 }
 
 /// SIGINT covers Ctrl+C. SIGTERM is used by Docker on Unix platforms.
