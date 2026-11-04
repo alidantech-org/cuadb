@@ -1,5 +1,5 @@
 ---
-{id: TSK-D066361C1628,name: "Build the Administration view for members, permissions, audit log and security status",type: task,status: planned,priority: medium,created_at: 2026-11-04T23:18:11.064Z,updated_at: 2026-11-04T23:18:19.541Z,tags: [cuadb,phase2-ui],order: 5120,depends_on: [TSK-449CDC06521C,TSK-A448B23E0C59]}
+{id: TSK-D066361C1628,name: "Build the Administration view for members, permissions, audit log and security status",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T23:18:11.064Z,updated_at: 2026-11-04T23:45:43.886Z,tags: [cuadb,phase2-ui],order: 5120,depends_on: [TSK-449CDC06521C,TSK-A448B23E0C59],extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T23:45:43.886Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-D066361C1628/1793835943888-start,started_at: 2026-11-04T23:45:43.908Z}]}}}
 ---
 
 # Build the Administration view for members, permissions, audit log and security status
@@ -16,8 +16,14 @@ This task belongs to **15 — Authenticated application UI, administration and c
 - [ ] Render the five tabs as HTMX fragments, admin-only, with the demo's table, segmented-control and hint styles.
 - [ ] Wire member add, edit, enable or disable, delete and password reset to the backend with confirmation modals and inline errors.
 - [ ] Wire the permission segmented control to grant and remove routes and the audit log to the filter parameters.
-- [ ] Show the Security tab as read-only operator configuration and verify a non-administrator receives a denied fragment.
+- [x] Show the Security tab as read-only operator configuration and verify a non-administrator receives a denied fragment.
 - [ ] Compare every tab with the demo in the built-in browser in light and dark and on mobile.
 
 ## Verification and handoff
 Run the focused tests for this slice, run `bun run format:check` and `bun run check` at the group boundary, add a Task comment with the evidence and any deliberate departure from the demo, tick accepted items with `task check`, and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T23:45:44.177Z · PETER IRUNGU
+
+Progress (2026-11-05): /admin (panel), /admin/users (Members with add, enable or disable, reset password), /admin/grants (member picker, grants table, add with four access levels, remove), /admin/audit (localized times, older events) and /admin/security (read-only operator configuration) are built as HTMX fragments with the demo's tables and styles. Tests cover admin-only access (anonymous redirected, non-admin 403), no inline code, the HX-Trigger refresh after changes and the policy message for weak passwords. Browser-verified: creating a member, the permissions grant flow, the audit and security tabs. Open: the Connections tab (needs the connection management backend), editing a role and deleting a member (backend does not offer them yet), audit filters, confirmation modals and the light/dark/mobile comparison.
