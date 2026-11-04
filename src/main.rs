@@ -9,7 +9,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let address = (config.host, config.port);
     let listener = tokio::net::TcpListener::bind(address).await?;
 
-    println!("CuaDB shell ready at http://{}:{}", config.host, config.port);
+    println!(
+        "CuaDB shell ready at http://{}:{}",
+        config.host, config.port
+    );
     axum::serve(listener, app::router()).await?;
 
     Ok(())

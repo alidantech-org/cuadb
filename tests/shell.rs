@@ -9,7 +9,12 @@ use tower::ServiceExt;
 #[tokio::test]
 async fn health_endpoint_returns_ok() {
     let response = cuadb::app::router()
-        .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
 
@@ -46,7 +51,9 @@ async fn status_fragment_returns_html() {
 
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_bytes(response.into_body(), 64_000).await.unwrap();
-    assert!(String::from_utf8(body.to_vec())
-        .unwrap()
-        .contains("App shell ready"));
+    assert!(
+        String::from_utf8(body.to_vec())
+            .unwrap()
+            .contains("App shell ready")
+    );
 }

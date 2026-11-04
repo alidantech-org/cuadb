@@ -5,14 +5,7 @@
  * On first invocation, missing JS dependencies are installed automatically.
  */
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  watch,
-  type FSWatcher,
-} from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, watch, type FSWatcher } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,7 +35,10 @@ function run(command: string, args: string[]): void {
 
 /** Install dependencies lazily so each root command works after a fresh clone. */
 function ensureFrontend(): void {
-  if (!existsSync(bin('tailwindcss')) || !existsSync(path('node_modules/htmx.org/dist/htmx.min.js'))) {
+  if (
+    !existsSync(bin('tailwindcss')) ||
+    !existsSync(path('node_modules/htmx.org/dist/htmx.min.js'))
+  ) {
     console.log('Installing frontend tooling with Bun…');
     run('bun', ['install']);
   }
