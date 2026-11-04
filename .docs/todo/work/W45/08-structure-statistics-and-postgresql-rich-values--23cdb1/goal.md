@@ -2,13 +2,22 @@
 {id: GOAL-GRP-230A7623CDB1,name: "08 — Structure, statistics and PostgreSQL rich values goal",type: documentation,extra: {created_at: 2026-11-04T07:32:06.961Z,group: GRP-230A7623CDB1}}
 ---
 
+---
+{id: GOAL-GRP-230A7623CDB1,name: "08 — Structure, statistics and PostgreSQL rich values goal",type: documentation,extra: {created_at: 2026-11-04T07:32:06.961Z,group: GRP-230A7623CDB1}}
+---
+
 # 08 — Structure, statistics and PostgreSQL rich values — Goal
 
 ## Outcome
 Complete the table inspection experience through Structure and Info panels and careful handling of PostgreSQL-specific value types. Users should inspect data definitions and storage without complex administration screens, and PostgreSQL/PostGIS objects should remain readable even when they do not map to common scalar types.
 
 ## Definition of done
-This group is complete when its implemented behavior is verifiable through the documented checks, not merely when files exist. Functionality must remain read-only and obey the shared database capability contract. All error states need truthful, usable messages and no credential disclosures. Work should be integrated with the existing single-process Rust application and browser shell, without introducing a separate runtime service. The group tasks describe individual deliverables and must be completed through Task checklists rather than a parallel root TODO file.
+Acceptance of **08 — Structure, statistics and PostgreSQL rich values** requires evidence for these results:
+1. **Implement table Structure tab from real metadata:** Show ordered column definitions, nullability, defaults, identity flags, primary and foreign keys and relevant indexes in a readable layout. The tab must work for supported views as well as ordinary tables and explain when metadata does not apply. Verification includes: Render ordered columns and native data type names with correct key indicators.
+2. **Implement Table Info tab with honest statistics and storage:** Display useful measurements including estimated rows, table data bytes, index bytes, combined size and relation type. Every value must be clearly identified as exact, estimated or unavailable where applicable. Verification includes: Render adapter-provided sizes, estimated rows and relation classification clearly.
+3. **Improve PostgreSQL JSON, arrays, binary and extension value display:** Make complex PostgreSQL values readable through structured previews and safe detail formatting. Types such as jsonb, UUID, arrays, enum labels, timestamp with time zone and bytea should retain important semantics without bloating row pages. Verification includes: Add bounded formatting for JSON/JSONB, arrays, enums and bytea.
+4. **Add optional PostGIS geometry and geography inspection:** Detect supported PostGIS types and show geometry subtype, SRID and bounded spatial representations on demand. Keep spatial data optional, read-only and safe even when geometry columns contain large or complex objects. Verification includes: Detect PostGIS extension availability and geometry/geography columns per database.
+Every listed result must be supported by tests, safe failure handling, and updated documentation where applicable. Verify the complete group against its own plan and linked task checklists. Keep the current single-process Rust deployment and read-only database scope intact. Record unavoidable engine limitations and integration test requirements explicitly.
 
 ## Boundaries
 Do not implement adjacent groups speculatively. Keep changes modular, add tests that can run without a live database when possible, and document any fixture-only validation explicitly. Preserve the existing Bun root commands and localhost deployment assumptions. Record decisions and unexpected compatibility limits in the Task workspace.
