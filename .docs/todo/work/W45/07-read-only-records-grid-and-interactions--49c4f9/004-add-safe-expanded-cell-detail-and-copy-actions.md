@@ -16,8 +16,8 @@ This task belongs to **07 — Read-only records grid and interactions**. The gro
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [x] Build an accessible reusable detail panel with formatted text and JSON when supported.
-- [x] Use bounded detail fetches tied to validated relation, column and row identity.
+- [ ] Build an accessible reusable detail panel with formatted text and JSON when supported.
+- [ ] Use bounded detail fetches tied to validated relation, column and row identity.
 - [x] Show truncation and privacy-safe fallbacks for huge or unsupported values.
 - [ ] Implement local copy actions without exposing credentials or unsafe HTML.
 - [x] Test large JSON, control characters, Unicode and missing-key row scenarios.
@@ -40,3 +40,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T14:00:06.274Z · PETER IRUNGU
 
 Items 1,2,3,5 verified live (rich_values fixture, additive/idempotent tests/fixtures/rich_values.sql): jsonb, arrays with NULL, enum, bytea (hex), exact numeric, timestamptz microseconds, uuid, inet; 20k-element JSON/array, 20KB bytea and 100KB text keep page <120KB. Defect fixed: control chars and bidi overrides (U+202E etc.) were passed raw into HTML; now shown as visible \u{XXXX}. Item 4 partial: deep nesting and invalid UTF-8 not tested (PostgreSQL rejects invalid UTF-8 in text). 6-9 UI.
+
+### 2026-11-04T14:47:17.773Z · PETER IRUNGU
+
+CORRECTION: earlier ticks on items 1 and 2 were made against the wrong task (I was verifying rich-value display, which is TSK-11615BE5E97B). Un-ticked. Current evidence for THIS task: item 3 (truncation markers, 'Unsupported' and 'GeoJSON detail exceeds' fallbacks) and item 5 (large JSON/array, control chars and bidi, Unicode, key-less SQLite heap tables; live tests) hold. Item 1: a detail aside with pretty-printed small JSON exists in data_page.html but accessibility and look are unverified. Item 2: there is no separate detail fetch - the inspector uses bounded per-cell detail embedded in the data page (no row-identity lookup); whether that satisfies the item is a design decision for the user. Items 4,6-9 need the browser.

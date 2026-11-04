@@ -17,10 +17,10 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Acceptance checklist
 - [x] Add bounded formatting for JSON/JSONB, arrays, enums and bytea.
-- [ ] Preserve date/time zone, exact numeric and NULL semantics in displayed values.
-- [ ] Prevent database strings from rendering as unsanitized HTML.
+- [x] Preserve date/time zone, exact numeric and NULL semantics in displayed values.
+- [x] Prevent database strings from rendering as unsanitized HTML.
 - [ ] Test deeply nested JSON, large arrays, invalid UTF-8 representations and binary values.
-- [ ] Document type-specific rendering behavior and size limits.
+- [x] Document type-specific rendering behavior and size limits.
 
 ## Canonical UI fidelity
 
@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T14:00:06.145Z · PETER IRUNGU
 
 Items 1,8 verified live: sizes/estimated rows/type from the adapter, 'Engine-reported estimate; not an exact COUNT(*)' captions, partitioned parent shows Unavailable, no COUNT scan. Left open: 2 (UI explanation placement), 3 (refresh action is the same bounded read; no UI control), 4 (no foreign-table / permission-restricted-stats fixture), 5 (capability flags for other engines), 6,7 UI.
+
+### 2026-11-04T14:47:17.915Z · PETER IRUNGU
+
+CORRECTION/UPDATE: this is the rich-value task. Evidence (tests/rich_live_http.rs, live PostgreSQL 18): items 1,2,3,5,8 verified - bounded JSON/array/enum/bytea, exact numeric text, NULL vs empty, timestamptz microseconds in session zone (UTC), markup escaped and control/bidi characters shown as \u{XXXX}, README 'Rich values' section. Item 4 partial (20k-element JSON/array, 20 KB bytea tested; deeply nested JSON not). Earlier comment on this task wrongly described storage statistics; those belong to TSK-0AA246B508ED. Items 6,7 are UI.

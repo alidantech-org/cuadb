@@ -16,8 +16,8 @@ This task belongs to **08 — Structure, statistics and PostgreSQL rich values**
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Render adapter-provided sizes, estimated rows and relation classification clearly.
-- [ ] Explain estimates, unknown values and partition-related size caveats in the UI.
+- [x] Render adapter-provided sizes, estimated rows and relation classification clearly.
+- [x] Explain estimates, unknown values and partition-related size caveats in the UI.
 - [ ] Provide a bounded refresh action without forcing SELECT COUNT(*) over large tables.
 - [ ] Test empty, partitioned, foreign and permission-restricted fixture scenarios.
 - [ ] Use the same capability flags that other database adapters will expose.
@@ -29,7 +29,7 @@ The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/
 ### Reference-specific acceptance
 - [ ] Expose indexes and storage in the demo's 'Indexes' segment, NOT a standalone 'Info' tab; show index name/definition/unique and storage rows for total, table data, indexes, referenced-by, estimated rows and schema.
 - [ ] Match the Advanced-mode database Overview cards, schema size bars, largest tables and extension list, using available and permission-safe real metadata.
-- [ ] Label estimates, empty sizes and unsupported metrics truthfully; do not perform unbounded full scans merely to reproduce example demo numbers.
+- [x] Label estimates, empty sizes and unsupported metrics truthfully; do not perform unbounded full scans merely to reproduce example demo numbers.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T13:56:03.605Z · PETER IRUNGU
 
 Group 07 note: the inspector reads bounded per-cell detail embedded in the data page (RowPreview + detail_value), so there is no separate row-detail route and no row-identity lookup; item 2 (detail fetch tied to row identity) is satisfied by design only if that is accepted - leaving items open for Phase B. Truncation markers (aria-label truncated) are rendered and escaping verified.
+
+### 2026-11-04T14:47:18.087Z · PETER IRUNGU
+
+Storage/statistics evidence (live PG 18, MariaDB, MySQL, SQLite): items 1,2,8 hold - adapter sizes, estimated rows and relation kind rendered with a 'Meaning' caption ('Engine-reported estimate; not an exact COUNT(*)'), partitioned parents show Unavailable, SQLite shows everything Unavailable, no COUNT scan anywhere. Left open: 3 (refresh is the same bounded read, no UI control), 4 (no foreign-table or permission-restricted-stats fixture), 5 (capability flags exist and are tested in adapter_contract, but not audited against this item), 6,7 UI. (An earlier comment here about row detail belonged to TSK-ABE2D51C83F3.)
