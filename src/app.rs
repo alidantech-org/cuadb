@@ -142,7 +142,9 @@ async fn security_headers(request: Request, next: Next) -> Response {
     if !is_static {
         headers.insert("x-content-type-options", "nosniff".parse().unwrap());
         headers.insert("x-frame-options", "DENY".parse().unwrap());
-        headers.insert("referrer-policy", "no-referrer".parse().unwrap());
+        // `same-origin`, not `no-referrer`: with `no-referrer` browsers send `Origin: null`
+        // on same-origin form posts, which the CSRF origin check must then refuse (login).
+        headers.insert("referrer-policy", "same-origin".parse().unwrap());
         headers.insert(
             "content-security-policy",
             "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"

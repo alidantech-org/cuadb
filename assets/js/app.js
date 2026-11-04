@@ -142,6 +142,12 @@ function decorateIcons(/** @type {ParentNode} */ root = document) {
   });
 }
 
+function setDrawer(/** @type {boolean} */ open) {
+  document.getElementById('side')?.classList.toggle('show', open);
+  document.documentElement.classList.toggle('drawer', open);
+  document.getElementById('menu')?.setAttribute('aria-expanded', String(open));
+}
+
 /* ------------------------------------------------------------ popovers */
 const POPS = ['cpop', 'spop', 'colpop', 'exppop'];
 function closePops(/** @type {string} */ except = '') {
@@ -310,10 +316,10 @@ document.addEventListener('click', (event) => {
   if (!inPop && !target.closest('[data-pop],#cbtn,#sbtn')) closePops();
 
   if (target.closest('[data-toggle-sidebar]')) {
-    const open = document.getElementById('side')?.classList.toggle('show') ?? false;
-    document.getElementById('menu')?.setAttribute('aria-expanded', String(open));
+    setDrawer(!(document.getElementById('side')?.classList.contains('show') ?? false));
     return;
   }
+  if (innerWidth < 761 && !target.closest('#side, #menu')) setDrawer(false);
   if (target.closest('#cbtn')) {
     togglePop('cpop');
     return;
@@ -360,7 +366,7 @@ document.addEventListener('click', (event) => {
   const rowLink = target.closest('#tree a.row');
   if (rowLink) {
     markActiveRow(rowLink);
-    if (innerWidth < 761) document.getElementById('side')?.classList.remove('show');
+    if (innerWidth < 761) setDrawer(false);
     return;
   }
 
@@ -465,7 +471,7 @@ document.addEventListener('input', (event) => {
 document.addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault();
-    document.getElementById('side')?.classList.add('show');
+    setDrawer(true);
     const input = /** @type {HTMLInputElement | null} */ (document.getElementById('f'));
     input?.focus();
     input?.select();
@@ -473,7 +479,7 @@ document.addEventListener('keydown', (event) => {
   }
   if (event.key === 'Escape') {
     closePops();
-    document.getElementById('side')?.classList.remove('show');
+    setDrawer(false);
     closeInspector();
     return;
   }

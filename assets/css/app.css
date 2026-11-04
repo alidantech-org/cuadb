@@ -1633,3 +1633,5 @@ td.mono-value {
   color: var(--mu);
   padding: 24px;
 }
+#mainbody{flex:1;display:flex;flex-direction:column;min-height:0}
+.drawer #menu{left:auto;right:8px}

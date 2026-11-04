@@ -930,3 +930,97 @@ async fn related_zip_never_follows_or_reveals_relations_the_user_may_not_export(
             .any(|e| e.kind == "export" && e.actor == "nora" && e.detail == "zip")
     );
 }
+
+fn assert_csp_clean(html: &str, what: &str) {
+    for needle in [
+        " style=",
+        "<style",
+        "<script>",
+        " onclick=",
+        " onload=",
+        " onchange=",
+    ] {
+        assert!(!html.contains(needle), "{what} contains `{needle}`");
+    }
+}
+
+#[tokio::test]
+async fn the_shell_carries_the_csrf_token_and_account_controls_for_signed_in_users() {
+    let w = world(true).await;
+    let login = post(
+        &w.router,
+        "/login",
+        None,
+        None,
+        &format!("login=admin&password={}", PW.replace(' ', "+")),
+    )
+    .await;
+    let cookie = cookie_of(&login);
+    let page = get(&w.router, "/", Some(&cookie)).await;
+    assert_eq!(page.status, StatusCode::OK);
+    let csrf = w
+        .svc
+        .login("admin", PW)
+        .await
+        .unwrap()
+        .principal
+        .csrf()
+        .to_string();
+    // Each login mints its own session, so the token of *this* session is in the page.
+    assert!(page.body.contains(r#"<meta name="csrf-token" content=""#));
+    assert!(
+        !page.body.contains(&format!("content=\"{csrf}\"")),
+        "another session's token"
+    );
+    assert!(
+        page.body.contains("Sign out"),
+        "account block with sign out"
+    );
+    assert!(
+        page.body.contains("Administration"),
+        "admins see the administration entry"
+    );
+    assert!(!page.body.contains("Trusted local session"));
+    assert_csp_clean(&page.body, "explorer page");
+    assert_eq!(
+        page.headers.get(header::REFERRER_POLICY).unwrap(),
+        "same-origin",
+        "no-referrer would make browsers send `Origin: null` on form posts"
+    );
+}
+
+#[tokio::test]
+async fn local_mode_has_no_sign_out_and_no_administration_entry() {
+    let w = world(false).await;
+    let page = get(&w.router, "/", None).await;
+    assert_eq!(page.status, StatusCode::OK);
+    assert!(page.body.contains("Trusted local session"));
+    assert!(!page.body.contains("Sign out"));
+    assert!(!page.body.contains("Administration"));
+    assert_csp_clean(&page.body, "local explorer page");
+}
+
+#[tokio::test]
+async fn the_login_page_is_a_complete_document_without_inline_code() {
+    let w = world(true).await;
+    let page = get(&w.router, "/login", None).await;
+    assert_eq!(page.status, StatusCode::OK);
+    assert!(page.body.starts_with("<!doctype html>"));
+    assert!(page.body.contains(r#"name="password" type="password""#));
+    assert_csp_clean(&page.body, "login page");
+}
+
+#[tokio::test]
+async fn data_and_catalog_fragments_stay_free_of_inline_style_and_script() {
+    let w = world(false).await;
+    for path in [
+        "/catalog/schemas",
+        "/catalog/relations?schema=main",
+        "/catalog/data?schema=main&relation=t",
+        "/connection/profiles",
+    ] {
+        let r = get(&w.router, path, None).await;
+        assert_eq!(r.status, StatusCode::OK, "{path}");
+        assert_csp_clean(&r.body, path);
+    }
+}
