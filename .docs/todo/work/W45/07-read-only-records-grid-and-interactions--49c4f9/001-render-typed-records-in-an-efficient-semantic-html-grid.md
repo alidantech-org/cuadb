@@ -47,3 +47,7 @@ Progress evidence (2026-11-04): semantic table headers/rows and typed/null cells
 ### 2026-11-04T13:46:53.726Z · PETER IRUNGU
 
 Live finding: tests/postgres_rows.rs filter case expected a 'row 11' value absent from tests/fixtures/rows.sql, and had never run live. Test changed to filter on the fixture's unique value; live paging/cursor/sort/filter test now passes on PostgreSQL 18.
+
+### 2026-11-04T13:56:03.471Z · PETER IRUNGU
+
+Group 07: grid escaping verified (script markup never appears raw; 1000-char value truncated in-page, live). Item 3 (explicit empty/unsupported states) and 5 (layout) need browser acceptance; left open.

@@ -6,7 +6,7 @@ use crate::{
 };
 use askama::Template;
 use axum::{
-    extract::{Query, State},
+    extract::{RawQuery, State},
     http::{HeaderValue, header},
     response::{Html, IntoResponse, Response},
 };
@@ -162,6 +162,74 @@ pub struct DataQuery {
     pub(super) column: Vec<String>,
 }
 
+/// Split a raw query into single-valued pairs and repeated `column` values.
+/// serde's urlencoded decoder cannot read repeated keys into a `Vec`, yet the grid's
+/// own links and column picker repeat `column=`. Unknown keys and duplicated
+/// single-valued keys are rejected.
+pub(super) fn split_query(
+    raw: Option<&str>,
+    allowed: &[&str],
+) -> Result<(std::collections::BTreeMap<String, String>, Vec<String>), AppError> {
+    let raw = raw.unwrap_or_default();
+    if raw.len() > 4096 {
+        return Err(invalid());
+    }
+    let mut single = std::collections::BTreeMap::new();
+    let mut columns = vec![];
+    for (key, value) in url::form_urlencoded::parse(raw.as_bytes()) {
+        if key == "column" && allowed.contains(&"column") {
+            columns.push(value.into_owned());
+        } else if allowed.contains(&key.as_ref())
+            && single
+                .insert(key.into_owned(), value.into_owned())
+                .is_none()
+        {
+        } else {
+            return Err(invalid());
+        }
+    }
+    Ok((single, columns))
+}
+
+impl DataQuery {
+    pub(super) fn from_raw(raw: Option<&str>) -> Result<Self, AppError> {
+        let (mut map, column) = split_query(
+            raw,
+            &[
+                "schema",
+                "relation",
+                "size",
+                "page",
+                "sort",
+                "direction",
+                "cursor",
+                "filter",
+                "spatial",
+                "pick",
+                "column",
+            ],
+        )?;
+        let number = |value: Option<String>| {
+            value
+                .map(|v| v.parse::<u32>().map_err(|_| invalid()))
+                .transpose()
+        };
+        Ok(Self {
+            schema: map.remove("schema").ok_or_else(invalid)?,
+            relation: map.remove("relation").ok_or_else(invalid)?,
+            size: number(map.remove("size"))?,
+            page: number(map.remove("page"))?,
+            sort: map.remove("sort"),
+            direction: map.remove("direction"),
+            cursor: map.remove("cursor"),
+            filter: map.remove("filter"),
+            spatial: map.remove("spatial"),
+            pick: map.remove("pick"),
+            column,
+        })
+    }
+}
+
 pub(super) fn parse(query: DataQuery) -> Result<Navigation, AppError> {
     if query.column.len() > 24
         || query
@@ -270,8 +338,9 @@ fn link(nav: &Navigation, page: u32, cursor: Option<&str>, sort: Option<SortSpec
 }
 pub async fn data(
     State(state): State<AppState>,
-    Query(query): Query<DataQuery>,
+    RawQuery(raw): RawQuery,
 ) -> Result<Response, AppError> {
+    let query = DataQuery::from_raw(raw.as_deref())?;
     let nav = parse(query)?;
     let catalog = state
         .catalog()

@@ -16,10 +16,10 @@ This task belongs to **07 — Read-only records grid and interactions**. The gro
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Render previous/next buttons using actual backend continuation state.
-- [ ] Offer bounded page-size choices without allowing arbitrary large values.
-- [ ] Preserve relation, sorting and pagination cursor during HTMX navigation.
-- [ ] Handle first, last and empty pages with accurate disabled states.
+- [x] Render previous/next buttons using actual backend continuation state.
+- [x] Offer bounded page-size choices without allowing arbitrary large values.
+- [x] Preserve relation, sorting and pagination cursor during HTMX navigation.
+- [x] Handle first, last and empty pages with accurate disabled states.
 - [ ] Test rapid paging and stale request behavior against a fake adapter.
 
 ## Canonical UI fidelity
@@ -33,3 +33,9 @@ The **required frontend specification** is `assets/cuadb-ui-demo.html` and the c
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T13:56:03.346Z · PETER IRUNGU
+
+BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Items 1-4 verified live: Previous/Next from real continuation state, ranges 1-50/51-100/101-120/0-0, disabled buttons on first/last/empty, size/page/cursor bounds rejected (400), sort+size+column selection preserved in nav links. Item 5 left open: rapid paging is covered live and slow-adapter timeouts with a fake, but dropping stale responses is browser behavior (hx-sync) - unverified until Phase B. 6-8 UI.

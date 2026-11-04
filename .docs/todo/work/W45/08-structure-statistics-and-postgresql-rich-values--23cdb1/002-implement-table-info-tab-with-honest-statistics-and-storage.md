@@ -33,3 +33,9 @@ The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T13:56:03.605Z · PETER IRUNGU
+
+Group 07 note: the inspector reads bounded per-cell detail embedded in the data page (RowPreview + detail_value), so there is no separate row-detail route and no row-identity lookup; item 2 (detail fetch tied to row identity) is satisfied by design only if that is accepted - leaving items open for Phase B. Truncation markers (aria-label truncated) are rendered and escaping verified.

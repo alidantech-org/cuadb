@@ -458,3 +458,23 @@ async fn many_relations_render_a_bounded_tree_and_search_reports_incompleteness(
         "search over a truncated list must say so"
     );
 }
+
+#[tokio::test]
+async fn repeated_column_parameters_are_accepted_but_other_duplicates_are_not() {
+    for path in [
+        "/catalog/data?schema=main&relation=t&column=id&column=note&pick=1",
+        "/catalog/export?schema=main&relation=t&format=csv&column=id&column=note",
+    ] {
+        let (status, _) = get(Mode::Healthy, path, 2000).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+    }
+    for path in [
+        "/catalog/data?schema=main&schema=other&relation=t",
+        "/catalog/data?schema=main&relation=t&size=25&size=50",
+        "/catalog/export?schema=main&relation=t&format=csv&format=json",
+        "/catalog/data?schema=main&relation=t&unknown=1",
+    ] {
+        let (status, _) = get(Mode::Healthy, path, 2000).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{path}");
+    }
+}

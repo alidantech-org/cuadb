@@ -16,11 +16,11 @@ This task belongs to **07 — Read-only records grid and interactions**. The gro
 CuaDB is a local-first, read-only database viewer served by one Rust/Axum process. Keep database-specific behavior inside adapter modules, use typed HTTP request and view models, and avoid exposing arbitrary SQL or credentials to browser state. Before adding a dependency or abstraction, check whether the existing shell and adapter contract provide a simpler solution. Never introduce unsafe write operations as a shortcut for inspection, and keep every query bounded by reasonable row, time and memory limits.
 
 ## Acceptance checklist
-- [ ] Generate sort links only for backend-approved column identifiers.
+- [x] Generate sort links only for backend-approved column identifiers.
 - [ ] Expose aria-sort and visible ascending/descending state on active headers.
-- [ ] Reset or adapt paging state when sorting changes.
+- [x] Reset or adapt paging state when sorting changes.
 - [ ] Render a safe error and restore usable controls when a sort is rejected or timed out.
-- [ ] Test sort transitions, NULL-heavy fixtures and fast repeated header clicks.
+- [x] Test sort transitions, NULL-heavy fixtures and fast repeated header clicks.
 
 ## Canonical UI fidelity
 
@@ -33,3 +33,9 @@ The **required frontend specification** is `assets/cuadb-ui-demo.html` and the c
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
+
+## Comments
+
+### 2026-11-04T13:56:03.197Z · PETER IRUNGU
+
+BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Items 1,3,5 verified live (PostgreSQL 18, tests/rows_live_http.rs): sort links only for sortable types, links reset page/cursor, NULLs always last (explicit NULLS LAST, both directions), repeatable order, 120/120 unique rows across sorted pages, 16 concurrent mixed-direction requests each return their own aria-sort. Defect fixed: repeated column= params (emitted by the app's own links and column picker) failed with 'invalid type: string, expected a sequence'; new raw-query parser (src/web/rows.rs split_query) now used by /catalog/data and /catalog/export. Items 2,4 (visible state, restoring controls after a rejected sort in a browser), 6,7(UI cycle),8 pending Phase B. Limitation: sorted paging uses offset paging (keyset only for unsorted/unique-key scans).

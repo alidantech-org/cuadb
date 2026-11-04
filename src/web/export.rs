@@ -8,7 +8,7 @@
 //! the loop at the next await point. Linked-table ZIP export is not implemented.
 
 use axum::{
-    extract::{Query, State},
+    extract::{RawQuery, State},
     http::{HeaderValue, header},
     response::{IntoResponse, Response},
 };
@@ -54,6 +54,49 @@ enum Format {
 
 fn invalid() -> AppError {
     AppError::new(ErrorKind::InvalidInput)
+}
+
+impl ExportQuery {
+    fn from_raw(raw: Option<&str>) -> Result<Self, AppError> {
+        let (mut map, column) = super::rows::split_query(
+            raw,
+            &[
+                "schema",
+                "relation",
+                "format",
+                "scope",
+                "size",
+                "page",
+                "sort",
+                "direction",
+                "filter",
+                "column",
+                "depth",
+            ],
+        )?;
+        Ok(Self {
+            schema: map.remove("schema").ok_or_else(invalid)?,
+            relation: map.remove("relation").ok_or_else(invalid)?,
+            format: map.remove("format").ok_or_else(invalid)?,
+            scope: map.remove("scope"),
+            size: map
+                .remove("size")
+                .map(|v| v.parse().map_err(|_| invalid()))
+                .transpose()?,
+            page: map
+                .remove("page")
+                .map(|v| v.parse().map_err(|_| invalid()))
+                .transpose()?,
+            sort: map.remove("sort"),
+            direction: map.remove("direction"),
+            filter: map.remove("filter"),
+            column,
+            depth: map
+                .remove("depth")
+                .map(|v| v.parse().map_err(|_| invalid()))
+                .transpose()?,
+        })
+    }
 }
 
 fn cell_text(cell: &Cell) -> String {
@@ -281,8 +324,9 @@ async fn related_zip(
 
 pub async fn export(
     State(state): State<AppState>,
-    Query(query): Query<ExportQuery>,
+    RawQuery(raw): RawQuery,
 ) -> Result<Response, AppError> {
+    let query = ExportQuery::from_raw(raw.as_deref())?;
     if query.format == "zip" {
         let plain = query.size.is_none()
             && query.page.is_none()
