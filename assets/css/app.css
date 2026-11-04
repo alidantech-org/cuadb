@@ -1805,7 +1805,25 @@ td.acts .btn {
   margin: 0;
 }
 
-.adm-filter{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin:0 0 8px}
-.adm-filter label{display:flex;flex-direction:column;gap:2px;color:var(--mu);font-size:11px}
-.adm-filter .inp{height:26px;min-width:110px}
-.inp-sm{height:24px;padding:0 4px}
+.adm-filter {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin: 0 0 8px;
+}
+.adm-filter label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--mu);
+  font-size: 11px;
+}
+.adm-filter .inp {
+  height: 26px;
+  min-width: 110px;
+}
+.inp-sm {
+  height: 24px;
+  padding: 0 4px;
+}
