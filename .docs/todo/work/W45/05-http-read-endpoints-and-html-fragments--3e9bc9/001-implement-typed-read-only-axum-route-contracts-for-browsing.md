@@ -20,7 +20,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [x] Delegate discovery and row reads to the adapter through application state.
 - [x] Reject invalid identifiers, directions, page sizes and unsupported relation types.
 - [x] Support full-page requests and HTMX fragment responses where appropriate.
-- [ ] Add isolated router tests with a fake adapter rather than requiring a live database.
+- [x] Add isolated router tests with a fake adapter rather than requiring a live database.
 
 ## Canonical UI fidelity
 
@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T11:29:32.483Z · PETER IRUNGU
 
 Implemented Axum GET contracts with typed serde query models for catalog and row routes, deny-unknown-fields parsing, duplicate scalar rejection and catalog delegation through AppState. Added global HTML no-store and browser security headers plus cache-disabled HTMX fragments and route-state tests. Export routes remain intentionally unimplemented and the reference UI state preservation is incomplete.
+
+### 2026-11-04T13:12:04.840Z · PETER IRUNGU
+
+Item 5 verified: tests/router_fake_adapter.rs drives the real router with an in-memory adapter (AppState::with_adapter): escaping, relation listing, permission-denied (403/in-region fragment), no driver text leak, slow adapter cut off by request timeout. Items 7-8 remain open (export routes not implemented; state preservation is UI).

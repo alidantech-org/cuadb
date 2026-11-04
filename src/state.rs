@@ -86,6 +86,15 @@ impl AppState {
         }
     }
 
+    /// Serve an already-built adapter (for isolated router tests with fakes).
+    /// It reports no connection runtime, so it never opens a database.
+    pub fn with_adapter(adapter: Arc<dyn DatabaseAdapter>) -> Self {
+        Self {
+            runtime: None,
+            catalog: Some(adapter),
+        }
+    }
+
     pub async fn connection_snapshot(&self) -> ConnectionSnapshot {
         match &self.runtime {
             Some(Runtime::PostgreSql(manager)) => manager.snapshot().await,

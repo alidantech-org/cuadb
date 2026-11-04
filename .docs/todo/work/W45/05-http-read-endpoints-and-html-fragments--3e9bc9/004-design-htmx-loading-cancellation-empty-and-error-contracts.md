@@ -39,3 +39,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T11:29:33.819Z · PETER IRUNGU
 
 Established stable sidebar/tree/main targets, HTMX loading indicator, disabled history caching, accessible status and safe error fragment behavior. Existing request timeout drops handler futures. Stale selection ordering, broader UI states and fake-adapter slow-route tests remain open.
+
+### 2026-11-04T13:12:04.975Z · PETER IRUNGU
+
+Backend partial: slow fake adapter is cancelled by the request timeout (router_fake_adapter.rs). HTMX-vs-full-page failure variants, stale-response handling and retry docs still open.
