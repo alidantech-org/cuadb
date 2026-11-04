@@ -300,7 +300,7 @@ function verify(): void {
   const savedDocs = asArray<DocRecord>(taskJson(executable, ['docs', 'list']), 'docs list');
   const groupNames = new Set(savedGroups.map((group) => group.name));
   const taskNames = new Set(savedTasks.map((task) => task.name));
-  const docPaths = new Set(savedDocs.map((doc) => doc.path.replace(/^\\.docs\\//, '')));
+  const docPaths = new Set(savedDocs.map((doc) => doc.path.startsWith('.docs/') ? doc.path.slice(6) : doc.path));
   const missingGroups = groups.filter((group) => !groupNames.has(group.title));
   const missingTasks = groups.flatMap((group) => group.tasks).filter((task) => !taskNames.has(task.title));
   const missingDocs = documents.filter((doc) => !docPaths.has(doc.path));
