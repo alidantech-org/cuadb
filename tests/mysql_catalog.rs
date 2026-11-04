@@ -26,7 +26,27 @@ async fn adapter_contract_without_mysql_network() {
 
 #[tokio::test]
 async fn disposable_mariadb_catalog_and_rows() {
-    let Ok(url) = std::env::var("CUADB_TEST_MARIADB_URL") else {
+    live_fixture(
+        "CUADB_TEST_MARIADB_URL",
+        "cuadb_fixture_mariadb",
+        cuadb::db::types::Engine::MariaDb,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn disposable_mysql_catalog_and_rows() {
+    live_fixture(
+        "CUADB_TEST_MYSQL_URL",
+        "cuadb_fixture_mysql",
+        cuadb::db::types::Engine::MySql,
+    )
+    .await;
+}
+
+/// Skipped (returns early) when the env var is unset; that is NOT live evidence.
+async fn live_fixture(env: &str, schema_name: &str, engine: cuadb::db::types::Engine) {
+    let Ok(url) = std::env::var(env) else {
         return;
     };
     let parsed = url::Url::parse(&url).unwrap();
@@ -41,17 +61,15 @@ async fn disposable_mariadb_catalog_and_rows() {
     let manager = MySqlManager::new(&url, &config.limits).unwrap();
     assert!(manager.snapshot().await.status == cuadb::db::types::ConnectionStatus::Ready);
     let catalog = manager.catalog();
+    assert_eq!(catalog.detected_engine().await, engine);
     let schemas = catalog.list_schemas().await.unwrap();
     assert!(
         schemas
             .items
             .iter()
-            .any(|schema| schema.name == "cuadb_fixture_mariadb")
+            .any(|schema| schema.name == schema_name)
     );
-    let relations = catalog
-        .list_relations("cuadb_fixture_mariadb")
-        .await
-        .unwrap();
+    let relations = catalog.list_relations(schema_name).await.unwrap();
     assert!(
         relations
             .items
@@ -61,7 +79,7 @@ async fn disposable_mariadb_catalog_and_rows() {
     );
     assert!(relations.items.iter().any(|relation| relation.id.name == "items_view" && relation.kind == RelationKind::View));
     let id = RelationId {
-        namespace: "cuadb_fixture_mariadb".into(),
+        namespace: schema_name.into(),
         name: "Mixed_Items".into(),
     };
     let columns = catalog.describe_columns(&id).await.unwrap();
@@ -80,7 +98,7 @@ async fn disposable_mariadb_catalog_and_rows() {
     );
     let constraints = catalog
         .list_constraints(&RelationId {
-            namespace: "cuadb_fixture_mariadb".into(),
+            namespace: schema_name.into(),
             name: "child".into(),
         })
         .await

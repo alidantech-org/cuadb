@@ -61,14 +61,14 @@ async fn fixture_pages_have_exact_bounds_and_cursor_navigation() {
         .fetch_rows(
             &relation("paging"),
             RowOptions {
-                filter: Some("row 11".into()),
+                filter: Some("Ω".into()),
                 ..RowOptions::default()
             },
         )
         .await
         .unwrap();
     assert_eq!(filtered.rows.len(), 1);
-    assert!(matches!(filtered.rows[0][1], Cell::Text(ref value) if value == "row 11"));
+    assert!(matches!(filtered.rows[0][0], Cell::Integer(1)));
     request.cursor = first.next_cursor.clone();
     let second = catalog
         .fetch_rows(&relation("paging"), request.clone())

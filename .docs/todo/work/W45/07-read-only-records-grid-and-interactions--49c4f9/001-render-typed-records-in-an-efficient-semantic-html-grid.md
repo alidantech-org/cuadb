@@ -43,3 +43,7 @@ Implemented initial shared read-only grid view with typed bounded cells, paging 
 ### 2026-11-04T12:45:50.105Z · PETER IRUNGU
 
 Progress evidence (2026-11-04): semantic table headers/rows and typed/null cells are rendered; sticky headers, horizontal scrolling and bounded previews are implemented. Focused rows/adapter tests passed and bun run format:check passed. The canonical grid remains incomplete: full selected-row inspector, export actions, FK navigation, preference controls, screenshot parity and several accessibility interactions are not accepted.
+
+### 2026-11-04T13:46:53.726Z · PETER IRUNGU
+
+Live finding: tests/postgres_rows.rs filter case expected a 'row 11' value absent from tests/fixtures/rows.sql, and had never run live. Test changed to filter on the fixture's unique value; live paging/cursor/sort/filter test now passes on PostgreSQL 18.

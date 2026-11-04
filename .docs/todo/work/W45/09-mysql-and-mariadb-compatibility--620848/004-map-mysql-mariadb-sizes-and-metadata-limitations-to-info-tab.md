@@ -30,3 +30,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T12:20:01.631Z · PETER IRUNGU
 
 Implemented INFORMATION_SCHEMA TABLE_ROWS, DATA_LENGTH and INDEX_LENGTH metrics and common availability-aware statistics display. Values are engine-reported estimates that may be stale or absent; no full scans. MariaDB fixture verified estimated rows. Caveats added to docs/mysql-mariadb.md; MySQL 8 and alternate storage engines remain unverified.
+
+### 2026-11-04T13:46:53.624Z · PETER IRUNGU
+
+Live finding (MySQL 8.4.13 vs MariaDB 11.8.9): MySQL reports information_schema column names upper-case and text as VARBINARY, which made every catalog call fail with Internal on MySQL. Fixed in src/db/mysql/catalog.rs (Field trait with case/varbinary fallback). tests/mysql_catalog.rs now runs independent live tests for MariaDB (CUADB_TEST_MARIADB_URL) and MySQL (CUADB_TEST_MYSQL_URL): both pass against the cuadb_fixture_* databases. A second Mixed_Items row was added via the operator account (idempotent insert) so has_more paging is exercised.

@@ -1,7 +1,7 @@
 //! MySQL/MariaDB catalog and bounded row reads.
 use std::time::Duration;
 
-use sqlx::{MySql, MySqlPool, Row, mysql::MySqlRow};
+use sqlx::{MySqlPool, Row, mysql::MySqlRow};
 use tokio::sync::RwLock;
 use tokio::time::timeout;
 
@@ -74,11 +74,43 @@ impl MySqlCatalog {
     }
 }
 
-fn get<T>(row: &MySqlRow, field: &str) -> Result<T, DbError>
-where
-    T: for<'r> sqlx::Decode<'r, MySql> + sqlx::Type<MySql>,
-{
-    row.try_get(field)
+/// Reads a result column. MySQL 8 reports information_schema names in upper case
+/// and many text columns as VARBINARY; MariaDB uses lower case and VARCHAR.
+trait Field: Sized {
+    fn read(row: &MySqlRow, name: &str) -> Result<Self, sqlx::Error>;
+}
+fn text(row: &MySqlRow, name: &str) -> Result<Option<String>, sqlx::Error> {
+    match row.try_get::<Option<String>, _>(name) {
+        Ok(value) => Ok(value),
+        Err(_) => row
+            .try_get::<Option<Vec<u8>>, _>(name)
+            .map(|bytes| bytes.map(|b| String::from_utf8_lossy(&b).into_owned())),
+    }
+}
+impl Field for String {
+    fn read(row: &MySqlRow, name: &str) -> Result<Self, sqlx::Error> {
+        text(row, name)?.ok_or_else(|| sqlx::Error::ColumnNotFound(name.into()))
+    }
+}
+impl Field for Option<String> {
+    fn read(row: &MySqlRow, name: &str) -> Result<Self, sqlx::Error> {
+        text(row, name)
+    }
+}
+macro_rules! plain_field {
+    ($($t:ty),*) => {$(
+        impl Field for $t {
+            fn read(row: &MySqlRow, name: &str) -> Result<Self, sqlx::Error> {
+                row.try_get(name)
+            }
+        }
+    )*};
+}
+plain_field!(i8, u64, Option<u64>);
+
+fn get<T: Field>(row: &MySqlRow, field: &str) -> Result<T, DbError> {
+    T::read(row, field)
+        .or_else(|_| T::read(row, field.to_ascii_uppercase().as_str()))
         .map_err(|_| DbError::new(DbErrorKind::Internal))
 }
 
