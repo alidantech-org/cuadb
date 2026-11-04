@@ -284,6 +284,14 @@ impl DatabaseAdapter for SqliteCatalog {
     async fn indexes(&self, id: &RelationId) -> Result<CatalogList<Index>, DbError> {
         self.indexes_inner(id).await
     }
+    /// SQLite has no partitioning: a visible relation has an empty (not unsupported) list.
+    async fn partitions(&self, id: &RelationId) -> Result<CatalogList<PartitionLink>, DbError> {
+        self.visible(id).await?;
+        Ok(CatalogList {
+            items: vec![],
+            truncated: false,
+        })
+    }
     async fn page(&self, id: &RelationId, o: RowOptions) -> Result<RowPage, DbError> {
         self.fetch_rows(id, o).await
     }

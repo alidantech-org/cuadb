@@ -18,9 +18,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 ## Acceptance checklist
 - [x] Implement allowlisted relation and column quoting for MySQL SQL generation.
 - [x] Provide bounded pages, safe sort controls and deterministic ties when available.
-- [ ] Normalize JSON, binary, decimal, time and NULL values without losing meaning.
+- [x] Normalize JSON, binary, decimal, time and NULL values without losing meaning.
 - [x] Reuse shared page responses and HTMX templates without MySQL-specific HTML branches.
-- [ ] Test pagination and sorting against MySQL and MariaDB fixtures.
+- [x] Test pagination and sorting against MySQL and MariaDB fixtures.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
@@ -30,3 +30,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T12:20:01.478Z · PETER IRUNGU
 
 Implemented bounded typed grid retrieval with catalog-allowlisted quoted identifiers, primary-key ordering/tie breaks when available, validated sorts, literal bound filter, bytea-like binary hex decoding, bounded text and shared RowPage model. MariaDB 11.8 disposable fixture verifies one-row page, has_more and integer decoding. Keyset cursors are not supported and fall back to bounded offset paging; mark cursor-specific checklist items as limitations.
+
+### 2026-11-04T14:04:42.201Z · PETER IRUNGU
+
+BACKEND VERIFIED on MariaDB 11.8.9 and MySQL 8.4.13 (live). Fixed: HEX() of whole BLOBs was unbounded (now SUBSTRING in SQL); BIT(n) rendered as '?'; NULL ordering differed from PostgreSQL (MySQL put NULLs first; now NULLS LAST via IS NULL); row filter treated % and _ as LIKE wildcards (now literal); information_schema case/VARBINARY on MySQL 8. Fixtures added additively via operator (tests/fixtures/mysql-rich.sql).

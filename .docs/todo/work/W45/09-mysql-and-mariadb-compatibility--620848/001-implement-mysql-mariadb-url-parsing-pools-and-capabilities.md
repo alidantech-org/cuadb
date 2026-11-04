@@ -20,7 +20,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [x] Create bounded connection pools with redacted errors and configurable timeouts.
 - [x] Expose engine/flavor capabilities to the common UI contract.
 - [x] Enforce least-privilege read-only access as far as the engine supports it.
-- [ ] Add independent MySQL and MariaDB connection failure integration tests.
+- [x] Add independent MySQL and MariaDB connection failure integration tests.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
@@ -30,3 +30,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T12:20:01.226Z · PETER IRUNGU
 
 Implemented strict redacted mysql:// and mariadb:// parsing, loopback/remote TLS policy, bounded SQLx pool, read-only session mode, cached server flavor probe, common adapter routing, and fixture-gated catalog integration. Evidence: cargo check; cargo test mysql::url::tests; cargo test --test mysql_catalog; CUADB_TEST_MARIADB_URL=... cargo test --test mysql_catalog disposable_mariadb_catalog_and_rows; bun run format:check; task validate. MariaDB 11.8 fixture verified using a restricted reader. MySQL 8 container pull unavailable; invalid-auth live test still needs fixture evidence. Keep corresponding acceptance items unchecked for unsupported proof.
+
+### 2026-11-04T14:04:41.934Z · PETER IRUNGU
+
+Item 5 verified live: tests/mysql_live_http.rs each_engine_reports_authentication_and_network_failures_without_secrets runs for MariaDB 11.8.9 and MySQL 8.4.13 independently: wrong password and unknown user -> AuthenticationFailed, closed port -> Unavailable, no secret in status text.

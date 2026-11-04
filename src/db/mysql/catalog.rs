@@ -11,8 +11,8 @@ use crate::db::{
     types::{
         Availability, Capability, CatalogList, Cell, Column, ColumnDetail, Constraint,
         ConstraintKind, DbError, DbErrorKind, Engine, Index, Namespace, Overview, PageRequest,
-        Relation, RelationId, RelationKind, RelationStats, RowOptions, RowPage, RowPreview,
-        SortDirection,
+        PartitionLink, Relation, RelationId, RelationKind, RelationStats, RowOptions, RowPage,
+        RowPreview, SortDirection,
     },
 };
 
@@ -139,7 +139,7 @@ fn sort_supported(native_type: &str) -> bool {
 
 fn is_binary(native_type: &str) -> bool {
     let native = native_type.to_ascii_lowercase();
-    native.contains("blob") || native.contains("binary") || native == "bit"
+    native.contains("blob") || native.contains("binary") || native.starts_with("bit")
 }
 
 fn cell(raw: Option<String>, native_type: &str) -> (Cell, RowPreview) {
@@ -297,6 +297,50 @@ impl DatabaseAdapter for MySqlCatalog {
 
     async fn constraints(&self, relation: &RelationId) -> Result<CatalogList<Constraint>, DbError> {
         self.list_constraints(relation).await
+    }
+
+    async fn partitions(
+        &self,
+        relation: &RelationId,
+    ) -> Result<CatalogList<PartitionLink>, DbError> {
+        self.visible_relation(relation).await?;
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    "SELECT partition_name, partition_method, partition_description \
+                     FROM information_schema.partitions \
+                     WHERE table_schema=? AND table_name=? AND partition_name IS NOT NULL \
+                     ORDER BY partition_ordinal_position LIMIT ?",
+                )
+                .bind(&relation.namespace)
+                .bind(&relation.name)
+                .bind(MAX_DETAILS + 1)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        let items = rows
+            .iter()
+            .map(|row| {
+                let name: String = get(row, "partition_name")?;
+                let method: Option<String> = get(row, "partition_method")?;
+                let description: Option<String> = get(row, "partition_description")?;
+                Ok(PartitionLink {
+                    parent: relation.clone(),
+                    child: RelationId {
+                        namespace: relation.namespace.clone(),
+                        name,
+                    },
+                    bound: Some(format!(
+                        "{} {}",
+                        method.unwrap_or_default(),
+                        description.unwrap_or_default()
+                    ))
+                    .map(|bound| bound.trim().to_string())
+                    .filter(|bound| !bound.is_empty()),
+                })
+            })
+            .collect::<Result<Vec<_>, DbError>>()?;
+        Ok(capped(items, MAX_DETAILS as usize))
     }
 
     async fn indexes(&self, relation: &RelationId) -> Result<CatalogList<Index>, DbError> {
@@ -609,7 +653,17 @@ impl DatabaseAdapter for MySqlCatalog {
         for (i, column) in selected.iter().enumerate() {
             let q = quote(&column.column.name)?;
             let expr = if is_binary(&column.column.native_type) {
-                format!("HEX({q})")
+                // Bound the transfer in the database: never HEX() a whole blob.
+                if column
+                    .column
+                    .native_type
+                    .to_ascii_lowercase()
+                    .starts_with("bit")
+                {
+                    format!("HEX({q})")
+                } else {
+                    format!("HEX(SUBSTRING({q}, 1, {PREVIEW_CHARS}))")
+                }
             } else {
                 format!("LEFT(CAST({q} AS CHAR), {PREVIEW_CHARS})")
             };
@@ -628,7 +682,7 @@ impl DatabaseAdapter for MySqlCatalog {
                 .map(|column| quote(&column.column.name).map(|q| format!("CAST({q} AS CHAR)")))
                 .collect::<Result<Vec<_>, _>>()?
                 .join(", ");
-            predicate = format!(" WHERE CONCAT_WS(' ', {search}) LIKE ?");
+            predicate = format!(" WHERE CONCAT_WS(' ', {search}) LIKE ? ESCAPE '!'");
         }
         let order = if let Some(sort) = &options.sort {
             let column = columns
@@ -638,8 +692,10 @@ impl DatabaseAdapter for MySqlCatalog {
             if !sort_supported(&column.column.native_type) {
                 return Err(DbError::new(DbErrorKind::Unsupported));
             }
+            // NULLs last in both directions, matching the PostgreSQL adapter.
             let mut order = format!(
-                " ORDER BY {} {}",
+                " ORDER BY ({} IS NULL), {} {}",
+                quote(&sort.column)?,
                 quote(&sort.column)?,
                 if sort.direction == SortDirection::Asc {
                     "ASC"
@@ -679,7 +735,12 @@ impl DatabaseAdapter for MySqlCatalog {
         );
         let mut q = sqlx::query(&query);
         if let Some(filter) = options.filter.as_deref() {
-            q = q.bind(format!("%{filter}%"));
+            // Literal substring: neutralize LIKE wildcards and the escape character.
+            let literal = filter
+                .replace('!', "!!")
+                .replace('%', "!%")
+                .replace('_', "!_");
+            q = q.bind(format!("%{literal}%"));
         }
         let rows = self
             .bounded(

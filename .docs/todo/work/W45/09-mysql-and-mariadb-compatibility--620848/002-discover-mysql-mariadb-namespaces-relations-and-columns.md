@@ -30,3 +30,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 ### 2026-11-04T12:20:01.334Z · PETER IRUNGU
 
 Implemented MySQL/MariaDB information_schema schema, relation, column, index, constraint and foreign-key discovery. A disposable MariaDB 11.8 integration fixture verifies mixed-case table and view discovery, generated/identity columns and FK references. SQL uses bound catalog values and escaped backtick identifiers. MySQL 8 fixture remains unavailable; the related test is environment-gated by CUADB_TEST_MARIADB_URL.
+
+### 2026-11-04T14:04:42.068Z · PETER IRUNGU
+
+Item 5 left open: mixed-case names and hidden-schema (mysql/sys/information_schema/performance_schema) restriction verified on both engines; no fixture for an EMPTY database or a no-privilege account. Defect fixed: Structure tab returned 400 for EVERY MySQL/MariaDB relation because partitions() fell back to Unsupported; now implemented from information_schema.partitions. Same latent defect fixed for SQLite (empty list).
