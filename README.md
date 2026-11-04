@@ -87,6 +87,33 @@ The browser home page should show a **CuaDB** sidebar, a **Not connected** label
 
 The `/health` endpoint tests the HTTP server, **not a database connection**.
 
+## Validated server configuration
+
+CuaDB validates typed settings before binding its HTTP listener. Errors identify the invalid **variable and accepted bounds**, but never echo a supplied value. Native development defaults to `127.0.0.1:4848`; Docker sets `CUADB_HOST=0.0.0.0` internally and publishes its web port to host loopback.
+
+| Environment variable | Default | Accepted range | Current usage |
+| --- | --- | --- | --- |
+| `CUADB_HOST` | `127.0.0.1` | IPv4 or IPv6 literal | HTTP listener |
+| `CUADB_PORT` | `4848` | 1–65535 | HTTP listener |
+| `CUADB_DATABASE_URL` | Unset | Optional nonempty string up to 8192 bytes | Safely stored but not yet connected |
+| `CUADB_CONNECTION_TIMEOUT_MS` | `5000` | 100–60000 | Future database connection |
+| `CUADB_QUERY_TIMEOUT_MS` | `15000` | 100–120000 | Future database queries |
+| `CUADB_REQUEST_TIMEOUT_MS` | `30000` | 500–180000 | Future HTTP request bounds |
+| `CUADB_DEFAULT_PAGE_SIZE` | `25` | 1–500; cannot exceed maximum | Future grid |
+| `CUADB_MAX_PAGE_SIZE` | `100` | 1–500 | Future grid |
+| `CUADB_MAX_POOL_CONNECTIONS` | `4` | 1–32 | Future database pool |
+
+The default page size reduces automatically when only the maximum is lowered; an explicitly configured default above the maximum is rejected. PostgreSQL URL schemes, hosts, TLS and authentication will be validated by the dedicated connection task—not this configuration milestone. **Setting a database URL does not yet connect the shell.**
+
+To change the local port:
+
+```bash
+CUADB_PORT=5050 bun run dev
+# Open http://127.0.0.1:5050
+```
+
+The Rust server reads **process environment variables**. The example file is documentation, not automatically loaded by the application; export variables or use your local environment loader. Never commit a real credential-bearing `.env`.
+
 ## Docker: one container and one frontend port
 
 ```bash
