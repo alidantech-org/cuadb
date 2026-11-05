@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-11-05
 
 First public release.
 
