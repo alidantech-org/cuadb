@@ -1,5 +1,5 @@
 ---
-{id: TSK-A513FD340BD5,name: "Establish compact accessible layout, tokens and responsive panels",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.015Z,updated_at: 2026-11-05T00:19:28.541Z,tags: [cuadb,explorer-ui],depends_on: [TSK-FFD6A5B94574],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.209Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:16.418Z},{from: blocked,to: planned,at: 2026-11-04T23:18:19.787Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:28.541Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-A513FD340BD5/1793791751211-start,started_at: 2026-11-04T11:29:11.231Z,end_ref: refs/tracking/TSK-A513FD340BD5/1793808856428-end,ended_at: 2026-11-04T16:14:16.418Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-A513FD340BD5/1793837968543-start,started_at: 2026-11-05T00:19:28.577Z}]}},links: [{type: blocks,task: TSK-5EE171C4C580}]}
+{id: TSK-A513FD340BD5,name: "Establish compact accessible layout, tokens and responsive panels",type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:06.015Z,updated_at: 2026-11-05T00:44:54.121Z,tags: [cuadb,explorer-ui],depends_on: [TSK-FFD6A5B94574],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.209Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:16.418Z},{from: blocked,to: planned,at: 2026-11-04T23:18:19.787Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:28.541Z},{from: in-progress,to: completed,at: 2026-11-05T00:44:54.121Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-A513FD340BD5/1793791751211-start,started_at: 2026-11-04T11:29:11.231Z,end_ref: refs/tracking/TSK-A513FD340BD5/1793808856428-end,ended_at: 2026-11-04T16:14:16.418Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-A513FD340BD5/1793837968543-start,started_at: 2026-11-05T00:19:28.577Z,end_ref: refs/tracking/TSK-A513FD340BD5/1793839494123-end,ended_at: 2026-11-05T00:44:54.122Z,summary: {files: 26,insertions: 1743,deletions: 241}}]}},links: [{type: blocks,task: TSK-5EE171C4C580}]}
 ---
 
 # Establish compact accessible layout, tokens and responsive panels
@@ -40,7 +40,7 @@ The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switche
 
 ### Amendment acceptance
 - [x] Port the demo's new tokens and components: danger colour token, `.tag.m-none|read|write|destructive` access tags, `#modal` scaffold, login card, form field and `textarea`/`select` styles, `.btn.dg` and error text.
-- [ ] The sidebar footer shows the connection picker, the database picker and the settings gear exactly as in the updated demo, with the SQL workspace button available only when the capability is enabled.
+- [x] The sidebar footer shows the connection picker, the database picker and the settings gear exactly as in the updated demo, with the SQL workspace button available only when the capability is enabled.
 
 ## Comments
 
@@ -63,3 +63,7 @@ Phase 2 progress (2026-11-05): the shell now ports the updated demo tokens and c
 ### 2026-11-05T00:19:38.433Z · PETER IRUNGU
 
 Phase 2 (2026-11-05): item 9 done, with all six app combinations (1440x900, 1280x800 and 390x844, light and dark) captured and the demo compared side by side at 1440 light, 1280 dark and 390. Item 11 stays open: there is no separate database picker because one connection is one database in the current backend and adapters cannot list databases. Owner decision needed: accept that deviation, or ask for the adapter work.
+
+### 2026-11-05T00:44:48.412Z · PETER IRUNGU
+
+Phase 2 round 2 (2026-11-05): the footer now has the connection picker, a database button (database name, engine, state and your access: read, can edit, can edit and run SQL) and the settings gear. A connection still points at one database, so the popover tells admins to add another database as its own connection rather than listing databases the adapters cannot enumerate. Header bars on every page now share the sidebar header's surface and 44px height.

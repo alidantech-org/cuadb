@@ -1,5 +1,5 @@
 ---
-{id: TSK-ABE2D51C83F3,name: Add safe expanded cell detail and copy actions,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.797Z,updated_at: 2026-11-05T00:19:29.059Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8DB2E738839F],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.886Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.078Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.066Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.059Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-ABE2D51C83F3/1793791781888-start,started_at: 2026-11-04T11:29:41.902Z,end_ref: refs/tracking/TSK-ABE2D51C83F3/1793808859080-end,ended_at: 2026-11-04T16:14:19.078Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-ABE2D51C83F3/1793837969062-start,started_at: 2026-11-05T00:19:29.087Z}]}},links: [{type: blocks,task: TSK-11615BE5E97B}]}
+{id: TSK-ABE2D51C83F3,name: Add safe expanded cell detail and copy actions,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:06.797Z,updated_at: 2026-11-05T00:44:54.564Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8DB2E738839F],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.886Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.078Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.066Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.059Z},{from: in-progress,to: completed,at: 2026-11-05T00:44:54.564Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-ABE2D51C83F3/1793791781888-start,started_at: 2026-11-04T11:29:41.902Z,end_ref: refs/tracking/TSK-ABE2D51C83F3/1793808859080-end,ended_at: 2026-11-04T16:14:19.078Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-ABE2D51C83F3/1793837969062-start,started_at: 2026-11-05T00:19:29.087Z,end_ref: refs/tracking/TSK-ABE2D51C83F3/1793839494566-end,ended_at: 2026-11-05T00:44:54.564Z,summary: {files: 26,insertions: 1743,deletions: 241}}]}},links: [{type: blocks,task: TSK-11615BE5E97B}]}
 ---
 
 # Add safe expanded cell detail and copy actions
@@ -17,7 +17,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Acceptance checklist
 - [x] Build an accessible reusable detail panel with formatted text and JSON when supported.
-- [ ] Use bounded detail fetches tied to validated relation, column and row identity.
+- [x] Use bounded detail fetches tied to validated relation, column and row identity.
 - [x] Show truncation and privacy-safe fallbacks for huge or unsupported values.
 - [x] Implement local copy actions without exposing credentials or unsafe HTML.
 - [x] Test large JSON, control characters, Unicode and missing-key row scenarios.
@@ -59,3 +59,7 @@ Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and ty
 ### 2026-11-05T00:19:38.819Z · PETER IRUNGU
 
 Phase 2 (2026-11-05): inspector, double-click copy, foreign-key links, the Export menu (page CSV, whole-table CSV and JSON, copy as CSV, ZIP with linked tables 1 or 2 hops, all bounded and server side) and Edit/Delete in the inspector are verified. Item 2 stays open: the inspector shows bounded values embedded in the page (truncated ones are marked) rather than fetching each cell by row identity; a full-cell fetch route would be new backend work.
+
+### 2026-11-05T00:44:48.752Z · PETER IRUNGU
+
+Phase 2 round 2 (2026-11-05): rows now open in a slide-over sheet (click outside closes it, so a double-click opens then closes). Truncated cells get Load full, which calls GET /catalog/cell with the whole primary key (PostgreSQL and SQLite, bound values, validated identifiers, capped at 65,536 characters). Copy buttons per value replace double-click copy.

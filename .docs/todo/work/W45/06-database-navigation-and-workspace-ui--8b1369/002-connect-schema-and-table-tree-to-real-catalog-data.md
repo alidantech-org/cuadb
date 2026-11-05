@@ -1,5 +1,5 @@
 ---
-{id: TSK-5EE171C4C580,name: Connect schema and table tree to real catalog data,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:06.091Z,updated_at: 2026-11-05T00:19:28.815Z,tags: [cuadb,explorer-ui],depends_on: [TSK-A513FD340BD5,TSK-5FC58B7B6E27,TSK-9890D0090922],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.351Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:16.782Z},{from: blocked,to: planned,at: 2026-11-04T23:18:19.832Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:28.815Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-5EE171C4C580/1793791751353-start,started_at: 2026-11-04T11:29:11.368Z,end_ref: refs/tracking/TSK-5EE171C4C580/1793808856783-end,ended_at: 2026-11-04T16:14:16.782Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-5EE171C4C580/1793837968818-start,started_at: 2026-11-05T00:19:28.839Z}]}},links: [{type: blocks,task: TSK-BE512E99EA68}]}
+{id: TSK-5EE171C4C580,name: Connect schema and table tree to real catalog data,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:06.091Z,updated_at: 2026-11-05T00:44:54.357Z,tags: [cuadb,explorer-ui],depends_on: [TSK-A513FD340BD5,TSK-5FC58B7B6E27,TSK-9890D0090922],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:11.351Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:16.782Z},{from: blocked,to: planned,at: 2026-11-04T23:18:19.832Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:28.815Z},{from: in-progress,to: completed,at: 2026-11-05T00:44:54.357Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-5EE171C4C580/1793791751353-start,started_at: 2026-11-04T11:29:11.368Z,end_ref: refs/tracking/TSK-5EE171C4C580/1793808856783-end,ended_at: 2026-11-04T16:14:16.782Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-5EE171C4C580/1793837968818-start,started_at: 2026-11-05T00:19:28.839Z,end_ref: refs/tracking/TSK-5EE171C4C580/1793839494360-end,ended_at: 2026-11-05T00:44:54.358Z,summary: {files: 26,insertions: 1743,deletions: 241}}]}},links: [{type: blocks,task: TSK-BE512E99EA68}]}
 ---
 
 # Connect schema and table tree to real catalog data
@@ -28,7 +28,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ### Reference-specific acceptance
 - [x] Match Simple explorer schema/table/view tree and Advanced explorer Overview plus grouped Tables, Views, Functions, Procedures, Sequences, Types and Triggers, filtered by actual adapter capabilities and permissions.
-- [ ] Preserve the demo's icon mapping, 24px dense rows, expand chevrons, schema/group counts, selectable table rows, relation-linked highlight and optional nested column previews.
+- [x] Preserve the demo's icon mapping, 24px dense rows, expand chevrons, schema/group counts, selectable table rows, relation-linked highlight and optional nested column previews.
 - [x] Support metadata-only routine/type/sequence/trigger detail screens; do not offer procedure execution, writes or fabricated server objects.
 
 ## Verification and handoff
@@ -58,3 +58,7 @@ Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and ty
 ### 2026-11-05T00:19:38.617Z · PETER IRUNGU
 
 Phase 2 (2026-11-05): expand and collapse, table and view and partition kinds, Simple and Advanced (Tables, Views, Functions, Procedures, Sequences, Types, Triggers with counts), metadata-only object pages, permission-filtered tree, the 'No databases assigned yet' state and focus handling on connection switch all verified. Item 7 stays open for two demo details that were not built: the multi-select mode with relation-linked highlight, and nested column previews under a table.
+
+### 2026-11-05T00:44:48.578Z · PETER IRUNGU
+
+Phase 2 round 2 (2026-11-05): Advanced mode has a select button for export mode (checkboxes, linked tables highlighted from real foreign keys, Include linked tables switch, Export ZIP over several tables) and a chevron on every table that expands its columns with key markers.

@@ -1,5 +1,5 @@
 ---
-{id: TSK-8EC2E48964BC,name: Implement table Structure tab from real metadata,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.044Z,updated_at: 2026-11-05T00:19:29.320Z,tags: [cuadb,inspectors],depends_on: [TSK-047C7016EEAA,TSK-FFD6A5B94574],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.511Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.668Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.141Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.320Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-8EC2E48964BC/1793791788513-start,started_at: 2026-11-04T11:29:48.525Z,end_ref: refs/tracking/TSK-8EC2E48964BC/1793808859670-end,ended_at: 2026-11-04T16:14:19.668Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-8EC2E48964BC/1793837969322-start,started_at: 2026-11-05T00:19:29.350Z}]}}}
+{id: TSK-8EC2E48964BC,name: Implement table Structure tab from real metadata,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:07.044Z,updated_at: 2026-11-05T00:44:54.809Z,tags: [cuadb,inspectors],depends_on: [TSK-047C7016EEAA,TSK-FFD6A5B94574],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.511Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.668Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.141Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.320Z},{from: in-progress,to: completed,at: 2026-11-05T00:44:54.809Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-8EC2E48964BC/1793791788513-start,started_at: 2026-11-04T11:29:48.525Z,end_ref: refs/tracking/TSK-8EC2E48964BC/1793808859670-end,ended_at: 2026-11-04T16:14:19.668Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-8EC2E48964BC/1793837969322-start,started_at: 2026-11-05T00:19:29.350Z,end_ref: refs/tracking/TSK-8EC2E48964BC/1793839494811-end,ended_at: 2026-11-05T00:44:54.809Z,summary: {files: 26,insertions: 1743,deletions: 241}}]}}}
 ---
 
 # Implement table Structure tab from real metadata
@@ -38,7 +38,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
 
 ### Amendment acceptance
-- [ ] Structure shows columns, types, nullability, defaults, keys, references, constraints and comments from real metadata in the demo's compact table style.
+- [x] Structure shows columns, types, nullability, defaults, keys, references, constraints and comments from real metadata in the demo's compact table style.
 
 ## Comments
 
@@ -57,3 +57,7 @@ Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and ty
 ### 2026-11-05T00:19:38.991Z · PETER IRUNGU
 
 Phase 2 (2026-11-05): Structure shows #, Column, Type, Nullable, Key, References (links), Default and generation, constraints and partitions inside the Data/Structure/Indexes switcher. Item 9 stays open because column comments are not exposed by the adapters yet.
+
+### 2026-11-05T00:44:48.920Z · PETER IRUNGU
+
+Phase 2 round 2 (2026-11-05): Structure shows PostgreSQL column comments next to the column name (SQLite and MySQL have none to show).

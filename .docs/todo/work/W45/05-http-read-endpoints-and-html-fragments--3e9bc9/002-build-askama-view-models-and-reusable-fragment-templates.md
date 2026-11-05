@@ -1,5 +1,5 @@
 ---
-{id: TSK-FFD6A5B94574,name: Build Askama view models and reusable fragment templates,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.740Z,updated_at: 2026-11-05T00:19:28.360Z,tags: [cuadb,http],depends_on: [TSK-DC88ADC32B93],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:25:00.389Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-FFD6A5B94574/1793791500391-start,started_at: 2026-11-04T11:25:00.407Z}]}},links: [{type: blocks,task: TSK-0AA246B508ED}]}
+{id: TSK-FFD6A5B94574,name: Build Askama view models and reusable fragment templates,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.740Z,updated_at: 2026-11-05T00:44:53.906Z,tags: [cuadb,http],depends_on: [TSK-DC88ADC32B93],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:25:00.389Z},{from: in-progress,to: completed,at: 2026-11-05T00:44:53.906Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-FFD6A5B94574/1793791500391-start,started_at: 2026-11-04T11:25:00.407Z,end_ref: refs/tracking/TSK-FFD6A5B94574/1793839493908-end,ended_at: 2026-11-05T00:44:53.906Z,summary: {files: 146,insertions: 28198,deletions: 892}}]}},links: [{type: blocks,task: TSK-0AA246B508ED}]}
 ---
 
 # Build Askama view models and reusable fragment templates
@@ -17,7 +17,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Acceptance checklist
 - [x] Create typed view models for sidebar tree, relation header, grid and inspector tabs.
-- [ ] Reuse components across full pages and HTMX responses without duplicate markup.
+- [x] Reuse components across full pages and HTMX responses without duplicate markup.
 - [x] Verify HTML escaping for suspicious table names, cell contents and error messages.
 - [x] Render explicit empty and inaccessible states with clear next actions.
 - [x] Keep template code free of direct driver calls or raw SQL statements.
@@ -38,9 +38,9 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
 
 ### Amendment acceptance
-- [ ] Every full page and fragment receives a principal view model (display name, role, local-or-authenticated mode, CSRF token, SQL-workspace and write capability flags) and shared popover, modal and toast partials exist.
+- [x] Every full page and fragment receives a principal view model (display name, role, local-or-authenticated mode, CSRF token, SQL-workspace and write capability flags) and shared popover, modal and toast partials exist.
 - [x] No template emits `style=` attributes or inline handlers; bar widths, swatches and density use classes, `data-*` attributes or CSS variables set from bundled JS.
-- [ ] Fragments for the new surfaces (account block, database switcher, connection modal, admin tabs, row editor, SQL workspace) are Askama partials, each with empty, loading, denied and error states.
+- [x] Fragments for the new surfaces (account block, database switcher, connection modal, admin tabs, row editor, SQL workspace) are Askama partials, each with empty, loading, denied and error states.
 
 ## Comments
 
@@ -59,3 +59,7 @@ Phase 2 progress (2026-11-05): explorer.html, schema_tree, relation_tree, data_p
 ### 2026-11-05T00:19:38.233Z · PETER IRUNGU
 
 Phase 2 (2026-11-05): item 7 verified (Simple and Advanced trees, Overview, Data/Structure/Indexes, metadata object pages). Still open: item 2 (the Data page still carries its own copy of the Data/Structure/Indexes switcher), item 9 (only the explorer and login pages receive the principal view model; plain catalog fragments do not need it) and item 11 (the row editor is built in the browser from the grid's typed column metadata, not as an Askama partial). Owner decision needed: accept these as deviations (then the items are reworded) or have them rebuilt.
+
+### 2026-11-05T00:44:48.238Z · PETER IRUNGU
+
+Phase 2 round 2 (2026-11-05): the Data page now includes the same relation_tabs partial as Structure and Indexes; the row editor is a server-rendered Askama partial (GET /data/editor, from catalog metadata, with enum selects, read-only keys and generated columns, comments and NULL toggles); the database popover, connection list, settings and Account block, admin tabs, connection dialog and SQL workspace are partials too. The shell receives the principal view model; fragments receive the capability they need (can_edit, access, admin), checked again on the server.

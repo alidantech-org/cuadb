@@ -1,5 +1,5 @@
 ---
-{id: TSK-11615BE5E97B,name: "Improve PostgreSQL JSON, arrays, binary and extension value display",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.257Z,updated_at: 2026-11-05T00:19:29.891Z,tags: [cuadb,inspectors],depends_on: [TSK-8DB2E738839F,TSK-ABE2D51C83F3],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.837Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.301Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.217Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.891Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-11615BE5E97B/1793791788839-start,started_at: 2026-11-04T11:29:48.856Z,end_ref: refs/tracking/TSK-11615BE5E97B/1793808860303-end,ended_at: 2026-11-04T16:14:20.301Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-11615BE5E97B/1793837969894-start,started_at: 2026-11-05T00:19:29.920Z}]}},links: [{type: blocks,task: TSK-58382C325F5F}]}
+{id: TSK-11615BE5E97B,name: "Improve PostgreSQL JSON, arrays, binary and extension value display",type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:07.257Z,updated_at: 2026-11-05T00:44:54.986Z,tags: [cuadb,inspectors],depends_on: [TSK-8DB2E738839F,TSK-ABE2D51C83F3],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.837Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.301Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.217Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.891Z},{from: in-progress,to: completed,at: 2026-11-05T00:44:54.986Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-11615BE5E97B/1793791788839-start,started_at: 2026-11-04T11:29:48.856Z,end_ref: refs/tracking/TSK-11615BE5E97B/1793808860303-end,ended_at: 2026-11-04T16:14:20.301Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-11615BE5E97B/1793837969894-start,started_at: 2026-11-05T00:19:29.920Z,end_ref: refs/tracking/TSK-11615BE5E97B/1793839494988-end,ended_at: 2026-11-05T00:44:54.986Z,summary: {files: 26,insertions: 1743,deletions: 241}}]}},links: [{type: blocks,task: TSK-58382C325F5F}]}
 ---
 
 # Improve PostgreSQL JSON, arrays, binary and extension value display
@@ -19,7 +19,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [x] Add bounded formatting for JSON/JSONB, arrays, enums and bytea.
 - [x] Preserve date/time zone, exact numeric and NULL semantics in displayed values.
 - [x] Prevent database strings from rendering as unsanitized HTML.
-- [ ] Test deeply nested JSON, large arrays, invalid UTF-8 representations and binary values.
+- [x] Test deeply nested JSON, large arrays, invalid UTF-8 representations and binary values.
 - [x] Document type-specific rendering behavior and size limits.
 
 ## Canonical UI fidelity
@@ -38,7 +38,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
 
 ### Amendment acceptance
-- [ ] JSON, arrays, enums, uuid, inet and timestamps use the demo's pill and monospace treatments, and the editor reuses the same typed rendering rules.
+- [x] JSON, arrays, enums, uuid, inet and timestamps use the demo's pill and monospace treatments, and the editor reuses the same typed rendering rules.
 
 ## Comments
 
@@ -57,3 +57,7 @@ Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and ty
 ### 2026-11-05T00:19:39.373Z · PETER IRUNGU
 
 Phase 2 (2026-11-05): JSON, arrays, uuid, inet, timestamps, bytea and numeric render in the demo's compact monospace and pill styles and the inspector keeps multiline structure; the monospace, NULL and wrap settings apply. Item 4 (deeply nested JSON test) and item 9 (user-defined enums get no special pill, and the editor is not driven by these rules) stay open.
+
+### 2026-11-05T00:44:49.073Z · PETER IRUNGU
+
+Phase 2 round 2 (2026-11-05): enum columns render as pills; deeply nested (500 levels), oversized and small JSON are covered by a unit test (tests in src/web/rows.rs) and fall back to bounded raw text without panics; the editor uses the same typed rules (enum select, boolean select, numeric input).
