@@ -228,13 +228,9 @@ fn decode_hex(value: &str) -> Option<Vec<u8>> {
     if !value.len().is_multiple_of(2) {
         return None;
     }
-    value
-        .as_bytes()
-        .chunks_exact(2)
-        .map(|part| {
-            let pair = std::str::from_utf8(part).ok()?;
-            u8::from_str_radix(pair, 16).ok()
-        })
+    (0..value.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(value.get(i..i + 2)?, 16).ok())
         .collect()
 }
 

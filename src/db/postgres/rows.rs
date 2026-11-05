@@ -330,9 +330,8 @@ fn decode_bytea(input: &str) -> Option<Vec<u8>> {
         return None;
     }
     let mut bytes = Vec::with_capacity(hex.len() / 2);
-    for part in hex.as_bytes().chunks_exact(2) {
-        let s = std::str::from_utf8(part).ok()?;
-        bytes.push(u8::from_str_radix(s, 16).ok()?);
+    for i in (0..hex.len()).step_by(2) {
+        bytes.push(u8::from_str_radix(hex.get(i..i + 2)?, 16).ok()?);
     }
     Some(bytes)
 }

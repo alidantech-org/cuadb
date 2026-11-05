@@ -378,6 +378,7 @@ fn form_map(pairs: Vec<(String, String)>) -> std::collections::HashMap<String, S
     pairs.into_iter().collect()
 }
 
+#[allow(clippy::result_large_err)]
 async fn prepare(
     state: &AppState,
     auth: &Auth,
