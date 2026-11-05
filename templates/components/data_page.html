@@ -17,11 +17,7 @@
     <button class="btn" type="button" data-pop="colpop" aria-controls="colpop" aria-expanded="false">Columns</button>
     <button class="btn" type="button" id="dn" data-density aria-label="Toggle compact rows">Compact</button>
     <button class="btn" type="button" data-pop="exppop" aria-controls="exppop" aria-expanded="false">Export ▾</button>
-    <nav class="seg" id="seg" aria-label="Table view">
-      <a class="on" aria-current="page" href="#">Data</a>
-      <a href="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-get="/catalog/structure?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-target="#catalog-panel" hx-swap="outerHTML">Structure</a>
-      <a href="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-get="/catalog/indexes?schema={{ schema }}&amp;relation={{ relation }}{{ profile_arg|safe }}" hx-target="#catalog-panel" hx-swap="outerHTML">Indexes</a>
-    </nav>
+    {% include "components/relation_tabs.html" %}
     <div class="pop" id="exppop">
       <a class="ci" href="{{ export_view_csv }}" download><span><b>Download CSV</b><small>This page, visible columns</small></span></a>
       <a class="ci" href="{{ export_all_csv }}" download><span><b>Download CSV: whole table</b><small>Bounded server stream</small></span></a>
@@ -54,7 +50,7 @@
           <tr tabindex="0" data-row="{{ row.number }}">
             <td class="rn"><span class="rnum">{{ row.number }}</span><input class="rck" type="checkbox" aria-label="Select row {{ row.number }}" tabindex="-1"></td>
             {% for cell in row.values %}
-            <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if !cell.fk_href.is_empty() %}<a class="fk" href="{{ cell.fk_href }}" hx-get="{{ cell.fk_href }}" hx-target="#mainbody" hx-swap="innerHTML" title="Open the referenced row">{{ cell.text }}</a>{% else if cell.class == "bool-value" %}<span class="pill {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
+            <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if !cell.fk_href.is_empty() %}<a class="fk" href="{{ cell.fk_href }}" hx-get="{{ cell.fk_href }}" hx-target="#mainbody" hx-swap="innerHTML" title="Open the referenced row">{{ cell.text }}</a>{% else if cell.class == "bool-value" %}<span class="pill {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}">{{ cell.text }}</span>{% else if cell.class == "enum-value" %}<span class="pill">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
             {% endfor %}
           </tr>
           {% endfor %}

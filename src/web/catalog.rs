@@ -37,10 +37,10 @@ struct CatalogTemplate {
     structure_active: bool,
     indexes_active: bool,
 }
-struct RelationLinks {
-    data: String,
-    structure: String,
-    indexes: String,
+pub(super) struct RelationLinks {
+    pub(super) data: String,
+    pub(super) structure: String,
+    pub(super) indexes: String,
 }
 #[derive(Template)]
 #[template(path = "components/structure_page.html")]
@@ -185,7 +185,7 @@ fn fragment(
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
 }
-fn relation_links(id: &RelationId, profile: Option<&str>) -> RelationLinks {
+pub(super) fn relation_links(id: &RelationId, profile: Option<&str>) -> RelationLinks {
     RelationLinks {
         data: relation_url("data", id, profile),
         structure: relation_url("structure", id, profile),

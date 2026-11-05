@@ -47,9 +47,10 @@ struct DisplayRow {
 #[derive(Template)]
 #[template(path = "components/data_page.html")]
 struct PageTemplate {
+    active: &'static str,
+    links: super::catalog::RelationLinks,
     /// Selected profile id, or empty for the default profile.
     profile: String,
-    profile_arg: String,
     filter: String,
     page_size: u32,
     has_spatial: bool,
@@ -59,8 +60,6 @@ struct PageTemplate {
     direction: Option<&'static str>,
     selected_columns: Vec<String>,
     available_columns: Vec<ColumnView>,
-    schema: String,
-    relation: String,
     schema_name: String,
     relation_name: String,
     headers: Vec<Header>,
@@ -545,6 +544,18 @@ pub async fn data(
                 .collect()
         })
         .unwrap_or_default();
+    // Enum columns get the pill treatment (best effort, one bounded metadata read).
+    let enum_columns: std::collections::HashSet<String> = catalog
+        .column_details(&nav.id)
+        .await
+        .map(|list| {
+            list.items
+                .into_iter()
+                .filter(|d| matches!(d.enum_values, crate::db::types::Availability::Available(_)))
+                .map(|d| d.column.name)
+                .collect()
+        })
+        .unwrap_or_default();
     let has_spatial = page.columns.iter().any(|column| {
         let native = column.native_type.to_ascii_lowercase();
         native.starts_with("geometry") || native.starts_with("geography")
@@ -615,7 +626,11 @@ pub async fn data(
                 Value {
                     fk_href,
                     text: visible_text(&preview.text),
-                    class: value_class(&preview.type_name),
+                    class: if enum_columns.contains(&column.name) {
+                        "enum-value"
+                    } else {
+                        value_class(&preview.type_name)
+                    },
                     native_type: preview.type_name,
                     truncated: preview.truncated,
                     is_null: matches!(cell, crate::db::types::Cell::Null),
@@ -654,12 +669,10 @@ pub async fn data(
         )
         && page.columns.iter().any(|c| c.primary_key);
     let view = PageTemplate {
+        active: "data",
+        links: super::catalog::relation_links(&nav.id, nav.profile.as_deref()),
         can_edit,
         profile: nav.profile.clone().unwrap_or_default(),
-        profile_arg: nav
-            .profile
-            .as_deref()
-            .map_or(String::new(), |id| format!("&profile={id}")),
         filter: nav.options.filter.clone().unwrap_or_default(),
         page_size: nav.options.limit,
         has_spatial,
@@ -685,8 +698,6 @@ pub async fn data(
                 },
             })
             .collect(),
-        schema: url::form_urlencoded::byte_serialize(nav.id.namespace.as_bytes()).collect(),
-        relation: url::form_urlencoded::byte_serialize(nav.id.name.as_bytes()).collect(),
         schema_name: nav.id.namespace.clone(),
         relation_name: nav.id.name.clone(),
         export_view_csv,
@@ -734,6 +745,19 @@ mod tests {
             r#"\x00ff"#
         );
         assert_eq!(detail_value(&Cell::Null, "text"), "NULL");
+    }
+
+    #[test]
+    fn deeply_nested_and_oversized_json_stays_bounded_text() {
+        // 500 levels exceed the JSON parser's recursion limit: shown as the raw text, no panic.
+        let deep = format!("{}1{}", "[".repeat(500), "]".repeat(500));
+        assert_eq!(detail_value(&Cell::Text(deep.clone()), "jsonb"), deep);
+        // Valid nesting that pretty-prints beyond the 1 KiB detail budget also falls back.
+        let wide = format!("[{}]", vec!["{\"k\":[1,2,3]}"; 400].join(","));
+        assert_eq!(detail_value(&Cell::Text(wide.clone()), "json"), wide);
+        // Small nested documents are pretty-printed for the sheet.
+        let small = detail_value(&Cell::Text(r#"{"a":{"b":[1,2]}}"#.into()), "jsonb");
+        assert!(small.contains('\n') && small.contains("\"b\""));
     }
 }
 
