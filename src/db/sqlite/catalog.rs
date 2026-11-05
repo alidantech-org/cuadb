@@ -8,7 +8,7 @@ const MAX_RELATIONS: i64 = 500;
 const MAX_COLUMNS: i64 = 512;
 const MAX_DETAILS: i64 = 300;
 const MAX_VISIBLE: usize = 24;
-const MAX_PAGE: u32 = 100;
+const MAX_PAGE: u32 = 1000;
 const MAX_OFFSET: u64 = 10_000;
 /// Bytes/characters fetched per text or blob cell (one over the 256 display limit).
 const PREVIEW: usize = 257;

@@ -255,7 +255,7 @@ async fn every_engine_satisfies_the_adapter_contract() {
             "{who}"
         );
         // Bounds and identifier safety
-        for limit in [0u32, 101] {
+        for limit in [0u32, 1001] {
             let bad = RowOptions {
                 limit,
                 ..RowOptions::default()

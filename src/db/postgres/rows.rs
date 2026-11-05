@@ -57,7 +57,7 @@ impl PgCatalog {
         mut options: RowOptions,
     ) -> Result<RowPage, DbError> {
         if options.limit == 0
-            || options.limit > 100
+            || options.limit > super::row_query::MAX_PAGE_SIZE
             || options.limit as usize > self.max_page_size
             || options.page > 100
         {
