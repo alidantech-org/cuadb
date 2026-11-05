@@ -72,9 +72,17 @@ async fn subjects() -> Vec<Subject> {
     let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("perf-sqlite");
     std::fs::create_dir_all(&dir).unwrap();
     let file = dir.join("perf.db");
+    // Both tests call this concurrently: serialize creation and publish the file atomically.
+    static BUILD: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
+    let _guard = BUILD
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .lock()
+        .await;
     if !file.exists() {
+        let building = dir.join(format!("perf-{}.building", std::process::id()));
+        let _ = std::fs::remove_file(&building);
         let mut c =
-            sqlx::SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", file.display()))
+            sqlx::SqliteConnection::connect(&format!("sqlite://{}?mode=rwc", building.display()))
                 .await
                 .unwrap();
         for sql in [
@@ -84,7 +92,9 @@ async fn subjects() -> Vec<Subject> {
             sqlx::query(sql).execute(&mut c).await.unwrap();
         }
         c.close().await.unwrap();
+        std::fs::rename(&building, &file).unwrap();
     }
+    drop(_guard);
     let url = format!(
         "sqlite:///{}",
         file.display().to_string().trim_start_matches('/')
