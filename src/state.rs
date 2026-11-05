@@ -809,6 +809,24 @@ impl AppState {
     }
 }
 
+/// The database part of a connection URL, for display only.
+fn database_name(url: &str) -> String {
+    let Ok(parsed) = url::Url::parse(url) else {
+        return String::new();
+    };
+    let last = parsed
+        .path_segments()
+        .and_then(|mut parts| parts.next_back().map(str::to_string))
+        .unwrap_or_default();
+    url::form_urlencoded::parse(format!("v={last}").as_bytes())
+        .next()
+        .map(|(_, v)| v.into_owned())
+        .unwrap_or_default()
+        .chars()
+        .take(63)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -835,22 +853,4 @@ mod tests {
         let outcome = AppState::from_config(&config).err().unwrap();
         assert!(!format!("{outcome:?}").contains("secret"));
     }
-}
-
-/// The database part of a connection URL, for display only.
-fn database_name(url: &str) -> String {
-    let Ok(parsed) = url::Url::parse(url) else {
-        return String::new();
-    };
-    let last = parsed
-        .path_segments()
-        .and_then(|mut parts| parts.next_back().map(str::to_string))
-        .unwrap_or_default();
-    url::form_urlencoded::parse(format!("v={last}").as_bytes())
-        .next()
-        .map(|(_, v)| v.into_owned())
-        .unwrap_or_default()
-        .chars()
-        .take(63)
-        .collect()
 }

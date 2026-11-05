@@ -840,6 +840,23 @@ impl DatabaseAdapter for PgCatalog {
     }
 }
 
+fn finish_cell(text: Option<String>) -> crate::db::types::CellValue {
+    use crate::db::types::{CellValue, MAX_CELL_CHARS};
+    match text {
+        None => CellValue {
+            text: None,
+            truncated: false,
+        },
+        Some(text) => {
+            let truncated = text.chars().count() > MAX_CELL_CHARS;
+            CellValue {
+                text: Some(text.chars().take(MAX_CELL_CHARS).collect()),
+                truncated,
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -877,22 +894,5 @@ mod tests {
         assert_eq!(available_bytes(None), Availability::Unavailable);
         assert_eq!(available_bytes(Some(-1)), Availability::Unavailable);
         assert_eq!(available_bytes(Some(0)), Availability::Available(0));
-    }
-}
-
-fn finish_cell(text: Option<String>) -> crate::db::types::CellValue {
-    use crate::db::types::{CellValue, MAX_CELL_CHARS};
-    match text {
-        None => CellValue {
-            text: None,
-            truncated: false,
-        },
-        Some(text) => {
-            let truncated = text.chars().count() > MAX_CELL_CHARS;
-            CellValue {
-                text: Some(text.chars().take(MAX_CELL_CHARS).collect()),
-                truncated,
-            }
-        }
     }
 }
