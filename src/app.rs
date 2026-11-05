@@ -96,6 +96,7 @@ fn api_routes() -> Router<crate::state::AppState> {
         .route("/connection/profiles", get(web::connection_profiles))
         .route("/sql/execute", post(web::sql::execute))
         .route("/sql/cancel", post(web::sql::cancel))
+        .route("/data/editor", get(web::sql::editor))
         .route("/data/insert", post(web::sql::insert))
         .route("/data/update", post(web::sql::update))
         .route("/data/delete", post(web::sql::delete))
@@ -112,7 +113,10 @@ fn api_routes() -> Router<crate::state::AppState> {
         .route("/catalog/overview", get(web::catalog::overview))
         .route("/catalog/objects", get(web::catalog::objects))
         .route("/catalog/object", get(web::catalog::object))
+        .route("/catalog/columns", get(web::catalog::columns))
+        .route("/catalog/links", get(web::catalog::links))
         .route("/catalog/data", get(web::rows::data))
+        .route("/catalog/cell", get(web::rows::cell))
         .route("/catalog/export", get(web::export::export))
         .nest_service("/static", ServeDir::new("public"))
 }

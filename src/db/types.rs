@@ -105,6 +105,8 @@ pub struct ColumnDetail {
     pub generated: Option<String>,
     pub domain: Option<String>,
     pub enum_values: Availability<Vec<String>>,
+    /// Column comment as stored by the engine (PostgreSQL `COMMENT ON COLUMN`).
+    pub comment: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -383,3 +385,15 @@ mod tests {
         assert_eq!(e.to_string(), "authentication_failed");
     }
 }
+
+/// The whole text of one cell (bounded), for the row sheet's "load full value".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellValue {
+    /// `None` for SQL NULL.
+    pub text: Option<String>,
+    /// The value was longer than [`MAX_CELL_CHARS`] and was cut.
+    pub truncated: bool,
+}
+
+/// Longest cell text returned by a single-cell fetch.
+pub const MAX_CELL_CHARS: usize = 65_536;

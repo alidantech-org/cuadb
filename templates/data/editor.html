@@ -1,0 +1,20 @@
+<h3><span>{{ title }}</span><span class="ia"><button class="btn ico" type="button" data-close-insp aria-label="Close editor">×</button></span></h3>
+<form class="ed" id="row-form" data-mode="{% if insert %}insert{% else %}update{% endif %}" autocomplete="off">
+  {% for f in fields %}
+  <div class="fl" data-col="{{ f.name }}">
+    <span>{{ f.name }} · {{ f.native_type }}{% if f.pk %} · key{% endif %}</span>
+    <div class="row2">
+      {% if f.kind == "readonly" %}<input class="inp" name="{{ f.name }}" data-ro="1" readonly aria-label="{{ f.name }}">
+      {% else if f.kind == "bool" %}<select class="inp" name="{{ f.name }}" aria-label="{{ f.name }}">{% if insert %}<option value="">default</option>{% endif %}<option value="true">true</option><option value="false">false</option></select>
+      {% else if f.kind == "enum" %}<select class="inp" name="{{ f.name }}" aria-label="{{ f.name }}">{% if insert %}<option value="">default</option>{% endif %}{% for o in f.options %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select>
+      {% else if f.kind == "long" %}<textarea class="inp" name="{{ f.name }}" rows="3" aria-label="{{ f.name }}"></textarea>
+      {% else if f.kind == "number" %}<input class="inp" name="{{ f.name }}" inputmode="decimal" aria-label="{{ f.name }}"{% if insert %} placeholder="default"{% endif %}>
+      {% else %}<input class="inp" name="{{ f.name }}" aria-label="{{ f.name }}"{% if insert %} placeholder="default"{% endif %}>
+      {% endif %}
+      {% if f.nullable && f.kind != "readonly" %}<label class="nlt"><input type="checkbox" data-null-for="{{ f.name }}"><span>NULL</span></label>{% endif %}
+    </div>
+    {% if !f.note.is_empty() %}<small class="mu fnote">{{ f.note }}</small>{% endif %}
+  </div>
+  {% endfor %}
+  <div class="ef"><div id="eerr" role="status"></div><button class="btn" type="button" data-close-insp>Cancel</button><button class="btn on" type="submit">{% if insert %}Insert row{% else %}Save changes{% endif %}</button></div>
+</form>

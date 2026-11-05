@@ -100,6 +100,16 @@ pub trait DatabaseAdapter: Send + Sync {
     async fn postgis_schema(&self) -> Result<Option<String>, DbError> {
         Ok(None)
     }
+    /// One cell, addressed by the relation's full primary key. Engines without support
+    /// report `Unsupported` and the sheet keeps the bounded value it already has.
+    async fn cell_value(
+        &self,
+        _relation: &RelationId,
+        _column: &str,
+        _key: &[(String, String)],
+    ) -> Result<crate::db::types::CellValue, DbError> {
+        Err(DbError::new(crate::db::types::DbErrorKind::Unsupported))
+    }
 }
 
 #[cfg(test)]

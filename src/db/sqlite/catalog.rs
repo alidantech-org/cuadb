@@ -103,6 +103,7 @@ impl SqliteCatalog {
                 },
                 domain: None,
                 enum_values: Availability::Unavailable,
+                comment: None,
             })
         }
         Ok(capped(out, MAX_COLUMNS as usize))
@@ -266,6 +267,62 @@ fn cell(r: Option<String>, ty: &str) -> (Cell, RowPreview) {
 impl DatabaseAdapter for SqliteCatalog {
     fn engine(&self) -> Engine {
         Engine::Sqlite
+    }
+    async fn cell_value(
+        &self,
+        relation: &RelationId,
+        column: &str,
+        key: &[(String, String)],
+    ) -> Result<crate::db::types::CellValue, DbError> {
+        use crate::db::types::{CellValue, MAX_CELL_CHARS};
+        let columns = self.column_details(relation).await?.items;
+        let keys: Vec<&str> = columns
+            .iter()
+            .filter(|c| c.column.primary_key)
+            .map(|c| c.column.name.as_str())
+            .collect();
+        if keys.is_empty()
+            || key.len() != keys.len()
+            || !keys.iter().all(|k| key.iter().any(|(name, _)| name == k))
+            || !columns.iter().any(|c| c.column.name == column)
+        {
+            return Err(DbError::new(DbErrorKind::InvalidIdentifier));
+        }
+        let mut sql = format!(
+            "SELECT substr(CAST({} AS TEXT), 1, {}) AS v FROM {} WHERE ",
+            quote(column)?,
+            MAX_CELL_CHARS + 1,
+            quote(&relation.name)?
+        );
+        for (index, (name, _)) in key.iter().enumerate() {
+            if index > 0 {
+                sql.push_str(" AND ");
+            }
+            sql.push_str(&format!("CAST({} AS TEXT) = ?", quote(name)?));
+        }
+        sql.push_str(" LIMIT 1");
+        let mut query = sqlx::query(&sql);
+        for (_, value) in key {
+            query = query.bind(value);
+        }
+        let row = self
+            .run(query.fetch_optional(&self.pool))
+            .await?
+            .ok_or_else(|| DbError::new(DbErrorKind::InvalidIdentifier))?;
+        let text: Option<String> = get(&row, "v")?;
+        Ok(match text {
+            None => CellValue {
+                text: None,
+                truncated: false,
+            },
+            Some(text) => {
+                let truncated = text.chars().count() > MAX_CELL_CHARS;
+                CellValue {
+                    text: Some(text.chars().take(MAX_CELL_CHARS).collect()),
+                    truncated,
+                }
+            }
+        })
     }
     fn supports(&self, c: Capability) -> bool {
         matches!(

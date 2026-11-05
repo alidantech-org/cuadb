@@ -157,6 +157,9 @@ pub async fn connection_status(
 
 struct ProfileRow {
     id: String,
+    database: String,
+    /// `read`, `write` (may edit) or `full` (may also run SQL).
+    access: &'static str,
     label: String,
     engine: &'static str,
     state: &'static str,
@@ -168,6 +171,7 @@ struct ProfileRow {
 #[template(path = "components/profile_list.html")]
 struct ProfileListTemplate {
     profiles: Vec<ProfileRow>,
+    admin: bool,
 }
 
 /// Trusted profiles configured on the server: ids, labels, engine family and
@@ -205,7 +209,21 @@ pub async fn connection_profiles(
             Some(id) => id == info.id,
             None => info.is_default,
         };
+        let access =
+            if auth.0.allows_wide(crate::auth::Action::Sql, &info.id, None) && !auth.0.is_open() {
+                "full"
+            } else if auth
+                .0
+                .allows_wide(crate::auth::Action::Edit, &info.id, None)
+                && !auth.0.is_open()
+            {
+                "write"
+            } else {
+                "read"
+            };
         profiles.push(ProfileRow {
+            access,
+            database: info.database,
             id: info.id,
             label: info.label,
             engine: info.engine,
@@ -214,7 +232,11 @@ pub async fn connection_profiles(
             selected,
         });
     }
-    let mut response = html(ProfileListTemplate { profiles })?.into_response();
+    let mut response = html(ProfileListTemplate {
+        profiles,
+        admin: auth.0.is_admin(),
+    })?
+    .into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

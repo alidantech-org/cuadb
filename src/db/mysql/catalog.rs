@@ -466,6 +466,7 @@ impl DatabaseAdapter for MySqlCatalog {
                             .or_else(|| extra.contains("GENERATED").then(|| extra.clone())),
                         domain: None,
                         enum_values: Availability::Unavailable,
+                        comment: None,
                     })
                 })
                 .collect::<Result<Vec<_>, DbError>>()?,

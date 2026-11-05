@@ -63,6 +63,7 @@ struct StructureColumn {
     /// `schema.table.column` of a single-column foreign key, shown as a link.
     references: String,
     ref_href: String,
+    comment: String,
 }
 struct StructureConstraint {
     name: String,
@@ -128,8 +129,10 @@ struct RelationTreeTemplate {
 }
 struct RelationItem {
     name: String,
+    schema: String,
     kind: String,
     href: String,
+    cols_href: String,
     is_view: bool,
 }
 
@@ -300,6 +303,7 @@ fn structure_column(detail: ColumnDetail) -> StructureColumn {
         },
         references: String::new(),
         ref_href: String::new(),
+        comment: detail.comment.unwrap_or_default(),
     }
 }
 fn structure_constraint(constraint: Constraint) -> StructureConstraint {
@@ -540,9 +544,11 @@ pub async fn relations(
             let kind = format!("{:?}", relation.kind);
             RelationItem {
                 name: relation.id.name.clone(),
+                schema: relation.id.namespace.clone(),
                 is_view: kind.contains("View"),
                 kind,
                 href: relation_url("data", &relation.id, profile),
+                cols_href: relation_url("columns", &relation.id, profile),
             }
         })
         .collect::<Vec<_>>();
@@ -646,22 +652,13 @@ pub async fn structure(
 }
 /// Relations in the same schema whose foreign keys point here. Bounded to the first 50
 /// visible relations, so it is a hint, not a complete dependency graph.
-async fn referenced_by(
+async fn referencing(
     c: &std::sync::Arc<dyn crate::db::adapter::DatabaseAdapter>,
     id: &RelationId,
     auth: &Auth,
     pid: &str,
-) -> StatisticView {
-    let meaning =
-        "Same-schema foreign keys that point at this relation (first 50 visible relations)"
-            .to_string();
-    let Ok(list) = c.list_relations(&id.namespace).await else {
-        return StatisticView {
-            name: "Referenced by".into(),
-            value: "Unavailable".into(),
-            meaning,
-        };
-    };
+) -> Option<Vec<String>> {
+    let list = c.list_relations(&id.namespace).await.ok()?;
     let mut found = Vec::new();
     for relation in list.items.into_iter().take(50) {
         if relation.id == *id
@@ -682,16 +679,138 @@ async fn referenced_by(
             found.push(relation.id.name);
         }
     }
-    StatisticView {
-        name: "Referenced by".into(),
-        value: if found.is_empty() {
-            "—".into()
-        } else {
-            found.join(", ")
+    Some(found)
+}
+async fn referenced_by(
+    c: &std::sync::Arc<dyn crate::db::adapter::DatabaseAdapter>,
+    id: &RelationId,
+    auth: &Auth,
+    pid: &str,
+) -> StatisticView {
+    let meaning =
+        "Same-schema foreign keys that point at this relation (first 50 visible relations)"
+            .to_string();
+    match referencing(c, id, auth, pid).await {
+        None => StatisticView {
+            name: "Referenced by".into(),
+            value: "Unavailable".into(),
+            meaning,
         },
-        meaning,
+        Some(found) => StatisticView {
+            name: "Referenced by".into(),
+            value: if found.is_empty() {
+                "—".into()
+            } else {
+                found.join(", ")
+            },
+            meaning,
+        },
     }
 }
+
+struct PreviewColumn {
+    name: String,
+    native_type: String,
+    pk: bool,
+}
+
+#[derive(Template)]
+#[template(path = "components/columns_preview.html")]
+struct ColumnsPreviewTemplate {
+    columns: Vec<PreviewColumn>,
+    truncated: bool,
+}
+
+/// Advanced explorer: the columns of a table, shown under it in the sidebar.
+pub async fn columns(
+    State(state): State<AppState>,
+    auth: Auth,
+    Query(query): Query<RelationQuery>,
+) -> Result<Response, AppError> {
+    let id = RelationId {
+        namespace: checked_query_name(query.schema)?,
+        name: checked_query_name(query.relation)?,
+    };
+    let profile = checked_profile(query.profile)?;
+    let pid = state.effective_profile(profile.as_deref());
+    auth.authorize(
+        &state,
+        Action::View,
+        &Resource::relation(&pid, &id.namespace, &id.name),
+    )
+    .await?;
+    let list = catalog(&state, profile.as_deref())?
+        .describe_columns(&id)
+        .await
+        .map_err(err)?;
+    let truncated = list.truncated;
+    let mut columns: Vec<_> = list.items;
+    columns.sort_by_key(|c| c.position);
+    tree_response(ColumnsPreviewTemplate {
+        columns: columns
+            .into_iter()
+            .map(|c| PreviewColumn {
+                pk: c.column.primary_key,
+                name: c.column.name,
+                native_type: c.column.native_type,
+            })
+            .collect(),
+        truncated,
+    })
+}
+
+#[derive(Template)]
+#[template(path = "components/relation_links.html")]
+struct RelationLinksTemplate {
+    outgoing: Vec<(String, String)>,
+    incoming: Vec<(String, String)>,
+}
+
+/// Tables linked to one relation by foreign keys, for the export selection highlight.
+pub async fn links(
+    State(state): State<AppState>,
+    auth: Auth,
+    Query(query): Query<RelationQuery>,
+) -> Result<Response, AppError> {
+    let id = RelationId {
+        namespace: checked_query_name(query.schema)?,
+        name: checked_query_name(query.relation)?,
+    };
+    let profile = checked_profile(query.profile)?;
+    let pid = state.effective_profile(profile.as_deref());
+    auth.authorize(
+        &state,
+        Action::View,
+        &Resource::relation(&pid, &id.namespace, &id.name),
+    )
+    .await?;
+    let c = catalog(&state, profile.as_deref())?;
+    let mut outgoing = Vec::new();
+    if let Ok(list) = c.list_constraints(&id).await {
+        for k in list.items {
+            if k.kind != crate::db::types::ConstraintKind::ForeignKey {
+                continue;
+            }
+            if let Some(target) = k.references
+                && auth.0.allows(
+                    Action::View,
+                    &Resource::relation(&pid, &target.namespace, &target.name),
+                )
+                && !outgoing.contains(&(target.namespace.clone(), target.name.clone()))
+            {
+                outgoing.push((target.namespace, target.name));
+            }
+        }
+    }
+    let incoming = referencing(&c, &id, &auth, &pid)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|name| (id.namespace.clone(), name))
+        .collect();
+    tree_response(RelationLinksTemplate { outgoing, incoming })
+}
+
 pub async fn indexes(
     State(state): State<AppState>,
     auth: Auth,

@@ -757,3 +757,73 @@ mod visible_text_tests {
         );
     }
 }
+
+/// `GET /catalog/cell?schema&relation&column&key.<pk>=value...`: the whole text of one cell
+/// (capped at 64 K characters), addressed by the full primary key.
+pub async fn cell(
+    State(state): State<AppState>,
+    auth: crate::web::auth::Auth,
+    RawQuery(raw): RawQuery,
+) -> Result<Response, AppError> {
+    let mut schema = None;
+    let mut relation = None;
+    let mut column = None;
+    let mut profile = None;
+    let mut key: Vec<(String, String)> = Vec::new();
+    for (name, value) in url::form_urlencoded::parse(raw.as_deref().unwrap_or("").as_bytes()) {
+        let value = value.into_owned();
+        match name.as_ref() {
+            "schema" if schema.is_none() => schema = Some(value),
+            "relation" if relation.is_none() => relation = Some(value),
+            "column" if column.is_none() => column = Some(value),
+            "profile" if profile.is_none() => profile = Some(value),
+            other => match other.strip_prefix("key.") {
+                Some(k) if !key.iter().any(|(n, _)| n == k) && key.len() < 8 => {
+                    key.push((self::name(k)?, value));
+                }
+                _ => return Err(invalid()),
+            },
+        }
+    }
+    let id = RelationId {
+        namespace: name(&schema.ok_or_else(invalid)?)?,
+        name: name(&relation.ok_or_else(invalid)?)?,
+    };
+    let column = name(&column.ok_or_else(invalid)?)?;
+    if key.is_empty()
+        || key
+            .iter()
+            .any(|(_, v)| v.len() > 512 || v.chars().any(char::is_control))
+    {
+        return Err(invalid());
+    }
+    let profile = crate::state::checked_profile(profile)?;
+    let pid = state.effective_profile(profile.as_deref());
+    auth.authorize(
+        &state,
+        crate::auth::Action::View,
+        &crate::auth::Resource::relation(&pid, &id.namespace, &id.name),
+    )
+    .await?;
+    let value = state
+        .adapter(profile.as_deref())?
+        .cell_value(&id, &column, &key)
+        .await
+        .map_err(classified)?;
+    let mut body = value.text.unwrap_or_default();
+    if value.truncated {
+        body.push_str("\n… (cut at 65,536 characters)");
+    }
+    let mut response = body.into_response();
+    let headers = response.headers_mut();
+    headers.insert(
+        axum::http::header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    headers.insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store"),
+    );
+    headers.insert("x-cuadb-null", axum::http::HeaderValue::from_static("0"));
+    Ok(response)
+}

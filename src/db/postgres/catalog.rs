@@ -203,7 +203,8 @@ impl PgCatalog {
                       CASE WHEN ty.typtype='e' THEN ARRAY(
                         SELECT e.enumlabel::text FROM pg_catalog.pg_enum e
                         WHERE e.enumtypid=ty.oid ORDER BY e.enumsortorder
-                      ) ELSE NULL END AS enum_values
+                      ) ELSE NULL END AS enum_values,
+                      pg_catalog.col_description(a.attrelid, a.attnum) AS comment
                 FROM pg_catalog.pg_attribute a
                 JOIN pg_catalog.pg_type ty ON ty.oid=a.atttypid
                 LEFT JOIN pg_catalog.pg_attrdef def
@@ -235,11 +236,60 @@ impl PgCatalog {
                         domain: get(r, "domain")?,
                         enum_values: enum_values
                             .map_or(Availability::Unavailable, Availability::Available),
+                        comment: get(r, "comment")?,
                     })
                 })
                 .collect::<Result<Vec<_>, DbError>>()?,
             MAX_COLUMNS,
         ))
+    }
+
+    /// Full text of one cell addressed by the whole primary key. Identifiers are checked
+    /// against the catalog and quoted; the key values are bound, never interpolated.
+    pub async fn cell_text(
+        &self,
+        id: &RelationId,
+        column: &str,
+        key: &[(String, String)],
+    ) -> Result<crate::db::types::CellValue, DbError> {
+        use super::row_query::quote;
+        let columns = self.describe_columns(id).await?.items;
+        let keys: Vec<&str> = columns
+            .iter()
+            .filter(|c| c.column.primary_key)
+            .map(|c| c.column.name.as_str())
+            .collect();
+        if keys.is_empty()
+            || key.len() != keys.len()
+            || !keys.iter().all(|k| key.iter().any(|(name, _)| name == k))
+            || !columns.iter().any(|c| c.column.name == column)
+        {
+            return Err(DbError::new(DbErrorKind::InvalidIdentifier));
+        }
+        let mut sql = format!(
+            "SELECT left({}::text, {}) AS v FROM {}.{} WHERE ",
+            quote(column)?,
+            crate::db::types::MAX_CELL_CHARS + 1,
+            quote(&id.namespace)?,
+            quote(&id.name)?
+        );
+        for (index, (name, _)) in key.iter().enumerate() {
+            if index > 0 {
+                sql.push_str(" AND ");
+            }
+            sql.push_str(&format!("{}::text = ${}", quote(name)?, index + 1));
+        }
+        sql.push_str(" LIMIT 1");
+        let mut query = sqlx::query(&sql);
+        for (_, value) in key {
+            query = query.bind(value);
+        }
+        let row = self.bounded(query.fetch_optional(&self.pool)).await?;
+        let text: Option<String> = match row {
+            Some(row) => get(&row, "v")?,
+            None => return Err(DbError::new(DbErrorKind::InvalidIdentifier)),
+        };
+        Ok(finish_cell(text))
     }
 
     pub async fn list_constraints(
@@ -670,6 +720,14 @@ impl DatabaseAdapter for PgCatalog {
     fn engine(&self) -> Engine {
         Engine::PostgreSql
     }
+    async fn cell_value(
+        &self,
+        relation: &RelationId,
+        column: &str,
+        key: &[(String, String)],
+    ) -> Result<crate::db::types::CellValue, DbError> {
+        self.cell_text(relation, column, key).await
+    }
 
     fn sort_supported(&self, native_type: &str) -> bool {
         super::row_query::sort_supported(native_type)
@@ -819,5 +877,22 @@ mod tests {
         assert_eq!(available_bytes(None), Availability::Unavailable);
         assert_eq!(available_bytes(Some(-1)), Availability::Unavailable);
         assert_eq!(available_bytes(Some(0)), Availability::Available(0));
+    }
+}
+
+fn finish_cell(text: Option<String>) -> crate::db::types::CellValue {
+    use crate::db::types::{CellValue, MAX_CELL_CHARS};
+    match text {
+        None => CellValue {
+            text: None,
+            truncated: false,
+        },
+        Some(text) => {
+            let truncated = text.chars().count() > MAX_CELL_CHARS;
+            CellValue {
+                text: Some(text.chars().take(MAX_CELL_CHARS).collect()),
+                truncated,
+            }
+        }
     }
 }

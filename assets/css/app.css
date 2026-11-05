@@ -2132,4 +2132,112 @@ tr.ck td {
 }
 
 /* Tailwind generates a .grid utility (display:grid); data tables must stay real tables. */
-table.grid{display:table}
+table.grid {
+  display: table;
+}
+
+/* ---- sidebar: column previews and export selection ---- */
+.relw {
+  position: relative;
+}
+.relw .sel-ck {
+  display: none;
+  position: absolute;
+  left: 4px;
+  top: 5px;
+  margin: 0;
+  accent-color: var(--ac);
+  width: 14px;
+  height: 14px;
+  z-index: 1;
+  pointer-events: none;
+}
+.selmode .relw .sel-ck {
+  display: block;
+}
+.selmode .relw > a.row {
+  padding-left: 24px;
+}
+.relw > .cv {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 24px;
+  width: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--mu);
+  z-index: 1;
+}
+html:not(.exm) .relw > .cv {
+  display: flex;
+}
+html:not(.exm) .relw > a.row {
+  padding-left: 18px;
+}
+html:not(.exm) .selmode .relw > .cv {
+  display: none;
+}
+.relw.o > .cv .ch {
+  transform: rotate(90deg);
+}
+.relw > .cols-slot {
+  display: none;
+}
+.relw.o > .cols-slot {
+  display: block;
+}
+.relw .cols {
+  margin: 0 0 2px 27px;
+}
+a.row.picked {
+  background: var(--acs);
+  color: var(--ac);
+  font-weight: 600;
+}
+#selbar {
+  display: none;
+  border-top: 1px solid var(--bd);
+  padding: 6px 10px;
+  background: var(--sf2);
+}
+
+.fnote {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+}
+#insp .ed {
+  padding: 8px 12px;
+}
+#insp .fl .inp {
+  width: 100%;
+}
+
+.tag.m-read {
+  color: var(--ok);
+}
+.tag.m-write {
+  color: var(--wr);
+}
+.tag.m-full {
+  color: #d0505f;
+}
+.sep-line {
+  border-top: 1px solid var(--bd);
+  margin: 3px 0;
+}
+#dpop {
+  padding: 6px 10px 10px;
+}
+.dnote {
+  margin: 8px 0 0;
+  max-width: none;
+}
+.sfoot .cbtn {
+  min-width: 0;
+}
+#dbtn {
+  flex: 0.8;
+}

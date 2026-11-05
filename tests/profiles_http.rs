@@ -230,13 +230,17 @@ async fn profile_list_exposes_labels_engine_and_state_but_never_urls_or_paths() 
         "super-secret-pw",
         "viewer",
         "127.0.0.1",
-        "nowhere",
-        "alpha.db",
         "profiles",
         env!("CARGO_TARGET_TMPDIR"),
     ] {
         assert!(!html.contains(secret), "{secret} leaked");
     }
+    // The database name is shown on purpose (it is not a credential); host and user never are.
+    assert!(html.contains(r#"data-db="nowhere""#));
+    assert!(
+        html.contains(r#"data-db="alpha.db""#),
+        "a SQLite file is shown by name only, never its directory"
+    );
     // Connected vs offline states are distinguishable.
     assert!(html.matches("Connected").count() >= 2);
     assert!(html.contains("Unavailable"));

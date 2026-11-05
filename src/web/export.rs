@@ -46,6 +46,9 @@ pub struct ExportQuery {
     depth: Option<u8>,
     /// Trusted connection profile id; absent means the default profile.
     profile: Option<String>,
+    /// Related-table ZIP only: more root relations, `schema US name` items joined by `RS`
+    /// (control characters can never appear in a validated identifier).
+    with: Option<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -75,6 +78,7 @@ impl ExportQuery {
                 "column",
                 "depth",
                 "profile",
+                "with",
             ],
         )?;
         Ok(Self {
@@ -95,6 +99,7 @@ impl ExportQuery {
             filter: map.remove("filter"),
             column,
             profile: map.remove("profile"),
+            with: map.remove("with"),
             depth: map
                 .remove("depth")
                 .map(|v| v.parse().map_err(|_| invalid()))
@@ -225,13 +230,13 @@ fn csv_text(columns: &[String], rows: &[Vec<Cell>]) -> String {
 /// byte caps. Unreadable linked relations are listed in the manifest, not fatal.
 async fn related_zip(
     catalog: &dyn DatabaseAdapter,
-    root: RelationId,
+    roots: Vec<RelationId>,
     depth: u8,
     may_export: &(dyn Fn(&RelationId) -> bool + Sync),
 ) -> Result<(Vec<u8>, bool), AppError> {
     use std::io::Write;
     ExportPlan {
-        relations: vec![root.clone()],
+        relations: roots.clone(),
         format: ExportFormat::RelatedZip,
         scope: ExportScope::RelatedRelations,
         max_rows: MAX_EXPORT_ROWS,
@@ -240,9 +245,9 @@ async fn related_zip(
     }
     .bounded()
     .map_err(|_| invalid())?;
-    let mut order = vec![root.clone()];
+    let mut order = roots.clone();
     let mut edges: Vec<serde_json::Value> = vec![];
-    let mut frontier = vec![root];
+    let mut frontier = roots;
     for _ in 0..depth {
         let mut next = vec![];
         for id in &frontier {
@@ -311,7 +316,7 @@ async fn related_zip(
                     .map_err(|_| AppError::new(ErrorKind::Internal))?;
                 manifest.push(serde_json::json!({"relation": format!("{}.{}", id.namespace, id.name), "file": name, "rows": done.rows.len(), "truncated": done.truncated}));
             }
-            Err(error) if order[0] == *id => return Err(error),
+            Err(error) if order.first() == Some(id) => return Err(error),
             Err(_) => {
                 manifest.push(serde_json::json!({"relation": format!("{}.{}", id.namespace, id.name), "status": "omitted: not readable"}));
             }
@@ -360,6 +365,33 @@ pub async fn export(
             &crate::auth::Resource::relation(&pid, &id.namespace, &id.name),
         )
         .await?;
+        let mut roots = vec![id.clone()];
+        for item in query
+            .with
+            .as_deref()
+            .unwrap_or("")
+            .split('\u{1e}')
+            .filter(|i| !i.is_empty())
+        {
+            let (schema, name) = item.split_once('\u{1f}').ok_or_else(invalid)?;
+            // Names with control characters (including these separators) are rejected here.
+            let extra = RelationId {
+                namespace: super::rows::name(schema)?,
+                name: super::rows::name(name)?,
+            };
+            auth.authorize(
+                &state,
+                crate::auth::Action::Export,
+                &crate::auth::Resource::relation(&pid, &extra.namespace, &extra.name),
+            )
+            .await?;
+            if !roots.contains(&extra) {
+                roots.push(extra);
+            }
+        }
+        if roots.len() > MAX_EXPORT_RELATIONS {
+            return Err(invalid());
+        }
         let principal = auth.0.clone();
         let may_export = move |target: &RelationId| {
             principal.allows(
@@ -370,7 +402,7 @@ pub async fn export(
         crate::auth::audit_export(&state, &auth.0, &id, "zip").await;
         let (bytes, truncated) = related_zip(
             catalog.as_ref(),
-            id.clone(),
+            roots,
             query.depth.unwrap_or(1),
             &may_export,
         )

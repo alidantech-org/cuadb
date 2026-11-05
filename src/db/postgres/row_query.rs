@@ -258,6 +258,7 @@ mod tests {
             generated: None,
             domain: None,
             enum_values: Availability::Unavailable,
+            comment: None,
         }
     }
     #[test]

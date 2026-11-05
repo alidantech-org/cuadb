@@ -1,0 +1,1 @@
+<ul class="links" hidden>{% for item in outgoing %}<li data-link="{{ item.0 }}.{{ item.1 }}" data-dir="out"></li>{% endfor %}{% for item in incoming %}<li data-link="{{ item.0 }}.{{ item.1 }}" data-dir="in"></li>{% endfor %}</ul>

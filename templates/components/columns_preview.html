@@ -1,0 +1,4 @@
+<div class="cols" role="group" aria-label="Columns">
+  {% for column in columns %}<div class="col"><b>{% if column.pk %}<span class="pk" title="Primary key">●</span> {% endif %}{{ column.name }}</b><span>{{ column.native_type }}</span></div>{% endfor %}
+  {% if truncated %}<div class="col mu">…more columns</div>{% endif %}
+</div>

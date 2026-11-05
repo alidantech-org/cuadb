@@ -253,8 +253,58 @@ function loadObjects() {
   });
 }
 
+/** The footer's database button shows the connected database and what the user may do there. */
+/** @type {{db: string, access: string, engine: string, state: string, label: string}} */
+let currentDb = { db: '', access: 'read', engine: '', state: '', label: '' };
+function syncDatabase(/** @type {HTMLElement} */ option) {
+  currentDb = {
+    db: option.dataset.db ?? '',
+    access: option.dataset.access ?? 'read',
+    engine: option.dataset.engine ?? '',
+    state: option.dataset.state ?? '',
+    label: option.dataset.label ?? '',
+  };
+  const name = document.getElementById('dname');
+  if (name) name.textContent = currentDb.db || 'database';
+}
+function renderDatabasePop() {
+  const pop = document.getElementById('dpop');
+  if (!pop) return;
+  pop.replaceChildren();
+  const rows = [
+    ['Database', currentDb.db || 'not named'],
+    ['Connection', currentDb.label],
+    ['Engine', currentDb.engine],
+    ['State', currentDb.state],
+  ];
+  for (const [label, value] of rows) {
+    const line = document.createElement('div');
+    line.className = 'sr';
+    const a = document.createElement('span');
+    a.textContent = String(label);
+    const b = document.createElement('b');
+    b.textContent = String(value);
+    line.append(a, b);
+    pop.append(line);
+  }
+  const access = document.createElement('div');
+  access.className = 'sr';
+  const text = document.createElement('span');
+  text.textContent = 'Your access';
+  const tag = document.createElement('span');
+  tag.className = `tag m-${currentDb.access}`;
+  tag.textContent =
+    { read: 'read', write: 'can edit', full: 'can edit and run SQL' }[currentDb.access] ?? 'read';
+  access.append(text, tag);
+  const hint = document.createElement('p');
+  hint.className = 'hint dnote';
+  hint.textContent =
+    'A connection points at one database. To browse another database, add it as its own connection.';
+  pop.append(access, hint);
+}
+
 /* ------------------------------------------------------------ popovers */
-const POPS = ['cpop', 'spop', 'colpop', 'exppop'];
+const POPS = ['cpop', 'dpop', 'spop', 'colpop', 'exppop'];
 function closePops(/** @type {string} */ except = '') {
   POPS.forEach((id) => {
     if (id === except) return;
@@ -381,6 +431,14 @@ function openInspector(/** @type {HTMLTableRowElement} */ row) {
     copy.setAttribute('aria-label', `Copy ${name.textContent}`);
     copy.textContent = 'Copy';
     caption.append(name, type, copy);
+    if (cell?.querySelector('.truncation') && gridColumns().some((c) => c.pk)) {
+      const full = document.createElement('button');
+      full.type = 'button';
+      full.className = 'cpy';
+      full.setAttribute('data-load-full', String(index));
+      full.textContent = 'Load full';
+      caption.append(full);
+    }
     const pre = document.createElement('pre');
     pre.textContent = cell?.querySelector('[data-null]') ? 'NULL' : (cell?.dataset.detail ?? '');
     kv.append(caption, pre);
@@ -397,6 +455,42 @@ function closeInspector() {
   const backdrop = document.getElementById('sheet-bk');
   if (backdrop) backdrop.hidden = true;
   $$('tr.sel').forEach((el) => el.classList.remove('sel'));
+}
+
+/** Fetch the whole text of a truncated cell (by primary key) and show it in the sheet. */
+async function loadFullValue(/** @type {HTMLButtonElement} */ button) {
+  const grid = document.getElementById('catalog-panel');
+  const row = /** @type {HTMLTableRowElement | undefined} */ (win.cuadbRow);
+  const heads = Array.from(
+    document.querySelectorAll('#catalog-panel table.grid thead th[data-col]'),
+  );
+  const head = /** @type {HTMLElement | undefined} */ (heads[Number(button.dataset.loadFull)]);
+  if (!grid || !row || !head) return;
+  const params = new URLSearchParams({
+    schema: grid.dataset.schema ?? '',
+    relation: grid.dataset.relation ?? '',
+    column: head.dataset.col ?? '',
+  });
+  if (grid.dataset.prof) params.set('profile', grid.dataset.prof);
+  const held = rowValues(row);
+  for (const col of gridColumns().filter((c) => c.pk)) {
+    const value = held[col.name]?.value;
+    if (value === null || value === undefined) return toast('This row has no usable key.');
+    params.set(`key.${col.name}`, value);
+  }
+  button.disabled = true;
+  button.textContent = 'Loading…';
+  try {
+    const response = await fetch(`/catalog/cell?${params.toString()}`);
+    if (!response.ok) throw new Error('failed');
+    const pre = button.closest('.kv')?.querySelector('pre');
+    if (pre) pre.textContent = await response.text();
+    button.remove();
+  } catch {
+    button.disabled = false;
+    button.textContent = 'Load full';
+    toast('The full value is not available for this column.');
+  }
 }
 
 /* ------------------------------------------------------------ row selection */
@@ -500,129 +594,69 @@ function rowValues(/** @type {HTMLTableRowElement} */ row) {
   return out;
 }
 
-function fieldControl(
-  /** @type {ReturnType<typeof gridColumns>[number]} */ col,
-  /** @type {string} */ value,
-) {
-  const isBool = col.type === 'boolean' || col.type === 'bool';
-  /** @type {HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement} */
-  let control;
-  if (isBool) {
-    control = document.createElement('select');
-    for (const option of ['true', 'false']) {
-      const o = document.createElement('option');
-      o.value = option;
-      o.textContent = option;
-      control.append(o);
-    }
-    control.value = ['true', 't', '1'].includes(value.toLowerCase()) ? 'true' : 'false';
-  } else if (value.length > 80 || value.includes('\n')) {
-    control = document.createElement('textarea');
-    control.rows = 4;
-    control.value = value;
-  } else {
-    control = document.createElement('input');
-    control.value = value;
-    if (/int|numeric|decimal|real|double|float/.test(col.type)) control.inputMode = 'decimal';
-  }
-  control.className = 'inp';
-  control.name = col.name;
-  control.setAttribute('autocomplete', 'off');
-  return control;
-}
-
-/** Show the editor in the inspector panel: a row to edit, or null for a new row. */
+/** Show the editor in the sheet: the form comes from the server, values are filled here. */
 function openEditor(/** @type {HTMLTableRowElement | null} */ row) {
   const panel = document.getElementById('insp');
-  if (!panel) return;
-  const insert = row === null;
-  const cols = gridColumns();
-  const values = row ? rowValues(row) : {};
-  panel.replaceChildren();
-  const title = document.createElement('h3');
-  const label = document.createElement('span');
-  label.textContent = insert ? 'New row' : `Edit row ${row?.dataset.row ?? ''}`;
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.setAttribute('data-close-insp', '');
-  close.setAttribute('aria-label', 'Close editor');
-  close.textContent = '×';
-  title.append(label, close);
-  const form = document.createElement('form');
-  form.className = 'ed';
-  form.id = 'row-form';
-  form.dataset.mode = insert ? 'insert' : 'update';
-  for (const col of cols) {
-    const current = values[col.name];
-    const field = document.createElement('div');
-    field.className = 'fl';
-    const caption = document.createElement('span');
-    caption.textContent = `${col.name} · ${col.type}${col.pk ? ' · key' : ''}`;
-    const line = document.createElement('div');
-    line.className = 'row2';
-    const readOnly = !col.editable || (!insert && (col.pk || current?.big));
-    if (readOnly) {
-      const shown = document.createElement('input');
-      shown.className = 'inp';
-      shown.readOnly = true;
-      shown.value = insert ? '' : current?.value === null ? 'NULL' : (current?.value ?? '');
-      shown.placeholder = col.editable ? '' : 'not editable here';
-      shown.setAttribute('aria-label', col.name);
-      line.append(shown);
-    } else {
-      const control = fieldControl(col, insert ? '' : (current?.value ?? ''));
-      if (insert) {
-        if (!(control instanceof HTMLSelectElement))
-          control.placeholder = col.pk || !col.required ? 'default' : 'required';
-        if (control instanceof HTMLSelectElement) {
-          const blank = document.createElement('option');
-          blank.value = '';
-          blank.textContent = 'default';
-          control.prepend(blank);
+  const grid = document.getElementById('catalog-panel');
+  if (!panel || !grid) return;
+  const params = new URLSearchParams({
+    schema: grid.dataset.schema ?? '',
+    relation: grid.dataset.relation ?? '',
+    mode: row ? 'update' : 'insert',
+  });
+  if (grid.dataset.prof) params.set('profile', grid.dataset.prof);
+  win.cuadbRow = row ?? win.cuadbRow;
+  const show = () => {
+    panel.classList.add('show');
+    const backdrop = document.getElementById('sheet-bk');
+    if (backdrop) backdrop.hidden = false;
+    win.cuadbEditing = true;
+  };
+  show();
+  const request = win.htmx?.ajax('GET', `/data/editor?${params.toString()}`, {
+    target: '#insp',
+    swap: 'innerHTML',
+  });
+  Promise.resolve(request).then(() => {
+    const form = document.getElementById('row-form');
+    if (!(form instanceof HTMLFormElement)) return;
+    if (row) {
+      const values = rowValues(row);
+      for (const [name, held] of Object.entries(values)) {
+        const control =
+          /** @type {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null} */ (
+            form.querySelector(`[name="${CSS.escape(name)}"]`)
+          );
+        if (!control) continue;
+        const nullBox = /** @type {HTMLInputElement | null} */ (
+          form.querySelector(`[data-null-for="${CSS.escape(name)}"]`)
+        );
+        if (held.value === null) {
+          if (control.dataset.ro) control.value = 'NULL';
+          if (nullBox) {
+            nullBox.checked = true;
+            control.disabled = true;
+          }
+        } else if (control instanceof HTMLSelectElement) {
+          control.value =
+            ['true', 't', '1'].includes(held.value.toLowerCase()) &&
+            control.querySelector('option[value="true"]')
+              ? 'true'
+              : held.value;
+        } else if (held.big) {
           control.value = '';
+          control.readOnly = true;
+          control.dataset.ro = '1';
+          control.placeholder = 'too large to edit here';
+        } else {
+          control.value = held.value;
         }
       }
-      control.setAttribute('aria-label', col.name);
-      line.append(control);
-      if (col.nullable) {
-        const wrap = document.createElement('label');
-        wrap.className = 'nlt';
-        const box = document.createElement('input');
-        box.type = 'checkbox';
-        box.dataset.nullFor = col.name;
-        box.checked = !insert && current?.value === null;
-        const text = document.createElement('span');
-        text.textContent = 'NULL';
-        wrap.append(box, text);
-        line.append(wrap);
-        control.disabled = box.checked;
-      }
     }
-    field.append(caption, line);
-    form.append(field);
-  }
-  const foot = document.createElement('div');
-  foot.className = 'ef';
-  const message = document.createElement('div');
-  message.id = 'eerr';
-  message.setAttribute('role', 'status');
-  const cancel = document.createElement('button');
-  cancel.type = 'button';
-  cancel.className = 'btn';
-  cancel.setAttribute('data-close-insp', '');
-  cancel.textContent = 'Cancel';
-  const save = document.createElement('button');
-  save.type = 'submit';
-  save.className = 'btn on';
-  save.textContent = insert ? 'Insert row' : 'Save changes';
-  foot.append(message, cancel, save);
-  form.append(foot);
-  panel.append(title, form);
-  panel.classList.add('show');
-  win.cuadbEditing = true;
-  /** @type {HTMLElement | null} */ (
-    form.querySelector('input:not([readonly]):not(:disabled),select,textarea')
-  )?.focus();
+    /** @type {HTMLElement | null} */ (
+      form.querySelector('input:not([readonly]):not(:disabled),select,textarea')
+    )?.focus();
+  });
 }
 
 function editorMessage(/** @type {string} */ text) {
@@ -657,7 +691,7 @@ function submitEditor(/** @type {HTMLFormElement} */ form) {
       values[`key.${col.name}`] = keyValue;
       continue;
     }
-    if (!control) continue;
+    if (!control || control.dataset.ro) continue;
     const before = old[col.name]?.value ?? null;
     const wantsNull = !!nullBox?.checked;
     const now = control.value;
@@ -895,6 +929,129 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+/* ------------------------------------------------------------ export selection + column previews */
+/** @type {Set<string>} */
+const picked = new Set();
+/** @type {Map<string, {out: string[], in: string[]}>} */
+const linkCache = new Map();
+let selectMode = false;
+
+async function linksOf(/** @type {string} */ qual) {
+  const hit = linkCache.get(qual);
+  if (hit) return hit;
+  const holder = document.querySelector(`.relw[data-qual="${CSS.escape(qual)}"]`);
+  const schema = holder instanceof HTMLElement ? (holder.dataset.schema ?? '') : '';
+  const relation = holder instanceof HTMLElement ? (holder.dataset.rel ?? '') : '';
+  const params = new URLSearchParams({ schema, relation });
+  if (win.cuadbProfile) params.set('profile', win.cuadbProfile);
+  const result = { out: /** @type {string[]} */ ([]), in: /** @type {string[]} */ ([]) };
+  try {
+    const html = await (await fetch(`/catalog/links?${params.toString()}`)).text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('li[data-link]').forEach((li) => {
+      const name = li.getAttribute('data-link') ?? '';
+      (li.getAttribute('data-dir') === 'in' ? result.in : result.out).push(name);
+    });
+  } catch {
+    /* highlighting is a hint; export still works without it */
+  }
+  linkCache.set(qual, result);
+  return result;
+}
+
+async function refreshPicks() {
+  const linked = new Set();
+  for (const qual of picked) {
+    const found = await linksOf(qual);
+    [...found.out, ...found.in].forEach((name) => linked.add(name));
+  }
+  $$('#tree .relw').forEach((node) => {
+    const holder = /** @type {HTMLElement} */ (node);
+    const qual = holder.dataset.qual ?? '';
+    const on = picked.has(qual);
+    const box = /** @type {HTMLInputElement | null} */ (holder.querySelector('.sel-ck'));
+    if (box) box.checked = on;
+    holder.querySelector('a.row')?.classList.toggle('lk', linked.has(qual) && !on);
+    holder.querySelector('a.row')?.classList.toggle('picked', on);
+  });
+  renderSelbar();
+}
+
+function renderSelbar() {
+  const bar = document.getElementById('selbar');
+  if (!bar) return;
+  bar.style.display = selectMode ? 'block' : 'none';
+  bar.replaceChildren();
+  if (!selectMode) return;
+  const top = document.createElement('div');
+  top.className = 'sr';
+  const count = document.createElement('b');
+  count.textContent = `${picked.size} selected`;
+  const buttons = document.createElement('span');
+  buttons.className = 'ia';
+  const done = document.createElement('button');
+  done.type = 'button';
+  done.className = 'btn';
+  done.setAttribute('data-sel-done', '');
+  done.textContent = 'Done';
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.className = 'btn on';
+  go.setAttribute('data-sel-export', '');
+  go.textContent = 'Export ZIP';
+  go.disabled = picked.size === 0;
+  buttons.append(done, go);
+  top.append(count, buttons);
+  const row = document.createElement('label');
+  row.className = 'sr';
+  const text = document.createElement('span');
+  text.textContent = 'Include linked tables';
+  const toggle = document.createElement('input');
+  toggle.type = 'checkbox';
+  toggle.className = 'tg';
+  toggle.id = 'sel-linked';
+  toggle.checked = win.cuadbIncludeLinked !== false;
+  toggle.setAttribute('data-sel-linked', '');
+  row.append(text, toggle);
+  bar.append(top, row);
+}
+
+function setSelectMode(/** @type {boolean} */ on) {
+  selectMode = on;
+  document.getElementById('tree')?.classList.toggle('selmode', on);
+  document.getElementById('selb')?.setAttribute('aria-pressed', String(on));
+  if (!on) picked.clear();
+  void refreshPicks();
+}
+
+function downloadZip() {
+  const [first, ...rest] = Array.from(picked);
+  if (!first) return;
+  const split = (/** @type {string} */ qual) => {
+    const holder = document.querySelector(`.relw[data-qual="${CSS.escape(qual)}"]`);
+    return holder instanceof HTMLElement
+      ? [holder.dataset.schema ?? '', holder.dataset.rel ?? '']
+      : ['', ''];
+  };
+  const [schema, relation] = split(first);
+  const params = new URLSearchParams({
+    schema: schema ?? '',
+    relation: relation ?? '',
+    format: 'zip',
+    scope: 'related',
+    depth: win.cuadbIncludeLinked === false ? '0' : '1',
+  });
+  if (rest.length) params.set('with', rest.map((q) => split(q).join('\u001f')).join('\u001e'));
+  if (win.cuadbProfile) params.set('profile', win.cuadbProfile);
+  const a = document.createElement('a');
+  a.href = `/catalog/export?${params.toString()}`;
+  a.download = '';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  toast(`Exporting ${picked.size} table${picked.size === 1 ? '' : 's'} as ZIP`);
+}
+
 /* ------------------------------------------------------------ sidebar tree */
 function openSchema(/** @type {Element} */ holder, /** @type {boolean} */ open) {
   holder.classList.toggle('o', open);
@@ -992,6 +1149,11 @@ document.addEventListener('click', (event) => {
     updateSelection();
     return;
   }
+  const fullBtn = target.closest('[data-load-full]');
+  if (fullBtn instanceof HTMLButtonElement) {
+    void loadFullValue(fullBtn);
+    return;
+  }
   const copyBtn = target.closest('[data-copy-value]');
   if (copyBtn instanceof HTMLElement) {
     const index = Number(copyBtn.dataset.copyValue);
@@ -1003,7 +1165,7 @@ document.addEventListener('click', (event) => {
     return;
   }
   const inPop = target.closest('.pop');
-  if (!inPop && !target.closest('[data-pop],#cbtn,#sbtn')) closePops();
+  if (!inPop && !target.closest('[data-pop],#cbtn,#dbtn,#sbtn')) closePops();
 
   if (target.closest('[data-modal-close]') || target.id === 'modal') {
     closeModal();
@@ -1014,6 +1176,11 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (innerWidth < 761 && !target.closest('#side, #menu')) setDrawer(false);
+  if (target.closest('#dbtn')) {
+    renderDatabasePop();
+    togglePop('dpop');
+    return;
+  }
   if (target.closest('#cbtn')) {
     togglePop('cpop');
     return;
@@ -1034,6 +1201,7 @@ document.addEventListener('click', (event) => {
     const name = document.getElementById('cname');
     if (name) name.textContent = label;
     win.cuadbProfile = profile.dataset.profile ?? '';
+    syncDatabase(profile);
     closePops();
     document.getElementById('f')?.focus();
     closeInspector();
@@ -1080,6 +1248,16 @@ document.addEventListener('click', (event) => {
     markActiveRow(null);
     if (innerWidth < 761) setDrawer(false);
     const profile = win.cuadbProfile ? `?profile=${encodeURIComponent(win.cuadbProfile)}` : '';
+    if (view === 'admin-connections') {
+      Promise.resolve(
+        win.htmx?.ajax('GET', '/admin', { target: '#mainbody', swap: 'innerHTML' }),
+      ).then(() =>
+        document
+          .querySelector('#adm-seg [data-tab="connections"]')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true })),
+      );
+      return;
+    }
     fetchInto(view === 'admin' ? '/admin' : `/sql${profile}`, '#mainbody', 'innerHTML');
     return;
   }
@@ -1322,6 +1500,7 @@ document.addEventListener('htmx:afterSwap', (event) => {
       const name = document.getElementById('cname');
       if (selected instanceof HTMLElement && name)
         name.textContent = selected.dataset.label ?? 'Connection';
+      if (selected instanceof HTMLElement) syncDatabase(selected);
       const dot = document.getElementById('cdot');
       if (selected instanceof HTMLElement && dot) {
         const ready = selected.dataset.ready === 'true';
@@ -1501,3 +1680,46 @@ applyPrefs();
 decorateIcons();
 
 enhanceTables(document);
+
+// Select mode: clicking a table in the sidebar toggles it instead of opening it.
+document.addEventListener(
+  'click',
+  (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const holder = target.closest('#tree .relw');
+    if (!selectMode || !(holder instanceof HTMLElement) || target.closest('.cv')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const qual = holder.dataset.qual ?? '';
+    if (picked.has(qual)) picked.delete(qual);
+    else picked.add(qual);
+    void refreshPicks();
+  },
+  true,
+);
+document.addEventListener('click', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest('#selb')) return setSelectMode(!selectMode);
+  if (target.closest('[data-sel-done]')) return setSelectMode(false);
+  if (target.closest('[data-sel-export]')) return downloadZip();
+  const chevron = target.closest('#tree .cv');
+  if (chevron instanceof HTMLElement) {
+    const holder = chevron.closest('.relw');
+    const slot = holder?.querySelector('.cols-slot');
+    if (!holder || !(slot instanceof HTMLElement)) return;
+    const open = holder.classList.toggle('o');
+    chevron.setAttribute('aria-expanded', String(open));
+    if (open && !slot.dataset.loaded) {
+      slot.dataset.loaded = '1';
+      win.htmx?.ajax('GET', chevron.dataset.cols ?? '', { target: slot, swap: 'innerHTML' });
+    }
+  }
+});
+document.addEventListener('change', (event) => {
+  const el = event.target;
+  if (el instanceof HTMLInputElement && el.dataset.selLinked !== undefined) {
+    win.cuadbIncludeLinked = el.checked;
+  }
+});

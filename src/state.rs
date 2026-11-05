@@ -81,6 +81,8 @@ impl Runtime {
 
 #[derive(Clone)]
 struct Entry {
+    /// The database (or SQLite file) name; never a host, user or password.
+    database: String,
     /// Saved from the Administration screen (editable); file-defined ones are read-only.
     managed: bool,
     id: String,
@@ -93,6 +95,8 @@ struct Entry {
 /// Non-secret facts about a configured profile, safe for templates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileInfo {
+    /// Database or SQLite file name of this connection (no credentials).
+    pub database: String,
     /// Saved from the Administration screen (can be edited or removed there).
     pub managed: bool,
     pub id: String,
@@ -270,6 +274,7 @@ impl AppState {
                 None
             };
             entries.push(Entry {
+                database: database_name(profile.url.expose()),
                 managed: false,
                 id: profile.id.clone(),
                 label: profile.label.clone(),
@@ -321,6 +326,7 @@ impl AppState {
         Self {
             ctx: None,
             entries: Arc::new(RwLock::new(vec![Entry {
+                database: String::new(),
                 managed: false,
                 id: crate::profiles::DEFAULT_PROFILE_ID.into(),
                 label: "Default connection".into(),
@@ -345,6 +351,7 @@ impl AppState {
                 adapters
                     .into_iter()
                     .map(|(id, label, catalog)| Entry {
+                        database: String::new(),
                         managed: false,
                         id: id.into(),
                         label: label.into(),
@@ -584,6 +591,7 @@ impl AppState {
             .iter()
             .enumerate()
             .map(|(index, entry)| ProfileInfo {
+                database: entry.database.clone(),
                 managed: entry.managed,
                 id: entry.id.clone(),
                 label: entry.label.clone(),
@@ -651,6 +659,7 @@ impl AppState {
             None
         };
         Ok(Entry {
+            database: database_name(&input.url),
             managed: true,
             id: input.id.clone(),
             label: input.label.clone(),
@@ -826,4 +835,22 @@ mod tests {
         let outcome = AppState::from_config(&config).err().unwrap();
         assert!(!format!("{outcome:?}").contains("secret"));
     }
+}
+
+/// The database part of a connection URL, for display only.
+fn database_name(url: &str) -> String {
+    let Ok(parsed) = url::Url::parse(url) else {
+        return String::new();
+    };
+    let last = parsed
+        .path_segments()
+        .and_then(|mut parts| parts.next_back().map(str::to_string))
+        .unwrap_or_default();
+    url::form_urlencoded::parse(format!("v={last}").as_bytes())
+        .next()
+        .map(|(_, v)| v.into_owned())
+        .unwrap_or_default()
+        .chars()
+        .take(63)
+        .collect()
 }
