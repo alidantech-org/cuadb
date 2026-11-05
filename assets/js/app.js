@@ -1515,8 +1515,10 @@ document.addEventListener('htmx:afterSwap', (event) => {
       loadObjects();
     }
     decorateBars(event.target);
+    // A new page replaces the sheet's row; swaps inside the sheet itself (the editor form,
+    // its messages) and elsewhere must leave it open.
+    if (event.target.id === 'mainbody' || event.target.id === 'catalog-panel') closeInspector();
   }
-  closeInspector();
 });
 
 /** Show server timestamps in the viewer's locale. */

@@ -1486,6 +1486,13 @@ async fn the_grid_offers_editing_only_where_the_user_may_edit_and_a_key_exists()
             && admin.contains("can edit")
     );
     assert!(admin.contains(r#"data-pk="1""#) && admin.contains(r#"data-nullable="1""#));
+    // The number column doubles as a selector (check-all in the header) and rows open a sheet.
+    assert!(
+        admin.contains("rck-all")
+            && admin.contains(r#"class="rck""#)
+            && admin.contains(r#"id="selinfo""#)
+    );
+    assert!(admin.contains(r#"id="sheet-bk""#) && admin.contains(r#"class="sheet""#));
     // Generated columns are listed, and the page carries what the browser needs to post.
     assert!(admin.contains(r#"data-schema="main""#) && admin.contains(r#"data-relation="items""#));
     // A table without any key cannot be updated or deleted by key: no editor.
