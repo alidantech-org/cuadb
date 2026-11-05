@@ -34,3 +34,7 @@ Focused mobile acceptance (2026-11-05): At 390x844 against the disposable Postgr
 ### 2026-11-05T02:20:40.565Z · PETER IRUNGU
 
 Implemented alongside the connection flow: opted-in loopback connection management, full paged catalogs with fuzzy search, canonical UI URL state, exact-row FK sheets, and the PostgreSQL spatial type/error classification fix. Verified with bun run check, bun run test, bun run build, live Mzizi exploration (geography.boundaries and geography.units return successfully), FK sheet reload/back, and fuzzy search for “boundries”.
+
+### 2026-11-05T02:43:31.354Z · PETER IRUNGU
+
+Follow-up: fixed sidebar catalog loading/search: schema relation requests no longer share a canceling hx-sync lock; names render before estimates/sizes; heavy row/schema summaries load afterward; flat mode loads schemas in parallel, keeps pagination controls, and search clears moved flat rows to prevent duplicates. Verified in Mzizi: flat mode listed all 145 relations, “unit” found three tables including geography.units, “runs” returned one row, collapse left no loading placeholders, and expand all completed across all 25 schemas. bun run check and bun run test pass.

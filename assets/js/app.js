@@ -571,6 +571,8 @@ function applyPrefs() {
   formatNumbers(document);
   formatDates(document);
   applyTreeView();
+  loadSchemaSummaries();
+  $$('#tree .sub').forEach((sub) => loadRelationStats(sub));
   if (S.mode !== lastMode) {
     lastMode = S.mode;
     // Grouping and metadata objects depend on the mode: rebuild the tree.
@@ -1427,8 +1429,14 @@ function applyTreeView() {
         }
         box?.append(rel);
       });
+      const more = sch.querySelector('.rel-more');
+      if (more) box?.append(more);
     });
-    if (box) sortChildren(box, '.relw', S.tsort, S.tdir, relName);
+    if (box) {
+      const flatbox = box;
+      sortChildren(flatbox, '.relw', S.tsort, S.tdir, relName);
+      flatbox.querySelectorAll('.rel-more').forEach((button) => flatbox.append(button));
+    }
   } else {
     if (box) {
       box.remove();
@@ -1559,7 +1567,7 @@ function filterTree() {
       const qual = (relation.getAttribute('data-qual') ?? '').toLocaleLowerCase();
       relation.toggleAttribute(
         'hidden',
-        needle !== '' && !name.includes(needle) && !qual.includes(needle),
+        needle !== '' && !fuzzyMatch(needle, name) && !fuzzyMatch(needle, qual),
       );
     });
   }
@@ -1581,27 +1589,144 @@ function searchServerTree() {
   treeSearchTimer = setTimeout(() => {
     const needle =
       /** @type {HTMLInputElement | null} */ (document.getElementById('f'))?.value.trim() ?? '';
+    // Flat mode moves rows out of their schema containers. Clear those old copies
+    // before server results are moved into the same flat list, or matches duplicate.
+    if (!S.tgroup) {
+      document
+        .querySelectorAll('#flatbox .relw, #flatbox [data-load-relations]')
+        .forEach((row) => row.remove());
+    }
     for (const schema of $$('#tree .sch')) {
       const button = schema.querySelector('[data-s]');
       const sub = schema.querySelector('.sub');
       const href = button?.getAttribute('hx-get');
+      const relationsHref = button?.getAttribute('data-relations');
       const name = schema.getAttribute('data-schema-name') ?? '';
-      if (!(sub instanceof HTMLElement) || !href) continue;
+      if (!(sub instanceof HTMLElement) || (!href && !relationsHref)) continue;
       if (!needle && !schema.classList.contains('o')) continue;
-      const url = new URL(href, location.origin);
+      const url = new URL(relationsHref ?? href ?? '', location.origin);
       url.searchParams.set('offset', '0');
       url.searchParams.set('limit', '200');
       if (needle) url.searchParams.set('q', needle);
       else url.searchParams.delete('q');
       if (S.mode === 'advanced') url.searchParams.set('group', '1');
       openSchema(schema, !!needle || schema.classList.contains('o'));
-      fetchInto(
-        `${url.pathname}${url.search}`,
-        `#tree .sch[data-schema-name="${CSS.escape(name)}"] .sub`,
-        'innerHTML',
-      );
+      loadSchemaRelations(schema, `${url.pathname}${url.search}`, true);
     }
   }, 120);
+}
+function loadSchemaRelations(
+  /** @type {Element} */ schema,
+  /** @type {string} */ requestUrl,
+  /** @type {boolean} */ force = false,
+) {
+  const sch = schema instanceof HTMLElement ? schema : null;
+  const button = sch?.querySelector('[data-s]');
+  const sub = sch?.querySelector('.sub');
+  if (!(button instanceof HTMLElement) || !(sub instanceof HTMLElement)) return;
+  if (!force && (sub.dataset.loaded === '1' || sub.dataset.loading === '1')) return;
+  if (sub.dataset.requestUrl !== requestUrl) {
+    sub.dataset.statsLoaded = '0';
+    sub.dataset.statsLoading = '0';
+  }
+  sub.dataset.loading = '1';
+  if (!sub.querySelector('[data-relation-name]')) {
+    const loading = document.createElement('div');
+    loading.className = 'note';
+    loading.textContent = 'Loading table names…';
+    sub.replaceChildren(loading);
+  }
+  const url = new URL(requestUrl, location.origin);
+  if (S.mode === 'advanced') url.searchParams.set('group', '1');
+  const finalUrl = `${url.pathname}${url.search}`;
+  sub.dataset.requestUrl = finalUrl;
+  const target = `#tree .sch[data-schema-name="${CSS.escape(sch?.dataset.schemaName ?? '')}"] .sub`;
+  win.htmx?.ajax('GET', finalUrl, { target, swap: 'innerHTML', source: button });
+}
+async function loadSchemaSummaries() {
+  const root = document.querySelector('#tree .schema-tree');
+  if (!(root instanceof HTMLElement) || root.dataset.details === 'true' || !S.tsums) return;
+  const params = new URLSearchParams({ details: 'true' });
+  if (win.cuadbProfile) params.set('profile', win.cuadbProfile);
+  const profile = win.cuadbProfile ?? '';
+  try {
+    const response = await fetch(`/catalog/schemas?${params}`, {
+      headers: { accept: 'text/html' },
+    });
+    if (!response.ok || profile !== (win.cuadbProfile ?? '')) return;
+    const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+    doc.querySelectorAll('.sch[data-schema-name]').forEach((loaded) => {
+      const name = loaded.getAttribute('data-schema-name') ?? '';
+      const current = document.querySelector(`#tree .sch[data-schema-name="${CSS.escape(name)}"]`);
+      if (!(current instanceof HTMLElement)) return;
+      current.dataset.tables = loaded.getAttribute('data-tables') ?? '-1';
+      current.dataset.bytes = loaded.getAttribute('data-bytes') ?? '-1';
+      const source = loaded.querySelector('.sch-sum');
+      const target = current.querySelector('.sch-sum');
+      if (source && target instanceof HTMLElement) {
+        target.textContent = source.textContent ?? '';
+        target.hidden = !target.textContent;
+      }
+    });
+    root.dataset.details = 'true';
+    applyTreeView();
+  } catch {
+    /* The schema names are already available; summaries can be retried on refresh. */
+  }
+}
+async function loadRelationStats(/** @type {Element} */ subElement) {
+  const sub = subElement instanceof HTMLElement ? subElement : null;
+  if (!(sub instanceof HTMLElement) || (!S.tcounts && !S.tsums)) return;
+  const requestUrl = sub.dataset.requestUrl ?? '';
+  if (!requestUrl || sub.dataset.statsLoading === '1' || sub.dataset.statsLoaded === '1') return;
+  sub.dataset.statsLoading = '1';
+  const url = new URL(requestUrl, location.origin);
+  url.searchParams.set('details', 'true');
+  try {
+    const response = await fetch(`${url.pathname}${url.search}`, {
+      headers: { accept: 'text/html' },
+    });
+    if (!response.ok || sub.dataset.requestUrl !== requestUrl) return;
+    const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const details = new Map(
+      Array.from(doc.querySelectorAll('.relw[data-rel]')).map((row) => [
+        row.getAttribute('data-rel') ?? '',
+        row,
+      ]),
+    );
+    const schemaName = new URL(requestUrl, location.origin).searchParams.get('schema') ?? '';
+    document
+      .querySelectorAll(`#tree .relw[data-schema="${CSS.escape(schemaName)}"][data-rel]`)
+      .forEach((row) => {
+        const source = details.get(row.getAttribute('data-rel') ?? '');
+        if (!(source instanceof HTMLElement) || !(row instanceof HTMLElement)) return;
+        row.dataset.rows = source.dataset.rows ?? '-1';
+        row.dataset.bytes = source.dataset.bytes ?? '-1';
+        const sourceLink = source.querySelector('a.row');
+        const targetLink = row.querySelector('a.row');
+        if (sourceLink instanceof HTMLElement && targetLink instanceof HTMLElement) {
+          targetLink.title = sourceLink.title;
+          const count = sourceLink.querySelector('[data-count]');
+          let targetCount = targetLink.querySelector('[data-count]');
+          if (count && !targetCount) {
+            targetCount = document.createElement('span');
+            targetCount.className = 'c';
+            targetCount.setAttribute('data-count', '');
+            targetLink.append(targetCount);
+          }
+          if (targetCount instanceof HTMLElement) {
+            targetCount.textContent = count?.textContent ?? '';
+            targetCount.hidden = !S.tcounts || !count;
+            targetCount.classList.toggle('hidden-count', S.side === 'size');
+          }
+        }
+      });
+    sub.dataset.statsLoaded = '1';
+  } catch {
+    /* Estimates are optional; relation names remain usable. */
+  } finally {
+    sub.dataset.statsLoading = '0';
+  }
 }
 function fuzzyMatch(/** @type {string} */ query, /** @type {string} */ value) {
   if (!query) return true;
@@ -1655,9 +1780,9 @@ function restoreSidebarState() {
     const button = schema.querySelector('[data-s]');
     openSchema(schema, true);
     const sub = schema.querySelector('.sub');
-    const href = button?.getAttribute('hx-get');
+    const href = button?.getAttribute('data-relations') ?? button?.getAttribute('hx-get');
     if (sub && href && !sub.querySelector('[data-relation-name]'))
-      fetchInto(href, `#tree .sch[data-schema-name="${CSS.escape(name)}"] .sub`, 'innerHTML');
+      loadSchemaRelations(schema, href);
   }
   if (search?.value) filterTree();
   selectActiveTable();
@@ -1853,8 +1978,32 @@ document.addEventListener('click', (event) => {
   const schemaBtn = target.closest('#tree [data-s]');
   if (schemaBtn) {
     const holder = schemaBtn.closest('.sch');
-    if (holder) openSchema(holder, !holder.classList.contains('o'));
+    if (holder) {
+      const opening = !holder.classList.contains('o');
+      openSchema(holder, opening);
+      if (opening) {
+        const href = schemaBtn.getAttribute('data-relations') ?? '';
+        if (href) loadSchemaRelations(holder, href);
+      }
+    }
     syncSidebarUrl();
+    return;
+  }
+  const more = target.closest('#tree [data-load-relations]');
+  if (more instanceof HTMLButtonElement) {
+    const schema = more.dataset.schema ?? '';
+    const href = more.dataset.href ?? '';
+    const holder = document.querySelector(`#tree .sch[data-schema-name="${CSS.escape(schema)}"]`);
+    const sub = holder?.querySelector('.sub');
+    if (sub instanceof HTMLElement && href) {
+      more.disabled = true;
+      more.textContent = 'Loading table names…';
+      sub.dataset.requestUrl = href;
+      sub.dataset.statsLoaded = '0';
+      sub.dataset.statsLoading = '0';
+      fetchInto(href, `#tree .sch[data-schema-name="${CSS.escape(schema)}"] .sub`, 'beforeend');
+      more.remove();
+    }
     return;
   }
   const rowLink = target.closest('#tree a.row');
@@ -2219,6 +2368,7 @@ document.addEventListener('htmx:afterSwap', (event) => {
       applyTreeView();
       restoreSidebarState();
       restoreLast();
+      loadSchemaSummaries();
     }
     if (event.target.id === 'mainbody' || event.target.id === 'catalog-panel') {
       const route = `/table/${encodeURIComponent(document.getElementById('catalog-panel')?.getAttribute('data-schema') ?? '')}/${encodeURIComponent(document.getElementById('catalog-panel')?.getAttribute('data-relation') ?? '')}`;
@@ -2242,12 +2392,16 @@ document.addEventListener('htmx:afterSwap', (event) => {
       if (event.target.id === 'mainbody' && partsAdminTab()) setTimeout(restoreAdminTab, 0);
     }
     if (event.target.matches('.sub')) {
-      const more = Array.from(event.target.querySelectorAll('[data-load-relations]'));
+      const subTarget = /** @type {HTMLElement} */ (event.target);
+      subTarget.dataset.loading = '0';
+      subTarget.dataset.loaded = '1';
+      const more = Array.from(subTarget.querySelectorAll('[data-load-relations]'));
       more.slice(0, -1).forEach((button) => button.remove());
       filterTree();
       loadObjects();
       applyTreeView();
       selectActiveTable();
+      loadRelationStats(subTarget);
     }
     decorateBars(event.target);
     // A new page replaces the sheet's row; swaps inside the sheet itself (the editor form,

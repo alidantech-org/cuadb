@@ -52,16 +52,23 @@ impl DatabaseAdapter for Fake {
     }
     async fn relations(&self, _: &str) -> Result<Vec<Relation>, DbError> {
         match self.0 {
-            Mode::Healthy => Ok(["users", "Users_Archive", "50%_off", "<b>x</b>", "orders"]
-                .into_iter()
-                .map(|name| Relation {
-                    id: RelationId {
-                        namespace: "main".into(),
-                        name: name.into(),
-                    },
-                    kind: RelationKind::Table,
-                })
-                .collect()),
+            Mode::Healthy => Ok([
+                "users",
+                "Users_Archive",
+                "50%_off",
+                "<b>x</b>",
+                "orders",
+                "units",
+            ]
+            .into_iter()
+            .map(|name| Relation {
+                id: RelationId {
+                    namespace: "main".into(),
+                    name: name.into(),
+                },
+                kind: RelationKind::Table,
+            })
+            .collect()),
             _ => Err(DbError::new(DbErrorKind::PermissionDenied)),
         }
     }
@@ -189,6 +196,8 @@ async fn schema_tree_escapes_names_from_the_adapter() {
     assert_eq!(status, StatusCode::OK);
     assert!(!body.contains("<script>alert(1)"));
     assert!(body.contains("&lt;script&gt;") || body.contains("&#60;script&#62;"));
+    assert!(body.contains("data-details=\"false\""));
+    assert!(!body.contains("Loading relations"));
 }
 
 #[tokio::test]
@@ -196,6 +205,24 @@ async fn relations_route_lists_adapter_relations() {
     let (status, body) = get(Mode::Healthy, "/catalog/relations?schema=main", 2000).await;
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains("users"));
+    assert!(body.contains("data-details=\"false\""));
+    assert!(!body.contains("data-count"));
+    let (_, detailed) = get(
+        Mode::Healthy,
+        "/catalog/relations?schema=main&details=true",
+        2000,
+    )
+    .await;
+    assert!(detailed.contains("data-details=\"true\""));
+}
+
+#[tokio::test]
+async fn relation_search_returns_exact_names_without_waiting_for_statistics() {
+    let (status, body) = get(Mode::Healthy, "/catalog/relations?schema=main&q=unit", 2000).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.contains("units"));
+    assert!(!body.contains("users"));
+    assert!(body.contains("data-details=\"false\""));
 }
 
 #[tokio::test]

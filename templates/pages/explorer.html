@@ -8,7 +8,7 @@
       {% if shell.sql %}<button class="btn ico" id="sqlb" type="button" title="SQL workspace" aria-label="SQL workspace" data-view="sql">&gt;_</button>{% endif %}
       <button class="btn ico" id="selb" type="button" title="Select tables to export" aria-label="Select tables to export" aria-pressed="false" hidden>☑</button>
     </div>
-    <div id="tree" aria-label="Schemas and relations" hx-sync="this:replace" hx-get="/catalog/schemas" hx-trigger="load" hx-swap="innerHTML">
+    <div id="tree" aria-label="Schemas and relations" hx-get="/catalog/schemas" hx-trigger="load" hx-swap="innerHTML">
       <div class="note" role="status">Loading accessible schemas…</div>
     </div>
     <div class="note" id="tree-none" hidden>Nothing matches.</div>

@@ -1,12 +1,12 @@
-<div class="schema-tree" aria-label="Database schemas" role="tree">
+<div class="schema-tree" aria-label="Database schemas" role="tree" data-details="{{ details }}">
   {% if schemas.is_empty() %}
     <div class="note" role="status">{{ note }}</div>
   {% else %}
     <a class="row ov-row" href="{{ overview_href }}" hx-get="{{ overview_href }}" hx-target="#mainbody" hx-swap="innerHTML" hx-sync="#mainbody:replace"><i class="ic-slot" data-ic="overview" aria-hidden="true"></i><span class="n">Overview</span></a>
     {% for schema in schemas %}
     <div class="sch" role="treeitem" aria-expanded="false" data-schema-name="{{ schema.name }}" data-tables="{{ schema.tables }}" data-bytes="{{ schema.bytes }}">
-      <button class="sh fo" type="button" data-s aria-label="Schema {{ schema.name }}" hx-get="{{ schema.href }}" hx-trigger="click once" hx-target="next .sub" hx-swap="innerHTML"><i class="ic-slot" data-ic="folder" aria-hidden="true"></i><span class="n">{{ schema.name }}</span>{% if !schema.summary.is_empty() %}<span class="c sch-sum">{{ schema.summary }}</span>{% endif %}</button>
-      <div class="sub" role="group"><div class="note">Loading relations…</div></div>
+      <button class="sh fo" type="button" data-s data-relations="{{ schema.href }}" hx-sync="this:replace" aria-label="Schema {{ schema.name }}"><i class="ic-slot" data-ic="folder" aria-hidden="true"></i><span class="n">{{ schema.name }}</span><span class="c sch-sum"{% if schema.summary.is_empty() %} hidden{% endif %}>{{ schema.summary }}</span></button>
+      <div class="sub" role="group"></div>
     </div>
     {% endfor %}
   {% endif %}

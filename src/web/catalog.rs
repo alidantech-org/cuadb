@@ -108,6 +108,7 @@ struct SchemaTreeTemplate {
     schemas: Vec<SchemaItem>,
     note: String,
     overview_href: String,
+    details: bool,
 }
 #[derive(Clone)]
 struct SchemaItem {
@@ -131,6 +132,7 @@ struct RelationTreeTemplate {
     /// The bounded catalog list was cut off; tell the user even when rows exist.
     truncated: bool,
     next_href: String,
+    details: bool,
 }
 struct RelationItem {
     name: String,
@@ -412,6 +414,8 @@ pub struct SchemaQuery {
     group: Option<String>,
     offset: Option<usize>,
     limit: Option<usize>,
+    /// Load estimated row and size metadata after relation names are visible.
+    details: Option<bool>,
 }
 
 fn fuzzy_distance(a: &str, b: &str) -> usize {
@@ -459,6 +463,7 @@ pub struct RelationQuery {
 #[serde(deny_unknown_fields)]
 pub struct ProfileQuery {
     pub(crate) profile: Option<String>,
+    details: Option<bool>,
 }
 
 fn checked_query_name(value: String) -> Result<String, AppError> {
@@ -495,6 +500,7 @@ pub async fn schemas(
                 schemas: vec![],
                 note: "Not configured. Set CUADB_DATABASE_URL or CUADB_PROFILES_FILE on the server to browse the catalog."
                     .into(),
+                details: false,
             });
         }
     };
@@ -511,15 +517,20 @@ pub async fn schemas(
                     DbErrorKind::TimedOut => "The database catalog did not respond in time.".into(),
                     _ => "The configured database is unavailable.".into(),
                 },
+                details: false,
             });
         }
     };
     let truncated = entries.truncated;
-    let summaries: std::collections::HashMap<String, crate::db::types::SchemaSummary> = c
-        .schema_summaries()
-        .await
-        .map(|list| list.into_iter().map(|s| (s.name.clone(), s)).collect())
-        .unwrap_or_default();
+    let details = query.details.unwrap_or(false);
+    let summaries: std::collections::HashMap<String, crate::db::types::SchemaSummary> = if details {
+        c.schema_summaries()
+            .await
+            .map(|list| list.into_iter().map(|s| (s.name.clone(), s)).collect())
+            .unwrap_or_default()
+    } else {
+        std::collections::HashMap::new()
+    };
     let schemas: Vec<SchemaItem> = entries
         .items
         .into_iter()
@@ -558,6 +569,7 @@ pub async fn schemas(
             profile_arg(profile).trim_start_matches('&')
         ),
         schemas,
+        details,
         note: if truncated {
             "Only schemas with USAGE are listed; the bounded list is incomplete.".into()
         } else if !auth.0.is_open() && schemas_empty {
@@ -591,11 +603,16 @@ pub async fn relations(
     };
     let adapter = catalog(&state, profile)?;
     let entries = adapter.list_relations(&schema).await.map_err(err)?;
-    let sizes: std::collections::HashMap<String, crate::db::types::RelationSize> = adapter
-        .relation_sizes(&schema)
-        .await
-        .map(|list| list.into_iter().map(|s| (s.name.clone(), s)).collect())
-        .unwrap_or_default();
+    let details = query.details.unwrap_or(false);
+    let sizes: std::collections::HashMap<String, crate::db::types::RelationSize> = if details {
+        adapter
+            .relation_sizes(&schema)
+            .await
+            .map(|list| list.into_iter().map(|s| (s.name.clone(), s)).collect())
+            .unwrap_or_default()
+    } else {
+        std::collections::HashMap::new()
+    };
     let mut matches = entries
         .items
         .into_iter()
@@ -679,6 +696,7 @@ pub async fn relations(
         } else {
             String::new()
         },
+        details,
         note: if truncated {
             "Only SELECT-visible relations are listed; the bounded list (and any search over it) is incomplete.".into()
         } else if needle.is_some() {

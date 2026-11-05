@@ -24,5 +24,5 @@
   {% endif %}
   {% if truncated && next_href.is_empty() %}<div class="note" role="status">{{ note }}</div>{% endif %}
 {% endif %}
-{% if !next_href.is_empty() %}<button class="ci rel-more" type="button" data-load-relations hx-get="{{ next_href }}" hx-target="closest .sub" hx-swap="beforeend"><span><b>Load more tables…</b></span></button>{% endif %}
-<div class="objs" data-objs="{{ objects_href }}"></div>
+{% if !next_href.is_empty() %}<button class="ci rel-more" type="button" data-load-relations data-href="{{ next_href }}" data-schema="{{ schema }}"><span><b>Load more tables…</b></span></button>{% endif %}
+<div class="objs" data-objs="{{ objects_href }}" data-details="{{ details }}"></div>
