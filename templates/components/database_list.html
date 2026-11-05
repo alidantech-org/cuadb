@@ -2,6 +2,7 @@
 <div class="note" role="status">No other databases are visible to this connection.</div>
 {% else %}
 {% for db in databases %}
-<button class="ci" type="button" role="option" data-use-db="{{ db.name }}" data-base="{{ base }}" aria-selected="{% if db.current %}true{% else %}false{% endif %}"><span><b>{{ db.name }}</b></span>{% if db.current %}<span class="chk">✓</span>{% endif %}</button>
+<div class="db-row"><button class="ci db-option" type="button" role="radio" data-use-db="{{ db.name }}" data-base="{{ base }}" aria-checked="{% if db.current %}true{% else %}false{% endif %}"><span class="db-radio" aria-hidden="true"></span><b class="db-name" title="{{ db.name }}">{{ db.name }}</b>{% if !db.size.is_empty() %}<small class="db-size">{{ db.size }}</small>{% endif %}</button>{% if can_manage %}<button class="db-drop" type="button" aria-label="Actions for database {{ db.name }}" title="Database actions" data-db-more data-scope="database" data-database="{{ db.name }}" data-profile="{{ base }}" data-tab="{% if db.current %}create-schema{% else %}drop-database{% endif %}">⋯</button>{% endif %}</div>
 {% endfor %}
 {% endif %}
+{% if can_manage %}<div class="db-lifecycle"><button class="btn" type="button" data-create-database data-profile="{{ base }}">＋ Create database</button> <button class="btn" type="button" data-new-schema data-profile="{{ base }}">＋ New schema</button></div>{% endif %}

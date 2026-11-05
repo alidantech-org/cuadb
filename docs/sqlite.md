@@ -1,6 +1,6 @@
 # SQLite support
 
-Set `CUADB_SQLITE_ROOT` to the directory containing files available for read-only browsing (default `/data` in Docker; point it to an existing local directory during native development) and configure `CUADB_DATABASE_URL=sqlite:////data/example.db`.
+Set `CUADB_SQLITE_ROOT` to the directory containing files available for browsing (default `./data/sqlite` locally and `/data/sqlite` in Docker) and configure `CUADB_DATABASE_URL=sqlite:////data/sqlite/example.db`.
 
 ## Path rules
 

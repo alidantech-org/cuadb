@@ -1,0 +1,18 @@
+# CuaDB sharing the host's network (Linux, or Docker Desktop with host networking enabled).
+# "localhost" inside CuaDB is then your computer: databases on localhost, on the router
+# network and on any VPN the host is connected to are all reachable with no mapping.
+#   docker compose -f docker-compose.host.yml up -d
+services:
+  cuadb:
+    image: ghcr.io/alidantech-org/cuadb:latest
+    container_name: cuadb
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      CUADB_HOST: 127.0.0.1 # only this computer can open the UI
+      CUADB_PORT: "4848"
+      CUADB_LOCAL_MODE: "true"
+    volumes:
+      - cuadb-data:/data
+volumes:
+  cuadb-data:

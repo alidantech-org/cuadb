@@ -20,7 +20,60 @@ use crate::{
 };
 
 fn bad(message: &str) -> Result<Response, AppError> {
-    notice_status(StatusCode::BAD_REQUEST, "refused", message)
+    problem(StatusCode::BAD_REQUEST, "Check the details", message, "")
+}
+
+/// Running inside a container (Docker, Podman or Kubernetes)?
+fn in_docker() -> bool {
+    std::path::Path::new("/.dockerenv").exists()
+        || std::path::Path::new("/run/.containerenv").exists()
+        || std::env::var_os("KUBERNETES_SERVICE_HOST").is_some()
+}
+
+/// A structured, copyable error: what failed, why, and what to try.
+fn problem(
+    status: StatusCode,
+    title: &str,
+    detail: &str,
+    hint: &str,
+) -> Result<Response, AppError> {
+    let esc = |text: &str| {
+        text.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+    };
+    let html = format!(
+        "<section class=\"notice error alert\" role=\"alert\" data-kind=\"refused\"><b>{}</b>{}{}</section>",
+        esc(title),
+        if detail.is_empty() {
+            String::new()
+        } else {
+            format!("<p>{}</p>", esc(detail))
+        },
+        if hint.is_empty() {
+            String::new()
+        } else {
+            format!("<small>{}</small>", esc(hint))
+        }
+    );
+    let mut response = (status, axum::response::Html(html)).into_response();
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store"),
+    );
+    Ok(response)
+}
+
+/// The URL with its password replaced by `****` (for showing a saved connection).
+fn mask_url(raw: &str) -> String {
+    match url::Url::parse(raw) {
+        Ok(mut parsed) if parsed.password().is_some_and(|p| !p.is_empty()) => {
+            let _ = parsed.set_password(Some("****"));
+            parsed.into()
+        }
+        _ => raw.to_string(),
+    }
 }
 
 async fn require_connection_manager(
@@ -28,7 +81,7 @@ async fn require_connection_manager(
     auth: &Auth,
     route: &str,
 ) -> Result<(), AppError> {
-    if auth.0.is_admin() || (auth.0.is_open() && state.local_connection_management()) {
+    if auth.0.is_admin() || auth.0.is_public_connection_manager() {
         Ok(())
     } else {
         auth.require_admin(state, route).await
@@ -51,13 +104,13 @@ struct Row {
     engine: &'static str,
     managed: bool,
     is_default: bool,
+    database: String,
 }
 
 #[derive(Template)]
 #[template(path = "admin/connections.html")]
 struct ListTemplate {
     rows: Vec<Row>,
-    key_set: bool,
     can_manage: bool,
 }
 
@@ -73,11 +126,11 @@ pub async fn list(State(state): State<AppState>, auth: Auth) -> Result<Response,
             engine: p.engine,
             managed: p.managed,
             is_default: p.is_default,
+            database: p.database,
         })
         .collect();
     render(ListTemplate {
         rows,
-        key_set: state.vault().is_some(),
         can_manage: state.can_manage(),
     })
 }
@@ -86,6 +139,8 @@ pub async fn list(State(state): State<AppState>, auth: Auth) -> Result<Response,
 #[template(path = "admin/connection_form.html")]
 struct FormTemplate {
     editing: bool,
+    masked_url: String,
+    has_password: bool,
     id: String,
     label: String,
     fields: Fields,
@@ -108,21 +163,26 @@ pub async fn form(
     let Some(id) = query.id.filter(|id| !id.is_empty()) else {
         return render(FormTemplate {
             editing: false,
+            masked_url: String::new(),
+            has_password: false,
             id: String::new(),
             label: String::new(),
             fields: Fields {
                 engine: "postgresql".into(),
                 port: "5432".into(),
-                tls: "verify-full".into(),
+                tls: "auto".into(),
                 ..Fields::default()
             },
-            writable: false,
+            writable: state.local_mode(),
         });
     };
     let (row, url) = stored(&state, &id).await?;
     let root = state.sqlite_root().unwrap_or_default();
     render(FormTemplate {
         editing: true,
+        masked_url: mask_url(&url),
+        has_password: url::Url::parse(&url)
+            .is_ok_and(|u| u.password().is_some_and(|p| !p.is_empty())),
         id: row.id,
         label: row.label,
         fields: connections::read_fields(&url, &root),
@@ -154,6 +214,10 @@ pub struct ConnForm {
     #[serde(default)]
     file: String,
     #[serde(default)]
+    url: String,
+    #[serde(default)]
+    save_after_test: String,
+    #[serde(default)]
     writable: String,
     #[serde(default)]
     csrf: String,
@@ -161,6 +225,10 @@ pub struct ConnForm {
 
 impl ConnForm {
     fn fields(&self, saved_password: Option<String>) -> Fields {
+        let credentials_supplied = !self.host.is_empty()
+            || !self.user.is_empty()
+            || !self.database.is_empty()
+            || !self.password.is_empty();
         Fields {
             engine: self.engine.clone(),
             host: self.host.clone(),
@@ -173,9 +241,43 @@ impl ConnForm {
             },
             database: self.database.clone(),
             tls: self.tls.clone(),
-            file: self.file.clone(),
+            file: if self.engine == "postgresql" && !credentials_supplied {
+                self.url.clone()
+            } else {
+                self.file.clone()
+            },
         }
     }
+}
+
+fn submitted_url(
+    form: &ConnForm,
+    root: &std::path::Path,
+    saved_password: Option<String>,
+) -> Result<String, &'static str> {
+    if !form.url.trim().is_empty() {
+        if form.engine != "postgresql" {
+            return Err("Pasted URLs are currently supported for PostgreSQL");
+        }
+        if form.host.is_empty() && form.user.is_empty() && form.database.is_empty() {
+            let mut parsed =
+                url::Url::parse(form.url.trim()).map_err(|_| "Enter a valid PostgreSQL URL")?;
+            if let Some(password) = saved_password.filter(|_| {
+                parsed
+                    .password()
+                    .is_none_or(|p| p.is_empty() || p == "****")
+            }) {
+                parsed
+                    .set_password(Some(&password))
+                    .map_err(|_| "The saved password could not be reused")?;
+            }
+            crate::db::postgres::url::parse(parsed.as_str())
+                .map_err(|_| "The PostgreSQL URL is invalid or uses unsupported options")?;
+            return Ok(parsed.into());
+        }
+        return Err("Use the pasted URL or the credential fields, not both");
+    }
+    connections::build_url(&form.fields(saved_password), root)
 }
 
 /// The stored row and its decrypted URL; the URL never leaves this module's callers.
@@ -200,7 +302,13 @@ async fn stored(
     Ok((row, url))
 }
 
-async fn record(state: &AppState, auth: &Auth, id: &str, detail: &str, outcome: &'static str) {
+pub(super) async fn record(
+    state: &AppState,
+    auth: &Auth,
+    id: &str,
+    detail: &str,
+    outcome: &'static str,
+) {
     if let Some(service) = state.auth() {
         service
             .record(
@@ -218,7 +326,7 @@ fn manage_message(error: ManageError) -> &'static str {
         ManageError::Exists => "A connection with this name already exists",
         ManageError::TooMany => "The connection limit has been reached",
         ManageError::Invalid => {
-            "The server rejected these connection details; check the address, TLS mode and file"
+            "These connection details are not valid: check the address, port, TLS mode or file name"
         }
         ManageError::Unknown => {
             "That connection is defined in the server configuration or no longer exists"
@@ -230,11 +338,6 @@ fn manage_message(error: ManageError) -> &'static str {
 fn prerequisites(state: &AppState) -> Option<&'static str> {
     if !state.can_manage() {
         return Some("This server cannot manage connections");
-    }
-    if state.vault().is_none() {
-        return Some(
-            "Set CUADB_SECRET_KEY on the server (openssl rand -hex 32) before saving connections",
-        );
     }
     None
 }
@@ -266,7 +369,7 @@ pub async fn create(
         return bad(message);
     }
     let root = state.sqlite_root().unwrap_or_default();
-    let url = match connections::build_url(&form.fields(None), &root) {
+    let url = match submitted_url(&form, &root, None) {
         Ok(url) => url,
         Err(message) => return bad(message),
     };
@@ -301,7 +404,14 @@ pub async fn create(
         return Err(AppError::new(ErrorKind::Internal));
     }
     record(&state, &auth, &id, "created", audit::OK).await;
-    notice("ok", "Connection saved. Grant access under Permissions.")
+    let mut response = notice("ok", "Connection saved and selected.")?;
+    // Tells the page to refresh the lists and switch to the new connection (ids are slugs).
+    if let Ok(value) = axum::http::HeaderValue::from_str(&format!(
+        r#"{{"cuadb:changed":{{}},"cuadb:connection-added":{{"id":"{id}"}}}}"#
+    )) {
+        response.headers_mut().insert("hx-trigger", value);
+    }
+    Ok(response)
 }
 
 /// POST /admin/connections/update
@@ -323,11 +433,10 @@ pub async fn update(
     }
     let (_, old_url) = stored(&state, &form.id).await?;
     let root = state.sqlite_root().unwrap_or_default();
-    let url =
-        match connections::build_url(&form.fields(connections::saved_password(&old_url)), &root) {
-            Ok(url) => url,
-            Err(message) => return bad(message),
-        };
+    let url = match submitted_url(&form, &root, connections::saved_password(&old_url)) {
+        Ok(url) => url,
+        Err(message) => return bad(message),
+    };
     let writable = form.writable == "on";
     let input = ManagedInput {
         id: form.id.clone(),
@@ -422,12 +531,18 @@ pub async fn test(
         None
     };
     let root = state.sqlite_root().unwrap_or_default();
-    let url = match connections::build_url(&form.fields(saved), &root) {
+    let url = match submitted_url(&form, &root, saved) {
         Ok(url) => url,
         Err(message) => return bad(message),
     };
     match state.test_url(&url).await {
         Ok((snapshot, millis)) if snapshot.is_ready() => {
+            if form.save_after_test == "on" {
+                if form.id.is_empty() {
+                    return create(State(state), auth, axum::Form(form)).await;
+                }
+                return update(State(state), auth, axum::Form(form)).await;
+            }
             record(&state, &auth, &form.id, "test ok", audit::OK).await;
             notice(
                 "info",
@@ -436,12 +551,190 @@ pub async fn test(
         }
         Ok((snapshot, _)) => {
             record(&state, &auth, &form.id, "test failed", audit::FAILED).await;
-            notice_status(
-                StatusCode::BAD_GATEWAY,
-                "refused",
-                &format!("Could not connect: {}.", snapshot.label().to_lowercase()),
-            )
+            let (title, detail, hint) = match (snapshot.status, snapshot.error_code) {
+                (crate::db::types::ConnectionStatus::AuthenticationFailed, _) => (
+                    "Sign-in was refused",
+                    "The server rejected the user name or password.",
+                    "Check the user and password. In a URL, special characters in the password must be percent-encoded (for example @ becomes %40).",
+                ),
+                (crate::db::types::ConnectionStatus::PermissionDenied, _) => (
+                    "This user may not read the database",
+                    "The login worked, but the role cannot inspect the catalog.",
+                    "Grant CONNECT on the database and USAGE on its schemas, or use a role that can.",
+                ),
+                (_, Some("database_timeout")) => (
+                    "No answer in time",
+                    "The host did not respond before the connection timeout.",
+                    "The address or port may be wrong, a firewall may be dropping the traffic, or the database may be down or overloaded.",
+                ),
+                _ => (
+                    "Could not connect",
+                    "The server could not be reached, or it refused the login or the database name.",
+                    "Check that the database is running and the host, port, user, password and database name are right. For TLS, Automatic works for localhost; use Off for a local server without TLS.",
+                ),
+            };
+            let hint = if in_docker() {
+                format!(
+                    "{hint} CuaDB is running in a container, where \"localhost\" is the container itself: use host.docker.internal for a database on this computer (add --add-host=host.docker.internal:host-gateway on Linux), a LAN address for another machine, or start the container with --network host."
+                )
+            } else {
+                hint.to_string()
+            };
+            problem(StatusCode::BAD_GATEWAY, title, detail, &hint)
         }
         Err(error) => bad(manage_message(error)),
     }
+}
+
+/// POST /connection/reconnect — refresh the selected connection's catalog after closing idle pools.
+pub async fn reconnect(
+    State(state): State<AppState>,
+    auth: Auth,
+    axum::Form(form): axum::Form<IdForm>,
+) -> Result<Response, AppError> {
+    let _ = &form.csrf;
+    let profile = crate::state::checked_profile(Some(form.id.clone()))?;
+    let id = profile
+        .as_deref()
+        .ok_or(AppError::new(ErrorKind::InvalidInput))?;
+    auth.authorize(
+        &state,
+        crate::auth::Action::View,
+        &crate::auth::Resource::profile(id),
+    )
+    .await?;
+    state
+        .reconnect(id)
+        .await
+        .map_err(|_| AppError::new(ErrorKind::InvalidInput))?;
+    notice("ok", "Connection refreshed.")
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DisconnectForm {
+    profile: String,
+}
+
+pub async fn disconnect(
+    State(state): State<AppState>,
+    auth: Auth,
+    axum::Form(form): axum::Form<DisconnectForm>,
+) -> Result<Response, AppError> {
+    let profile = crate::state::checked_profile(Some(form.profile))?;
+    let id = profile
+        .as_deref()
+        .ok_or(AppError::new(ErrorKind::InvalidInput))?;
+    auth.authorize(
+        &state,
+        crate::auth::Action::View,
+        &crate::auth::Resource::profile(id),
+    )
+    .await?;
+    state
+        .disconnect_profile(id)
+        .await
+        .map_err(|_| AppError::new(ErrorKind::InvalidInput))?;
+    Ok(Html("").into_response())
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LifecycleForm {
+    profile: String,
+    operation: String,
+    #[serde(default)]
+    database: String,
+    #[serde(default)]
+    schema: String,
+    #[serde(default)]
+    relation: String,
+    #[serde(default)]
+    confirm: String,
+}
+
+/// POST /connection/lifecycle — permission-scoped PostgreSQL database/object DDL.
+pub async fn lifecycle(
+    State(state): State<AppState>,
+    auth: Auth,
+    axum::Form(form): axum::Form<LifecycleForm>,
+) -> Result<Response, AppError> {
+    let requested = crate::state::checked_profile(Some(form.profile))?;
+    let profile_id = requested
+        .as_deref()
+        .ok_or(AppError::new(ErrorKind::InvalidInput))?;
+    let base = state.effective_profile(Some(profile_id));
+    auth.authorize(
+        &state,
+        crate::auth::Action::Sql,
+        &crate::auth::Resource::profile(&base),
+    )
+    .await?;
+    let (operation, expected, description) = match form.operation.as_str() {
+        "create-database" => (
+            crate::state::DatabaseOperation::CreateDatabase(&form.database),
+            format!("CREATE {}", form.database),
+            format!("Create database {}", form.database),
+        ),
+        "drop-database" => (
+            crate::state::DatabaseOperation::DropDatabase(&form.database),
+            form.database.clone(),
+            format!("Drop database {}", form.database),
+        ),
+        "drop-schema" => (
+            crate::state::DatabaseOperation::DropSchema(&form.schema),
+            form.schema.clone(),
+            format!("Drop schema {} and its objects", form.schema),
+        ),
+        "drop-table" => (
+            crate::state::DatabaseOperation::DropTable(&form.schema, &form.relation),
+            format!("{}.{}", form.schema, form.relation),
+            format!("Drop table {}.{}", form.schema, form.relation),
+        ),
+        _ => return Err(AppError::new(ErrorKind::InvalidInput)),
+    };
+    if form.confirm != expected {
+        return notice_status(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "refused",
+            &format!("Confirmation text did not match. Expected: {expected}"),
+        );
+    }
+    state
+        .database_lifecycle(profile_id, operation)
+        .await
+        .map_err(|_| AppError::new(ErrorKind::InvalidInput))?;
+    record(&state, &auth, profile_id, &description, audit::OK).await;
+    notice("ok", &format!("{description} completed."))
+}
+
+#[derive(serde::Deserialize)]
+pub struct RevealQuery {
+    id: String,
+}
+
+/// GET /admin/connections/reveal?id= — the saved password and URL, only for an
+/// administrator or the trusted local instance, and only when asked for.
+pub async fn reveal(
+    State(state): State<AppState>,
+    auth: Auth,
+    Query(query): Query<RevealQuery>,
+) -> Result<Response, AppError> {
+    require_connection_manager(&state, &auth, "/admin/connections/reveal").await?;
+    if !(state.local_mode() || auth.0.is_admin()) {
+        return Err(AppError::new(ErrorKind::Forbidden));
+    }
+    let (row, url) = stored(&state, &query.id).await?;
+    record(&state, &auth, &row.id, "password revealed", audit::OK).await;
+    let password = url::Url::parse(&url)
+        .ok()
+        .and_then(|u| u.password().map(str::to_string))
+        .unwrap_or_default();
+    let mut response =
+        axum::Json(serde_json::json!({ "url": url, "password": password })).into_response();
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store"),
+    );
+    Ok(response)
 }

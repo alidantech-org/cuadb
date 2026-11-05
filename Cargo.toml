@@ -2,9 +2,28 @@
 name = "cuadb"
 version = "0.1.0"
 edition = "2024"
-description = "A lightweight, read-only database explorer"
+description = "A local-first database explorer and SQL workspace for PostgreSQL and SQLite, in one binary with a browser UI"
 license = "MIT"
-publish = false
+readme = "README.md"
+repository = "https://github.com/alidantech-org/cuadb"
+homepage = "https://github.com/alidantech-org/cuadb"
+documentation = "https://github.com/alidantech-org/cuadb/tree/main/docs"
+keywords = ["database", "postgresql", "sqlite", "sql", "explorer"]
+categories = ["command-line-utilities", "database", "web-programming::http-server"]
+rust-version = "1.88"
+build = "build.rs"
+include = [
+    "/src/**",
+    "/templates/**",
+    "/public/**",
+    "/build.rs",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+    "/docs/**",
+]
 
 [dependencies]
 askama = "0.16.1"

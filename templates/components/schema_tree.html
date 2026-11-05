@@ -5,9 +5,10 @@
     <a class="row ov-row" href="{{ overview_href }}" hx-get="{{ overview_href }}" hx-target="#mainbody" hx-swap="innerHTML" hx-sync="#mainbody:replace"><i class="ic-slot" data-ic="overview" aria-hidden="true"></i><span class="n">Overview</span></a>
     {% for schema in schemas %}
     <div class="sch" role="treeitem" aria-expanded="false" data-schema-name="{{ schema.name }}" data-tables="{{ schema.tables }}" data-bytes="{{ schema.bytes }}">
-      <button class="sh fo" type="button" data-s data-relations="{{ schema.href }}" hx-sync="this:replace" aria-label="Schema {{ schema.name }}"><i class="ic-slot" data-ic="folder" aria-hidden="true"></i><span class="n">{{ schema.name }}</span><span class="c sch-sum"{% if schema.summary.is_empty() %} hidden{% endif %}>{{ schema.summary }}</span></button>
+      <div class="sch-head"><button class="sh fo" type="button" data-s data-relations="{{ schema.href }}" hx-sync="this:replace" aria-label="Schema {{ schema.name }}"><span class="ch" aria-hidden="true"></span><i class="ic-slot" data-ic="folder" aria-hidden="true"></i><span class="n">{{ schema.name }}</span><span class="c sch-sum"{% if schema.summary.is_empty() %} hidden{% endif %}>{{ schema.summary }}</span></button>{% if can_manage %}<button class="tree-more" type="button" data-obj-menu data-scope="schema" data-schema="{{ schema.name }}" data-profile="{{ profile }}" aria-haspopup="menu" aria-label="Actions for schema {{ schema.name }}" title="Schema actions">⋯</button>{% endif %}</div>
       <div class="sub" role="group"></div>
     </div>
     {% endfor %}
+    {% if new_schema %}<button class="tree-add" type="button" data-new-schema data-profile="{{ profile }}">＋ New schema</button>{% endif %}
   {% endif %}
 </div>

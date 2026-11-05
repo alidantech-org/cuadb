@@ -1,4 +1,4 @@
-//! Saved connections: encrypted at rest, admin-only, never shown back, restored on restart.
+//! Saved connections: encrypted at rest, public shared management, never shown back, restored on restart.
 
 use std::{fs, path::PathBuf};
 
@@ -48,21 +48,23 @@ async fn world(name: &str, with_key: bool) -> World {
     fs::create_dir_all(&dir).unwrap();
     sqlite_file(&dir, "base.db").await;
     sqlite_file(&dir, "extra.db").await;
-    let config = Config::from_values(&[
-        (
-            "CUADB_DATABASE_URL",
-            format!(
-                "sqlite:///{}",
-                dir.join("base.db")
-                    .display()
-                    .to_string()
-                    .trim_start_matches('/')
-            )
-            .as_str(),
-        ),
+    let base_url = format!(
+        "sqlite:///{}",
+        dir.join("base.db")
+            .display()
+            .to_string()
+            .trim_start_matches('/')
+    );
+    let data_dir = dir.join("app-state");
+    let mut values = vec![
+        ("CUADB_DATABASE_URL", base_url.as_str()),
         ("CUADB_SQLITE_ROOT", dir.to_str().unwrap()),
-    ])
-    .unwrap();
+        ("CUADB_DATA_DIR", data_dir.to_str().unwrap()),
+    ];
+    if with_key {
+        values.push(("CUADB_SECRET_KEY", KEY));
+    }
+    let config = Config::from_values(&values).unwrap();
     let svc = AuthService::new(
         AuthStore::open_memory().await.unwrap(),
         SessionPolicy {
@@ -76,12 +78,10 @@ async fn world(name: &str, with_key: bool) -> World {
     .unwrap();
     bootstrap_admin(&svc.store, "admin", PW).await.unwrap();
     svc.refresh_enforced().await.unwrap();
-    let mut state = AppState::from_config(&config)
+    let state = AppState::from_config(&config)
+        .await
         .unwrap()
         .with_auth(svc.clone());
-    if with_key {
-        state = state.with_vault(SecretBox::new(&SecretKey::parse_hex(KEY).unwrap()));
-    }
     let router = router_with_state(&config.limits, state);
     let login = svc.login("admin", PW).await.unwrap();
     World {
@@ -239,19 +239,19 @@ async fn an_admin_saves_tests_edits_and_removes_a_connection_without_secrets_lea
 }
 
 #[tokio::test]
-async fn saving_needs_the_key_and_an_administrator() {
+async fn anyone_can_manage_shared_connections_with_a_generated_key() {
     let w = world("nokey", false).await;
-    let (status, refused) = post(
+    assert!(w.dir.join("app-state/connection.key").is_file());
+    let (status, saved) = post(
         &w,
         &w.admin,
         "/admin/connections",
         "label=X&engine=sqlite&file=extra.db",
     )
     .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert!(refused.contains("CUADB_SECRET_KEY") && !refused.contains("extra.db"));
+    assert_eq!(status, StatusCode::OK, "{saved}");
     let (_, list) = get(&w, &w.admin, "/admin/connections").await;
-    assert!(list.contains("openssl rand -hex 32") && !list.contains("+ New connection"));
+    assert!(list.contains("+ New connection") && !list.contains("CUADB_SECRET_KEY"));
 
     let w = world("viewer", true).await;
     let admin = w.svc.login("admin", PW).await.unwrap().principal;
@@ -265,10 +265,7 @@ async fn saving_needs_the_key_and_an_administrator() {
         .await
         .unwrap();
     let vic = (format!("cuadb_session={}", s.token), s.csrf);
-    assert_eq!(
-        get(&w, &vic, "/admin/connections").await.0,
-        StatusCode::FORBIDDEN
-    );
+    assert_eq!(get(&w, &vic, "/admin/connections").await.0, StatusCode::OK);
     assert_eq!(
         post(
             &w,
@@ -278,7 +275,7 @@ async fn saving_needs_the_key_and_an_administrator() {
         )
         .await
         .0,
-        StatusCode::FORBIDDEN
+        StatusCode::OK
     );
     assert_eq!(
         post(
@@ -289,7 +286,7 @@ async fn saving_needs_the_key_and_an_administrator() {
         )
         .await
         .0,
-        StatusCode::FORBIDDEN
+        StatusCode::OK
     );
     let _ = fs::remove_dir_all(&w.dir);
 }
@@ -351,6 +348,7 @@ async fn saved_connections_come_back_after_a_restart_and_need_the_same_key() {
     store.close().await;
     // Restart with the key: it is registered and marked as saved here.
     let state = AppState::from_config(&with_key)
+        .await
         .unwrap()
         .with_auth_from_config(&with_key)
         .await
@@ -359,23 +357,20 @@ async fn saved_connections_come_back_after_a_restart_and_need_the_same_key() {
     assert!(infos.iter().any(|p| p.id == "extra" && p.managed));
     assert!(infos.iter().any(|p| p.id == "default" && !p.managed));
     state.close().await;
-    // Restart without the key, or with another one: it refuses to run, naming no secret.
+    // Restart without the key, or with another one: it still starts, but the connection it
+    // cannot decrypt is left out rather than blocking every other database.
     for key in [
         None,
         Some("fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"),
     ] {
         let config = cfg(key);
-        let error = AppState::from_config(&config)
-            .unwrap()
-            .with_auth_from_config(&config)
-            .await
-            .err()
-            .expect("must refuse");
-        let message = error.to_string();
-        assert!(
-            message.contains("CUADB_SECRET_KEY") && !message.contains("extra.db"),
-            "{message}"
-        );
+        let Ok(state) = AppState::from_config(&config).await else {
+            continue;
+        };
+        if let Ok(state) = state.with_auth_from_config(&config).await {
+            assert!(!state.profiles().iter().any(|p| p.id == "extra"));
+            state.close().await;
+        }
     }
     let _ = fs::remove_dir_all(&dir);
 }

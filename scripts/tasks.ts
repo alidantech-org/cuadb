@@ -17,6 +17,8 @@ const prettierFiles = [
   'assets/css/app.css',
   'assets/js/app.js',
   'assets/js/theme.js',
+  'assets/pwa/sw.js',
+  'assets/pwa/site.webmanifest',
   'scripts/**/*.ts',
   'package.json',
   'tsconfig.json',
@@ -60,6 +62,11 @@ function buildAssets(release = false): void {
   copyFileSync(path('node_modules/htmx.org/dist/htmx.min.js'), path('public/htmx.min.js'));
   copyFileSync(path('assets/js/app.js'), path('public/app.js'));
   copyFileSync(path('assets/js/theme.js'), path('public/theme.js'));
+  copyFileSync(path('assets/pwa/sw.js'), path('public/sw.js'));
+  copyFileSync(path('assets/pwa/site.webmanifest'), path('public/site.webmanifest'));
+  copyFileSync(path('assets/icons/favicon.svg'), path('public/favicon.svg'));
+  copyFileSync(path('assets/icons/icon-192.png'), path('public/icon-192.png'));
+  copyFileSync(path('assets/icons/icon-512.png'), path('public/icon-512.png'));
 }
 
 /**

@@ -69,6 +69,7 @@ async fn world(name: &str, access: &str, enabled: bool) -> World {
         db.display().to_string().trim_start_matches('/')
     );
     let config = Config::from_values(&[
+        ("CUADB_LOCAL_MODE", "false"),
         ("CUADB_DATABASE_URL", url.as_str()),
         ("CUADB_SQLITE_ROOT", dir.to_str().unwrap()),
         (
@@ -95,6 +96,7 @@ async fn world(name: &str, access: &str, enabled: bool) -> World {
     bootstrap_admin(&svc.store, "admin", PW).await.unwrap();
     svc.refresh_enforced().await.unwrap();
     let state = AppState::from_config(&config)
+        .await
         .unwrap()
         .with_auth(svc.clone());
     let router = router_with_state(&config.limits, state.clone());
@@ -236,9 +238,18 @@ async fn permissions_gate_every_endpoint_and_open_mode_can_never_run_sql() {
         )
         .await
         .unwrap();
-        AppState::from_config(&Config::from_values(&[("CUADB_SQL_WORKSPACE", "enabled")]).unwrap())
-            .unwrap()
-            .with_auth(svc)
+        let demo_root =
+            std::env::temp_dir().join(format!("cuadb-open-demo-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&demo_root);
+        let config = Config::from_values(&[
+            ("CUADB_SQL_WORKSPACE", "enabled"),
+            ("CUADB_LOCAL_MODE", "false"),
+            ("CUADB_SQLITE_ROOT", demo_root.to_str().unwrap()),
+        ])
+        .unwrap();
+        let state = AppState::from_config(&config).await.unwrap();
+        let _ = std::fs::remove_dir_all(demo_root);
+        state.with_auth(svc)
     };
     let open = router_with_state(&Config::from_values(&[]).unwrap().limits, open_state);
     let anon = ("".to_string(), "".to_string());
@@ -253,6 +264,7 @@ async fn permissions_gate_every_endpoint_and_open_mode_can_never_run_sql() {
             "{path} -> {status}"
         );
     }
+    drop(open);
     let viewer = user(&w, "vera", Role::Viewer, &[("default", "", "", 15)]).await;
     let editor_no_sql = user(&w, "edd", Role::Editor, &[("default", "", "", 7)]).await;
     let nobody = user(&w, "nob", Role::Editor, &[]).await;
@@ -870,6 +882,7 @@ async fn transactions_are_private_expire_and_end_with_the_session() {
         .state
         .clone()
         .with_sql_settings(cuadb::state::SqlSettings {
+            local: false,
             tx_ttl: Duration::from_millis(1),
             ..w.state.sql_settings()
         });
@@ -1221,6 +1234,7 @@ async fn two_profiles(name: &str) -> (World, PathBuf) {
     )
     .unwrap();
     let config = Config::from_values(&[
+        ("CUADB_LOCAL_MODE", "false"),
         ("CUADB_PROFILES_FILE", file.to_str().unwrap()),
         ("CUADB_SQLITE_ROOT", dir.to_str().unwrap()),
         ("CUADB_SQL_WORKSPACE", "enabled"),
@@ -1241,6 +1255,7 @@ async fn two_profiles(name: &str) -> (World, PathBuf) {
     bootstrap_admin(&svc.store, "admin", PW).await.unwrap();
     svc.refresh_enforced().await.unwrap();
     let state = AppState::from_config(&config)
+        .await
         .unwrap()
         .with_auth(svc.clone());
     let router = router_with_state(&config.limits, state.clone());

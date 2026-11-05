@@ -17,9 +17,11 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn disconnected_server_responds_without_a_database() {
-    let config = Config::from_values(&[]).unwrap();
-    let state = AppState::from_config(&config).unwrap();
-    let response = app::router_with_state(&config.limits, state)
+    let sqlite_root = std::env::temp_dir().join(format!("cuadb-no-config-{}", std::process::id()));
+    let config =
+        Config::from_values(&[("CUADB_SQLITE_ROOT", sqlite_root.to_str().unwrap())]).unwrap();
+    let state = AppState::from_config(&config).await.unwrap();
+    let response = app::router_with_state(&config.limits, state.clone())
         .oneshot(
             Request::builder()
                 .uri("/connection/status")
@@ -32,8 +34,10 @@ async fn disconnected_server_responds_without_a_database() {
     assert_eq!(response.headers().get("cache-control").unwrap(), "no-store");
     let body = to_bytes(response.into_body(), 4096).await.unwrap();
     let html = String::from_utf8(body.to_vec()).unwrap();
-    assert!(html.contains("Not configured"));
+    assert!(html.contains("Connected"));
     assert!(!html.contains("postgresql://"));
+    state.close().await;
+    let _ = std::fs::remove_dir_all(sqlite_root);
 }
 
 #[tokio::test]
@@ -48,7 +52,7 @@ async fn configured_but_unreachable_database_does_not_break_health() {
     ])
     .unwrap();
 
-    let state = AppState::from_config(&config).unwrap();
+    let state = AppState::from_config(&config).await.unwrap();
     let health = app::router_with_state(&config.limits, state.clone())
         .oneshot(
             Request::builder()

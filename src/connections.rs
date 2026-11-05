@@ -91,6 +91,20 @@ fn host_ok(host: &str) -> bool {
 
 /// Assemble the engine URL. `sqlite_root` is only used for SQLite files.
 pub fn build_url(fields: &Fields, sqlite_root: &std::path::Path) -> Result<String, &'static str> {
+    let mut fields = fields.clone();
+    if fields.engine == "postgresql" && !fields.file.is_empty() {
+        if fields.host.is_empty() && fields.user.is_empty() && fields.database.is_empty() {
+            let parsed = validate_pasted_url(&fields.file)?;
+            fields.host = parsed.host;
+            fields.port = parsed.port;
+            fields.user = parsed.user;
+            fields.password = parsed.password;
+            fields.database = parsed.database;
+            fields.tls = parsed.tls;
+        } else {
+            return Err("Choose either a connection URL or enter credentials below");
+        }
+    }
     match Engine::parse(&fields.engine).ok_or("Choose PostgreSQL or SQLite")? {
         Engine::Sqlite => {
             let name = fields.file.trim();
@@ -101,7 +115,9 @@ pub fn build_url(fields: &Fields, sqlite_root: &std::path::Path) -> Result<Strin
             {
                 return Err("The file must be inside the SQLite folder");
             }
-            let full = sqlite_root.join(name);
+            let root =
+                std::path::absolute(sqlite_root).unwrap_or_else(|_| sqlite_root.to_path_buf());
+            let full = root.join(name);
             Ok(format!(
                 "sqlite:///{}",
                 full.display().to_string().trim_start_matches('/')
@@ -135,8 +151,14 @@ pub fn build_url(fields: &Fields, sqlite_root: &std::path::Path) -> Result<Strin
             {
                 return Err("Enter the database name");
             }
+            let loopback = host.eq_ignore_ascii_case("localhost")
+                || host
+                    .trim_matches(['[', ']'])
+                    .parse::<std::net::IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback());
             let tls = match fields.tls.as_str() {
-                "" | "verify-full" => "verify-full",
+                "" | "auto" if loopback => "disable",
+                "" | "auto" | "verify-full" => "verify-full",
                 "require" => "require",
                 "disable" => "disable",
                 _ => return Err("Choose a TLS mode from the list"),
@@ -158,6 +180,41 @@ pub fn build_url(fields: &Fields, sqlite_root: &std::path::Path) -> Result<Strin
             Ok(url.into())
         }
     }
+}
+
+fn validate_pasted_url(raw: &str) -> Result<Fields, &'static str> {
+    if !raw.starts_with("postgres://") && !raw.starts_with("postgresql://") {
+        return Err("Paste a PostgreSQL URL beginning with postgres:// or postgresql://");
+    }
+    let parsed = Url::parse(raw).map_err(|_| "Enter a valid PostgreSQL URL")?;
+    if parsed.host_str().is_none_or(str::is_empty) || parsed.username().is_empty() {
+        return Err("The URL must include a host and user name");
+    }
+    let database = parsed.path().trim_start_matches('/');
+    if database.is_empty() || database.contains('/') {
+        return Err("The URL must include one database name");
+    }
+    let tls = parsed
+        .query_pairs()
+        .find(|(key, _)| key == "sslmode")
+        .map(|(_, value)| value.into_owned())
+        .unwrap_or_else(|| "verify-full".into());
+    if !matches!(
+        tls.as_str(),
+        "disable" | "require" | "verify-ca" | "verify-full"
+    ) {
+        return Err("Choose a supported TLS mode in the PostgreSQL URL");
+    }
+    Ok(Fields {
+        engine: "postgresql".into(),
+        host: parsed.host_str().unwrap_or_default().into(),
+        port: parsed.port().unwrap_or(5432).to_string(),
+        user: parsed.username().into(),
+        password: parsed.password().map(str::to_string),
+        database: database.into(),
+        tls,
+        ..Fields::default()
+    })
 }
 
 /// The non-secret parts of a stored URL, to prefill the edit form. The password is

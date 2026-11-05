@@ -1,25 +1,33 @@
-# Bun builds local CSS/JS assets; it is absent from the final container.
+# syntax=docker/dockerfile:1
+
+# 1. Bun compiles the CSS and JavaScript. It is not part of the final image.
 FROM oven/bun:1 AS assets
 WORKDIR /app
 COPY . .
-RUN bun install --frozen-lockfile
-RUN bun run assets:build
+RUN bun install --frozen-lockfile && bun run assets:build
 
-# Build Rust and compile Askama templates. Existing Cargo.lock is respected.
+# 2. Rust builds one self-contained binary (the web assets are embedded in it).
 FROM rust:1-bookworm AS builder
 WORKDIR /app
 COPY . .
-RUN cargo build --locked --release
+COPY --from=assets /app/public ./public
+RUN cargo build --locked --release && strip target/release/cuadb
 
-# One runtime container, one HTTP port: no Node, Bun, Nginx or database.
+# 3. Minimal runtime: the binary, a data volume, one HTTP port, no shell tools needed.
 FROM debian:bookworm-slim AS runtime
-WORKDIR /app
-COPY --from=builder /app/target/release/cuadb ./cuadb
-COPY --from=assets /app/public/ ./public/
-ENV CUADB_PORT=4848
-ENV CUADB_HOST=0.0.0.0
-ENV CUADB_SQLITE_ROOT=/data
+LABEL org.opencontainers.image.title="CuaDB" \
+      org.opencontainers.image.description="A local-first database explorer and SQL workspace for PostgreSQL and SQLite" \
+      org.opencontainers.image.source="https://github.com/alidantech-org/cuadb" \
+      org.opencontainers.image.licenses="MIT"
+COPY --from=builder /app/target/release/cuadb /usr/local/bin/cuadb
+ENV CUADB_HOST=0.0.0.0 \
+    CUADB_PORT=4848 \
+    CUADB_SQLITE_ROOT=/data/sqlite \
+    CUADB_DATA_DIR=/data/app-state
+RUN mkdir -p /data/sqlite /data/app-state && chown -R 10001:10001 /data
 VOLUME ["/data"]
 EXPOSE 4848
 USER 10001:10001
-CMD ["/app/cuadb"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["/usr/local/bin/cuadb", "healthcheck"]
+ENTRYPOINT ["/usr/local/bin/cuadb"]

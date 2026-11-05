@@ -20,7 +20,6 @@ use axum::{
     routing::{get, post},
 };
 use tokio::{sync::Semaphore, time};
-use tower_http::services::ServeDir;
 
 use crate::{
     config::Limits,
@@ -88,17 +87,30 @@ fn api_routes() -> Router<crate::state::AppState> {
             get(web::connections::list).post(web::connections::create),
         )
         .route("/admin/connections/form", get(web::connections::form))
+        .route("/admin/connections/reveal", get(web::connections::reveal))
         .route("/admin/connections/update", post(web::connections::update))
         .route("/admin/connections/delete", post(web::connections::delete))
         .route("/admin/connections/test", post(web::connections::test))
+        .route("/connection/reconnect", post(web::connections::reconnect))
+        .route("/connection/disconnect", post(web::connections::disconnect))
+        .route("/connection/lifecycle", post(web::connections::lifecycle))
+        .route("/object/actions", get(web::objects::dialog))
+        .route("/object/actions/preview", post(web::objects::preview))
+        .route("/object/actions/run", post(web::objects::run))
         .route("/admin/security", get(web::auth::admin_security))
         .route("/sql", get(web::sql::workspace_page))
+        .route("/sql/hints", get(web::sql::hints))
+        .route("/ai/schema", get(web::sql::ai_schema))
+        .route("/ai/describe", get(web::sql::ai_describe))
+        .route("/ai/search", get(web::sql::ai_search))
+        .route("/ai/relations", get(web::sql::ai_relations))
         .route("/connection/profiles", get(web::connection_profiles))
         .route("/connection/databases", get(web::connection_databases))
         .route("/connection/use", post(web::connection_use))
         .route("/sql/execute", post(web::sql::execute))
         .route("/sql/cancel", post(web::sql::cancel))
         .route("/data/editor", get(web::sql::editor))
+        .route("/data/lookup", get(web::lookup::lookup))
         .route("/data/insert", post(web::sql::insert))
         .route("/data/update", post(web::sql::update))
         .route("/data/delete", post(web::sql::delete))
@@ -121,7 +133,8 @@ fn api_routes() -> Router<crate::state::AppState> {
         .route("/catalog/cell", get(web::rows::cell))
         .route("/catalog/foreign", get(web::rows::foreign_row))
         .route("/catalog/export", get(web::export::export))
-        .nest_service("/static", ServeDir::new("public"))
+        .route("/sw.js", get(crate::assets::service_worker))
+        .route("/static/{name}", get(crate::assets::serve))
         .fallback(get(web::explorer))
 }
 
@@ -132,7 +145,7 @@ pub fn router_with_limits(limits: &Limits) -> Router {
 
 /// Real server router shares one connection state across all request handlers.
 /// The authentication layer is always installed: it either resolves a session or,
-/// while no administrator exists, hands handlers the open read-only principal.
+/// while auth is not enforced, supplies the shared public connection principal.
 pub fn router_with_state(limits: &Limits, state: crate::state::AppState) -> Router {
     let routes = api_routes()
         .with_state(state.clone())
@@ -170,7 +183,7 @@ async fn security_headers(request: Request, next: Next) -> Response {
         headers.insert("referrer-policy", "same-origin".parse().unwrap());
         headers.insert(
             "content-security-policy",
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.openai.com https://api.anthropic.com https://openrouter.ai http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
                 .parse()
                 .unwrap(),
         );

@@ -1,20 +1,192 @@
-//! Start the local-only server with bounded shutdown and no database connection.
+//! The `cuadb` command: start the server (with a small CLI), run admin commands, or
+//! check health for containers. Shutdown is bounded.
 
 use cuadb::{app, config::Config, state::AppState};
 use std::{error::Error, time::Duration};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+const HELP: &str = "\
+CuaDB - a local-first database explorer and SQL workspace (PostgreSQL and SQLite).
+
+USAGE:
+    cuadb [OPTIONS]
+    cuadb admin <bootstrap|reset-password|list-users> [--login NAME] [--password-stdin]
+    cuadb healthcheck
+
+OPTIONS:
+    -p, --port <PORT>            Port to listen on (default 4848)        [CUADB_PORT]
+        --host <IP>              Address to bind (default 127.0.0.1)     [CUADB_HOST]
+        --data-dir <DIR>         Where CuaDB keeps its own state         [CUADB_DATA_DIR]
+        --sqlite-root <DIR>      Folder SQLite files are opened from     [CUADB_SQLITE_ROOT]
+        --database-url <URL>     Add one connection at startup           [CUADB_DATABASE_URL]
+        --profiles-file <FILE>   JSON file of several connections        [CUADB_PROFILES_FILE]
+        --local                  Trusted local mode: full access, no sign-in
+        --no-local               Permissions mode: sign-in and grants
+        --open                   Open the browser when the server is ready
+    -V, --version                Print the version
+    -h, --help                   Print this help
+
+By default the server listens on 127.0.0.1 only, which is treated as trusted local mode.
+Every setting is also available as an environment variable (see docs/configuration.md).
+";
+
+struct Cli {
+    open: bool,
+    healthcheck: bool,
+    admin: bool,
+}
+
+fn set_env(key: &str, value: &str) {
+    // SAFETY: called while parsing arguments, before any thread is started.
+    unsafe { std::env::set_var(key, value) };
+}
+
+/// Where an installed `cuadb` keeps its state when no data directory is given.
+/// `cargo run` (development) keeps using `./data`; containers set the variables themselves.
+fn default_data_dir() -> Option<std::path::PathBuf> {
+    if std::env::var_os("CARGO_MANIFEST_DIR").is_some() {
+        return None;
+    }
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    if cfg!(target_os = "windows") {
+        return std::env::var_os("APPDATA").map(|d| std::path::PathBuf::from(d).join("cuadb"));
+    }
+    if cfg!(target_os = "macos") {
+        return home.map(|h| h.join("Library/Application Support/cuadb"));
+    }
+    std::env::var_os("XDG_DATA_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| home.map(|h| h.join(".local/share")))
+        .map(|d| d.join("cuadb"))
+}
+
+fn parse_cli() -> Result<Cli, Box<dyn Error>> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut cli = Cli {
+        open: false,
+        healthcheck: false,
+        admin: false,
+    };
+    match args.first().map(String::as_str) {
+        Some("admin") => {
+            cli.admin = true;
+            return Ok(cli);
+        }
+        Some("healthcheck") => {
+            cli.healthcheck = true;
+            return Ok(cli);
+        }
+        _ => {}
+    }
+    let mut iter = args.into_iter();
+    while let Some(arg) = iter.next() {
+        let (flag, inline) = match arg.split_once('=') {
+            Some((f, v)) if f.starts_with("--") => (f.to_string(), Some(v.to_string())),
+            _ => (arg.clone(), None),
+        };
+        let mut value = |name: &str| -> Result<String, Box<dyn Error>> {
+            inline
+                .clone()
+                .or_else(|| iter.next())
+                .ok_or_else(|| format!("{name} needs a value").into())
+        };
+        match flag.as_str() {
+            "-h" | "--help" => {
+                print!("{HELP}");
+                std::process::exit(0);
+            }
+            "-V" | "--version" => {
+                println!("cuadb {}", env!("CARGO_PKG_VERSION"));
+                std::process::exit(0);
+            }
+            "-p" | "--port" => set_env("CUADB_PORT", &value("--port")?),
+            "--host" => set_env("CUADB_HOST", &value("--host")?),
+            "--data-dir" => set_env("CUADB_DATA_DIR", &value("--data-dir")?),
+            "--sqlite-root" => set_env("CUADB_SQLITE_ROOT", &value("--sqlite-root")?),
+            "--database-url" => set_env("CUADB_DATABASE_URL", &value("--database-url")?),
+            "--profiles-file" => set_env("CUADB_PROFILES_FILE", &value("--profiles-file")?),
+            "--local" => set_env("CUADB_LOCAL_MODE", "true"),
+            "--no-local" => set_env("CUADB_LOCAL_MODE", "false"),
+            "--open" => cli.open = true,
+            other => {
+                return Err(format!("unknown option `{other}`. Try `cuadb --help`.").into());
+            }
+        }
+    }
+    if std::env::var_os("CUADB_DATA_DIR").is_none()
+        && let Some(dir) = default_data_dir()
+    {
+        set_env("CUADB_DATA_DIR", &dir.to_string_lossy());
+        if std::env::var_os("CUADB_SQLITE_ROOT").is_none() {
+            set_env("CUADB_SQLITE_ROOT", &dir.join("sqlite").to_string_lossy());
+        }
+    }
+    Ok(cli)
+}
+
+/// Exit status for `cuadb healthcheck` (used by the container HEALTHCHECK).
+fn healthcheck() -> i32 {
+    use std::{
+        io::{Read, Write},
+        net::{SocketAddr, TcpStream},
+    };
+    let port: u16 = std::env::var("CUADB_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(4848);
+    let address = SocketAddr::from(([127, 0, 0, 1], port));
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, Duration::from_secs(2)) else {
+        return 1;
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    if stream
+        .write_all(b"GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n")
+        .is_err()
+    {
+        return 1;
+    }
+    let mut reply = String::new();
+    let _ = stream.read_to_string(&mut reply);
+    i32::from(!reply.starts_with("HTTP/1.0 200") && !reply.starts_with("HTTP/1.1 200"))
+}
+
+fn open_browser(url: &str) {
+    let (program, args): (&str, Vec<&str>) = if cfg!(target_os = "macos") {
+        ("open", vec![url])
+    } else if cfg!(target_os = "windows") {
+        ("cmd", vec!["/C", "start", "", url])
+    } else {
+        ("xdg-open", vec![url])
+    };
+    let _ = std::process::Command::new(program)
+        .args(args)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let cli = parse_cli().inspect_err(|error| eprintln!("cuadb: {error}"))?;
+    if cli.healthcheck {
+        std::process::exit(healthcheck());
+    }
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(run(cli))
+}
+
+async fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
     let config = Config::from_env()?;
-    if std::env::args().nth(1).as_deref() == Some("admin") {
+    if cli.admin {
         return admin_command(&config).await;
     }
-    let state = AppState::from_config(&config)?
+    let state = AppState::from_config(&config)
+        .await?
         .with_auth_from_config(&config)
         .await?;
     if state.auth().is_none() {
         eprintln!(
-            "level=warn event=auth_not_configured message=\"no administrator exists: the local read-only explorer is open to anyone who can reach this port; run `cuadb admin bootstrap` before exposing it\""
+            "level=warn event=auth_not_configured message=\"no administrator exists; this CuaDB instance is in shared public mode and anyone who can reach this port can manage saved connections; restrict network access before exposing it\""
         );
     }
     let listener = tokio::net::TcpListener::bind((config.host, config.port)).await?;
@@ -36,6 +208,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "CuaDB shell ready at http://{}:{}",
         config.host, config.port
     );
+    if cli.open {
+        let shown = if config.host.is_unspecified() {
+            "127.0.0.1".to_string()
+        } else {
+            config.host.to_string()
+        };
+        open_browser(&format!("http://{shown}:{}", config.port));
+    }
 
     // Notify Axum to stop accepting new connections, then let in-flight
     // handlers complete. The outer deadline prevents a hung shutdown.

@@ -4,6 +4,8 @@ pub mod auth;
 pub mod catalog;
 pub mod connections;
 pub mod export;
+pub mod lookup;
+pub mod objects;
 pub mod rows;
 pub mod sql;
 
@@ -30,10 +32,12 @@ pub struct Shell {
 
 impl Shell {
     pub fn new(state: &AppState, principal: &crate::auth::Principal) -> Self {
-        let local = principal.is_open();
+        let local = principal.is_open() || state.local_mode();
         Self {
             login: principal.login().to_string(),
-            role: if local {
+            role: if principal.login() == "public" {
+                "public"
+            } else if local {
                 "local"
             } else if principal.is_admin() {
                 "admin"
@@ -43,7 +47,7 @@ impl Shell {
             local,
             admin: principal.is_admin(),
             sql: state.sql_settings().enabled
-                && !local
+                && !principal.is_open()
                 && state.profiles().iter().any(|profile| {
                     principal.allows_wide(crate::auth::Action::Sql, &profile.id, None)
                 }),
@@ -172,10 +176,6 @@ struct ProfileRow {
 #[template(path = "components/profile_list.html")]
 struct ProfileListTemplate {
     profiles: Vec<ProfileRow>,
-    admin: bool,
-    full_admin: bool,
-    local_setup: bool,
-    key_set: bool,
 }
 
 /// Trusted profiles configured on the server: ids, labels, engine family and
@@ -211,7 +211,12 @@ pub async fn connection_profiles(
     }
     let mut profiles = Vec::new();
     for (info, probe) in infos.into_iter().zip(probes) {
-        let snapshot = probe.await.ok().flatten();
+        // A slow or unreachable database must not hold the whole list back.
+        let (snapshot, checking) =
+            match tokio::time::timeout(std::time::Duration::from_millis(1200), probe).await {
+                Ok(joined) => (joined.ok().flatten(), false),
+                Err(_) => (None, true),
+            };
         let selected = match chosen_base {
             Some(id) => id == info.id,
             None => info.is_default,
@@ -235,19 +240,19 @@ pub async fn connection_profiles(
             id: info.id,
             label: info.label,
             engine: info.engine,
-            state: snapshot.map_or("Unavailable", |snapshot| snapshot.label()),
+            state: snapshot.map_or(
+                if checking {
+                    "Checking…"
+                } else {
+                    "Unavailable"
+                },
+                |snapshot| snapshot.label(),
+            ),
             ready: snapshot.is_some_and(|snapshot| snapshot.is_ready()),
             selected,
         });
     }
-    let mut response = html(ProfileListTemplate {
-        profiles,
-        admin: auth.0.is_admin() || (auth.0.is_open() && state.local_connection_management()),
-        full_admin: auth.0.is_admin(),
-        local_setup: auth.0.is_open() && !state.local_connection_management(),
-        key_set: state.vault().is_some(),
-    })?
-    .into_response();
+    let mut response = html(ProfileListTemplate { profiles })?.into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
@@ -257,6 +262,7 @@ pub async fn connection_profiles(
 struct DatabaseRow {
     name: String,
     current: bool,
+    size: String,
 }
 
 #[derive(Template)]
@@ -264,6 +270,7 @@ struct DatabaseRow {
 struct DatabaseListTemplate {
     databases: Vec<DatabaseRow>,
     base: String,
+    can_manage: bool,
 }
 
 fn database_switch_allowed(auth: &auth::Auth, base: &str) -> bool {
@@ -296,18 +303,45 @@ pub async fn connection_databases(
         .databases_of(&base)
         .await
         .map_err(|_| AppError::new(crate::error::ErrorKind::InvalidInput))?;
+    let sizes = state.database_sizes_of(&base).await.unwrap_or_default();
     let databases = names
         .into_iter()
         .map(|name| DatabaseRow {
             current: name == current,
+            size: sizes
+                .iter()
+                .find(|(database, _)| database == &name)
+                .map(|(_, bytes)| database_size_label(*bytes))
+                .unwrap_or_default(),
             name,
         })
         .collect();
-    let mut response = html(DatabaseListTemplate { databases, base })?.into_response();
+    let can_manage = auth.0.allows_wide(crate::auth::Action::Sql, &base, None)
+        && state
+            .profile_engine(Some(&base))
+            .await
+            .is_some_and(|engine| engine == crate::db::types::Engine::PostgreSql);
+    let mut response = html(DatabaseListTemplate {
+        databases,
+        base,
+        can_manage,
+    })?
+    .into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
+}
+
+fn database_size_label(bytes: u64) -> String {
+    const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
+    let mut size = bytes as f64;
+    let mut unit = 0;
+    while size >= 1024.0 && unit < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit += 1;
+    }
+    format!("{size:.1} {}", UNITS[unit])
 }
 
 #[derive(serde::Deserialize)]

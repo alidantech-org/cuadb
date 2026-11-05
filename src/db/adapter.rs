@@ -104,6 +104,10 @@ pub trait DatabaseAdapter: Send + Sync {
     async fn list_databases(&self) -> Result<Vec<String>, DbError> {
         Err(DbError::new(crate::db::types::DbErrorKind::Unsupported))
     }
+    /// Optional database sizes for engines that expose them to the current role.
+    async fn database_sizes(&self) -> Result<Vec<(String, u64)>, DbError> {
+        Ok(Vec::new())
+    }
     /// Estimated rows and size of the tables of a schema (statistics only).
     async fn relation_sizes(
         &self,

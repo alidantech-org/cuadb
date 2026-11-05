@@ -65,14 +65,14 @@ pub struct Config {
     pub data_dir: std::path::PathBuf,
     /// `required`: refuse to run without an administrator; `auto`: enforce once one exists.
     pub auth_mode: AuthMode,
-    /// Allows trusted loopback users to manage saved connections without an admin account.
-    pub local_connection_management: bool,
     pub session_idle_minutes: u64,
     pub session_max_hours: u64,
     /// Add `Secure` to the session cookie (`auto`: only when not bound to loopback).
     pub cookie_secure: Option<bool>,
     /// Opt-in SQL workspace and typed editing (`CUADB_SQL_WORKSPACE=enabled`). Off by default.
     pub sql_workspace: bool,
+    /// Trusted local instance (bound to loopback, or `CUADB_LOCAL_MODE=true`): full access.
+    pub local_mode: bool,
     pub sql_max_rows: usize,
     pub tx_timeout_seconds: u64,
     /// Access of the single `CUADB_DATABASE_URL` profile (`read-write` adds a writer pool).
@@ -240,7 +240,7 @@ impl Config {
 
         let sqlite_root = read("CUADB_SQLITE_ROOT")?
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| "/data".into());
+            .unwrap_or_else(|| "./data/sqlite".into());
 
         let database_url = match read("CUADB_DATABASE_URL")? {
             Some(value) if value.is_empty() || value.len() > 8192 || value.trim() != value => {
@@ -283,22 +283,6 @@ impl Config {
                 ));
             }
         };
-        let local_connection_management = match read("CUADB_LOCAL_CONNECTIONS")?.as_deref() {
-            None | Some("disabled") => false,
-            Some("enabled") => true,
-            Some(_) => {
-                return Err(ConfigError::invalid(
-                    "CUADB_LOCAL_CONNECTIONS",
-                    "must be 'enabled' or 'disabled'",
-                ));
-            }
-        };
-        if local_connection_management && !host.is_loopback() {
-            return Err(ConfigError::invalid(
-                "CUADB_LOCAL_CONNECTIONS",
-                "requires CUADB_HOST to be a loopback address",
-            ));
-        }
         let session_idle_minutes = bounded_number(
             &mut read,
             "CUADB_SESSION_IDLE_MINUTES",
@@ -327,8 +311,20 @@ impl Config {
             }
         };
 
+        let local_mode = match read("CUADB_LOCAL_MODE")?.as_deref() {
+            None | Some("auto") => host.is_loopback(),
+            Some("true") => true,
+            Some("false") => false,
+            Some(_) => {
+                return Err(ConfigError::invalid(
+                    "CUADB_LOCAL_MODE",
+                    "must be 'auto', 'true' or 'false'",
+                ));
+            }
+        };
         let sql_workspace = match read("CUADB_SQL_WORKSPACE")?.as_deref() {
-            None | Some("disabled") => false,
+            None => local_mode,
+            Some("disabled") => false,
             Some("enabled") => true,
             Some(_) => {
                 return Err(ConfigError::invalid(
@@ -390,11 +386,11 @@ impl Config {
             sqlite_root,
             data_dir,
             auth_mode,
-            local_connection_management,
             session_idle_minutes,
             session_max_hours,
             cookie_secure,
             sql_workspace,
+            local_mode,
             sql_max_rows,
             tx_timeout_seconds,
             database_writable,
@@ -435,7 +431,10 @@ mod tests {
         assert_eq!(config.host, IpAddr::from([127, 0, 0, 1]));
         assert_eq!(config.port, 4848);
         assert!(config.database_url().is_none());
-        assert_eq!(config.sqlite_root, std::path::PathBuf::from("/data"));
+        assert_eq!(
+            config.sqlite_root,
+            std::path::PathBuf::from("./data/sqlite")
+        );
         assert_eq!(config.limits.connection_timeout, Duration::from_secs(5));
         assert_eq!(config.limits.query_timeout, Duration::from_secs(15));
         assert_eq!(config.limits.request_timeout, Duration::from_secs(30));
@@ -444,20 +443,11 @@ mod tests {
         assert_eq!(config.limits.max_pool_connections, 4);
         assert_eq!(config.limits.max_in_flight_requests, 64);
         assert_eq!(config.limits.max_request_body_bytes, 65_536);
-        assert!(!config.local_connection_management);
     }
 
     #[test]
-    fn local_connection_management_is_loopback_only_and_opt_in() {
-        let config = Config::from_values(&[("CUADB_LOCAL_CONNECTIONS", "enabled")]).unwrap();
-        assert!(config.local_connection_management);
-        assert!(
-            Config::from_values(&[
-                ("CUADB_HOST", "0.0.0.0"),
-                ("CUADB_LOCAL_CONNECTIONS", "enabled"),
-            ])
-            .is_err()
-        );
+    fn connections_are_not_limited_to_loopback_configuration() {
+        assert!(Config::from_values(&[("CUADB_HOST", "0.0.0.0")]).is_ok());
     }
 
     #[test]

@@ -73,6 +73,9 @@ impl SqliteWorkspace {
 }
 
 fn map(error: sqlx::Error) -> DbError {
+    if let sqlx::Error::Database(db) = &error {
+        crate::sql::exec::note_db_message(db.message());
+    }
     DbError::new(match &error {
         sqlx::Error::PoolTimedOut => DbErrorKind::TimedOut,
         sqlx::Error::Database(db) => match db.code().as_deref() {

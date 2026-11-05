@@ -124,10 +124,10 @@ pub fn parse(raw: &str) -> Result<ValidatedPgUrl, UrlError> {
         return Err(UrlError::Database);
     }
 
-    // Local trust-auth PostgreSQL commonly has no TLS certificate. Remote
-    // targets still require verified TLS unless the operator explicitly opts
-    // into another supported mode.
-    let mut mode = if passwordless {
+    // Local PostgreSQL (trust auth or a Docker container) commonly has no TLS
+    // certificate. Remote targets still require verified TLS unless the operator
+    // explicitly opts into another supported mode.
+    let mut mode = if passwordless || loopback {
         PgSslMode::Disable
     } else {
         PgSslMode::VerifyFull
@@ -302,5 +302,25 @@ mod tests {
         let error = result.unwrap_err();
         assert!(!format!("{error:?}").contains("secret123"));
         assert!(!error.to_string().contains("secret123"));
+    }
+}
+
+#[cfg(test)]
+mod loopback_default_tests {
+    use super::parse;
+    use sqlx::postgres::PgSslMode;
+
+    #[test]
+    fn a_loopback_url_with_a_password_defaults_to_no_tls_but_remote_hosts_verify() {
+        let local = parse("postgresql://postgres:pw@localhost:5432/app").unwrap();
+        assert!(matches!(
+            local.into_options().get_ssl_mode(),
+            PgSslMode::Disable
+        ));
+        let remote = parse("postgresql://postgres:pw@db.example.com:5432/app").unwrap();
+        assert!(matches!(
+            remote.into_options().get_ssl_mode(),
+            PgSslMode::VerifyFull
+        ));
     }
 }

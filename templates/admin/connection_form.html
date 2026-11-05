@@ -1,38 +1,71 @@
-<div class="mc" role="document">
-  <form id="conn-form" hx-post="{% if editing %}/admin/connections/update{% else %}/admin/connections{% endif %}" hx-target="#modal-msg" hx-swap="innerHTML" autocomplete="off" data-engine="{{ fields.engine }}">
-    <h3 id="modal-title">{% if editing %}Edit connection{% else %}New connection{% endif %}</h3>
-    <div class="mb">
+<div class="mc cw" role="document">
+  <form id="conn-form" hx-post="{% if editing %}/admin/connections/update{% else %}/admin/connections/test{% endif %}" hx-target="#modal-msg" hx-swap="innerHTML" autocomplete="off" data-engine="{{ fields.engine }}" data-method="details" data-step="{% if editing %}2{% else %}1{% endif %}" data-editing="{% if editing %}1{% else %}0{% endif %}"{% if editing %} data-id="{{ id }}"{% endif %}>
+    <header class="oa-head">
+      <h3 id="modal-title"><span class="sh-title"><span class="hico sh-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span><span class="sh-text"><b>{% if editing %}Edit connection{% else %}New connection{% endif %}</b>{% if editing %}<small>{{ label }}</small>{% endif %}</span></span></h3>
+      <button class="oa-x" type="button" data-modal-close aria-label="Close">✕</button>
+    </header>
+    <ol class="cw-steps" aria-label="Steps"><li data-step-ind="1">Database</li><li data-step-ind="2">Connection</li></ol>
+
+    <div class="mb cw-pane" data-pane="1">
+      <p class="cw-q">What do you want to connect to?</p>
+      <div class="cw-grid" role="radiogroup" aria-label="Database type">
+        <button type="button" class="cw-card" role="radio" data-pick-engine="postgresql" aria-checked="{% if fields.engine == "postgresql" %}true{% else %}false{% endif %}"><span class="cw-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span><b>PostgreSQL</b><small>A server: local, Docker or hosted</small></button>
+        <button type="button" class="cw-card" role="radio" data-pick-engine="sqlite" aria-checked="{% if fields.engine == "sqlite" %}true{% else %}false{% endif %}"><span class="cw-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg></span><b>SQLite</b><small>A database file on this machine</small></button>
+        <button type="button" class="cw-card" role="radio" disabled aria-checked="false"><span class="cw-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/></svg></span><b>MySQL / MariaDB</b><small>Coming later</small></button>
+      </div>
+      <div class="cw-methods">
+        <p class="cw-q">How do you want to add it?</p>
+        <div class="cw-grid two" role="radiogroup" aria-label="Method">
+          <button type="button" class="cw-card" role="radio" data-pick-method="url" aria-checked="false"><b>Connection URL</b><small>Paste <code>postgresql://user:password@host:5432/db</code></small></button>
+          <button type="button" class="cw-card" role="radio" data-pick-method="details" aria-checked="true"><b>Host, user and password</b><small>Fill in each detail</small></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb cw-pane" data-pane="2">
       {% if editing %}<input type="hidden" name="id" value="{{ id }}">{% endif %}
-      <label class="fl"><span>Name</span><input class="inp" name="label" value="{{ label }}" required maxlength="48" autocomplete="off"></label>
-      <label class="fl"><span>Engine</span>
-        <select class="inp" name="engine" data-engine-select>
-          <option value="postgresql" {% if fields.engine == "postgresql" %}selected{% endif %}>PostgreSQL</option>
-          <option value="sqlite" {% if fields.engine == "sqlite" %}selected{% endif %}>SQLite</option>
-          <option value="" disabled>MySQL / MariaDB (later)</option>
-        </select></label>
+      <input type="hidden" name="engine" value="{{ fields.engine }}">
+      <label class="fl"><span class="flh"><b>Name</b><small>shown in the connection list</small></span><input class="inp" name="label" value="{{ label }}" required maxlength="48" autocomplete="off"></label>
+
       <div class="eng-pg">
-        <div class="adm-row"><label class="fl"><span>Host</span><input class="inp" name="host" value="{{ fields.host }}" maxlength="253" placeholder="db.internal"></label>
-        <label class="fl fl-port"><span>Port</span><input class="inp" name="port" value="{{ fields.port }}" inputmode="numeric" maxlength="5"></label></div>
-        <div class="adm-row"><label class="fl"><span>User</span><input class="inp" name="user" value="{{ fields.user }}" maxlength="64" autocomplete="off"></label>
-        <label class="fl"><span>Password</span><input class="inp" name="password" type="password" maxlength="256" autocomplete="new-password" placeholder="{% if editing %}Leave blank to keep the saved password{% else %}Password{% endif %}"></label></div>
-        <div class="adm-row"><label class="fl"><span>Database</span><input class="inp" name="database" value="{{ fields.database }}" maxlength="63"></label>
-        <label class="fl"><span>TLS</span><select class="inp" name="tls">
-          <option value="verify-full" {% if fields.tls == "verify-full" || fields.tls.is_empty() %}selected{% endif %}>Verify certificate (recommended)</option>
-          <option value="require" {% if fields.tls == "require" %}selected{% endif %}>Encrypt only</option>
-          <option value="disable" {% if fields.tls == "disable" %}selected{% endif %}>Off (local only)</option>
-        </select></label></div>
+        <div class="cw-tabs" role="tablist" aria-label="Method">
+          <button type="button" role="tab" class="oa-tab" data-cw-method="details">Details</button>
+          <button type="button" role="tab" class="oa-tab" data-cw-method="url">Connection URL</button>
+        </div>
+        <div class="m-url">
+          <label class="fl"><span class="flh"><b>URL</b><small>{% if editing && has_password %}password shown as ****{% else %}postgresql://…{% endif %}</small></span>
+            <span class="pw-row"><input class="inp" name="url" value="{{ masked_url }}" maxlength="2048" placeholder="postgresql://user:password@host:5432/database" autocomplete="off" spellcheck="false">{% if editing && has_password %}<button class="btn" type="button" data-reveal="url">Show</button>{% endif %}</span></label>
+          <p class="hint">Sent only to this server and stored encrypted. Keep <code>****</code> to keep the saved password.</p>
+        </div>
+        <div class="m-details">
+          <div class="adm-row"><label class="fl"><span class="flh"><b>Host</b></span><input class="inp" name="host" value="{{ fields.host }}" maxlength="253" placeholder="localhost"></label>
+          <label class="fl fl-port"><span class="flh"><b>Port</b></span><input class="inp" name="port" value="{{ fields.port }}" inputmode="numeric" maxlength="5"></label></div>
+          <div class="adm-row"><label class="fl"><span class="flh"><b>User</b></span><input class="inp" name="user" value="{{ fields.user }}" maxlength="64" autocomplete="off"></label>
+          <label class="fl"><span class="flh"><b>Password</b>{% if editing && has_password %}<small>saved</small>{% endif %}</span><span class="pw-row"><input class="inp" name="password" type="password" maxlength="256" autocomplete="new-password" placeholder="{% if editing && has_password %}•••••••• (leave blank to keep){% else %}Password{% endif %}">{% if editing && has_password %}<button class="btn" type="button" data-reveal="password">Show</button>{% endif %}</span></label></div>
+          <div class="adm-row"><label class="fl"><span class="flh"><b>Database</b></span><input class="inp" name="database" value="{{ fields.database }}" maxlength="63"></label>
+          <label class="fl"><span class="flh"><b>TLS</b></span><select class="inp" name="tls">
+            <option value="auto" {% if fields.tls == "auto" || fields.tls.is_empty() %}selected{% endif %}>Automatic (off for localhost)</option>
+            <option value="verify-full" {% if fields.tls == "verify-full" %}selected{% endif %}>Verify certificate (recommended)</option>
+            <option value="require" {% if fields.tls == "require" %}selected{% endif %}>Encrypt only</option>
+            <option value="disable" {% if fields.tls == "disable" %}selected{% endif %}>Off (local only)</option>
+          </select></label></div>
+        </div>
       </div>
       <div class="eng-sqlite">
-        <label class="fl"><span>File (inside the SQLite folder)</span><input class="inp" name="file" value="{{ fields.file }}" maxlength="255" placeholder="shop.db"></label>
+        <label class="fl"><span class="flh"><b>File</b><small>inside the SQLite folder</small></span><input class="inp" name="file" value="{{ fields.file }}" maxlength="255" placeholder="shop.db"></label>
       </div>
+      {% if !editing %}<input type="hidden" name="save_after_test" value="on">{% endif %}
       <label class="chk-row"><input type="checkbox" name="writable" {% if writable %}checked{% endif %}> Allow changes (SQL workspace and row editing, with the right permissions)</label>
-      <p class="hint">Saved on the server and encrypted. The browser never receives the password.</p>
-      <div id="modal-msg" class="adm-msg" role="status" aria-live="polite"></div>
     </div>
+
+    <div id="modal-msg" class="adm-msg cw-msg" role="status" aria-live="polite"></div>
     <div class="mf">
+      <button class="btn s2only" type="button" data-cw-back>Back</button>
+      <span class="sp"></span>
       <button class="btn" type="button" data-modal-close>Cancel</button>
-      <button class="btn" type="button" hx-post="/admin/connections/test" hx-include="#conn-form" hx-target="#modal-msg" hx-swap="innerHTML">Test connection</button>
-      <button class="btn on" type="submit">{% if editing %}Save changes{% else %}Save connection{% endif %}</button>
+      <button class="btn on s1only" type="button" data-cw-next>Continue</button>
+      <button class="btn s2only" type="button" hx-post="/admin/connections/test" hx-include="#conn-form" hx-vals='{"save_after_test":""}' hx-target="#modal-msg" hx-swap="innerHTML">Test only</button>
+      <button class="btn on s2only" type="submit">{% if editing %}Save changes{% else %}Test and save{% endif %}</button>
     </div>
   </form>
 </div>

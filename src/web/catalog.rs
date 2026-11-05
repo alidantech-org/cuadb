@@ -105,10 +105,13 @@ struct StatisticView {
 #[derive(Template)]
 #[template(path = "components/schema_tree.html")]
 struct SchemaTreeTemplate {
+    new_schema: bool,
     schemas: Vec<SchemaItem>,
     note: String,
     overview_href: String,
     details: bool,
+    can_manage: bool,
+    profile: String,
 }
 #[derive(Clone)]
 struct SchemaItem {
@@ -133,6 +136,8 @@ struct RelationTreeTemplate {
     truncated: bool,
     next_href: String,
     details: bool,
+    can_manage: bool,
+    profile: String,
 }
 struct RelationItem {
     name: String,
@@ -501,6 +506,9 @@ pub async fn schemas(
                 note: "Not configured. Set CUADB_DATABASE_URL or CUADB_PROFILES_FILE on the server to browse the catalog."
                     .into(),
                 details: false,
+                new_schema: false,
+                can_manage: false,
+                profile: pid,
             });
         }
     };
@@ -518,6 +526,9 @@ pub async fn schemas(
                     _ => "The configured database is unavailable.".into(),
                 },
                 details: false,
+                new_schema: false,
+                can_manage: false,
+                profile: pid,
             });
         }
     };
@@ -563,13 +574,25 @@ pub async fn schemas(
         })
         .collect();
     let schemas_empty = schemas.is_empty();
+    let can_manage = auth.0.allows_wide(Action::Sql, &pid, None)
+        && state
+            .workspace_for(profile)
+            .is_some_and(|workspace| workspace.writable());
+    let new_schema = can_manage
+        && state
+            .profile_engine(profile)
+            .await
+            .is_some_and(|engine| engine == crate::db::types::Engine::PostgreSql);
     tree_response(SchemaTreeTemplate {
+        new_schema,
         overview_href: format!(
             "/catalog/overview?{}",
             profile_arg(profile).trim_start_matches('&')
         ),
         schemas,
         details,
+        can_manage,
+        profile: pid.clone(),
         note: if truncated {
             "Only schemas with USAGE are listed; the bounded list is incomplete.".into()
         } else if !auth.0.is_open() && schemas_empty {
@@ -666,6 +689,10 @@ pub async fn relations(
         })
         .collect::<Vec<_>>();
     let view_count = relations.iter().filter(|r| r.is_view).count();
+    let can_manage = auth.0.allows_wide(Action::Sql, &pid, None)
+        && state
+            .workspace_for(profile)
+            .is_some_and(|workspace| workspace.writable());
     tree_response(RelationTreeTemplate {
         grouped: query.group.as_deref() == Some("1"),
         table_count: relations.len() - view_count,
@@ -697,6 +724,8 @@ pub async fn relations(
             String::new()
         },
         details,
+        can_manage,
+        profile: pid,
         note: if truncated {
             "Only SELECT-visible relations are listed; the bounded list (and any search over it) is incomplete.".into()
         } else if needle.is_some() {

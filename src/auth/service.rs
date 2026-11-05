@@ -203,6 +203,7 @@ impl AuthService {
             session_hash: session_hash.to_vec(),
             grants,
             open: false,
+            public_connection_manager: false,
         })))
     }
 

@@ -92,6 +92,43 @@ pub trait WriteTx: Send {
     async fn query(&mut self, sql: &str, max_rows: usize) -> Result<SqlResult, DbError>;
     async fn commit(self: Box<Self>) -> Result<(), DbError>;
     async fn rollback(self: Box<Self>) -> Result<(), DbError>;
+
+    /// Run one statement of a trusted-local script: rows for queries, rows affected for
+    /// everything else. The error is the database's own message.
+    async fn run_step(&mut self, sql: &str, max_rows: usize) -> Result<SqlResult, String> {
+        let started = std::time::Instant::now();
+        let outcome = if crate::sql::script::returns_rows(sql) {
+            self.query(sql, max_rows).await
+        } else {
+            self.execute(sql, &[]).await.map(|affected| SqlResult {
+                columns: vec![],
+                rows: vec![],
+                truncated: false,
+                affected: Some(affected),
+                elapsed_ms: 0,
+            })
+        };
+        outcome
+            .map(|mut result| {
+                result.elapsed_ms = started.elapsed().as_millis() as u64;
+                result
+            })
+            .map_err(|error| take_db_message().unwrap_or_else(|| error.code().to_string()))
+    }
+}
+
+thread_local! {
+    static DB_MESSAGE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Remember the database's own error text for the statement that just failed. The failing
+/// future returns to its caller in the same poll, so the same thread reads it back.
+pub fn note_db_message(message: &str) {
+    DB_MESSAGE.with(|slot| *slot.borrow_mut() = Some(message.to_string()));
+}
+
+pub fn take_db_message() -> Option<String> {
+    DB_MESSAGE.with(|slot| slot.borrow_mut().take())
 }
 
 const MAX_RUNNING: usize = 64;
@@ -271,6 +308,27 @@ impl TxRegistry {
         };
         entry.tx = Some(tx);
         if let Some(change) = change {
+            if entry.pending.len() >= MAX_PENDING_CHANGES {
+                return Err(TxError::TooManyChanges);
+            }
+            entry.pending.push(change);
+        }
+        Ok(())
+    }
+
+    /// Put a checked-out transaction back and stage several changes at once.
+    pub async fn restore_with(
+        &self,
+        id: &str,
+        tx: Box<dyn WriteTx>,
+        changes: Vec<PendingChange>,
+    ) -> Result<(), TxError> {
+        let mut map = self.inner.lock().await;
+        let Some(entry) = map.get_mut(id) else {
+            return Err(TxError::NotFound);
+        };
+        entry.tx = Some(tx);
+        for change in changes {
             if entry.pending.len() >= MAX_PENDING_CHANGES {
                 return Err(TxError::TooManyChanges);
             }

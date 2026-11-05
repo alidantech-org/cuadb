@@ -50,6 +50,7 @@ async fn world(url: &str, access: &str, query_ms: &str) -> World {
     bootstrap_admin(&svc.store, "admin", PW).await.unwrap();
     svc.refresh_enforced().await.unwrap();
     let state = AppState::from_config(&config)
+        .await
         .unwrap()
         .with_auth(svc.clone());
     let router = router_with_state(&config.limits, state);

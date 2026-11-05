@@ -2,6 +2,8 @@
   <header class="bar">
     <h1><i class="ic-slot" data-ic="relation" data-name="{{ relation_name }}" aria-hidden="true"></i><span>{{ schema_name }}.</span>{{ relation_name }}</h1>
     <span class="meta">{{ shown_from }}–{{ shown_to }}{% if approximate_total != "unavailable" %} · ~{{ approximate_total }} rows{% endif %}{% if !size_label.is_empty() %} · {{ size_label }}{% endif %}</span>
+    {% if !stable %}<span class="chip warn" role="status" tabindex="0" title="No suitable unique key. Ordering is best effort; concurrent changes may repeat or skip rows."><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-2.9L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>No unique key · order approximate</span>{% endif %}
+    {% if truncated_columns %}<span class="chip" role="status" tabindex="0" title="Showing the first 24 columns; use Columns to choose others.">First 24 columns</span>{% endif %}
     <span class="sp"></span>
     <form class="row-search" action="/catalog/data" method="get" role="search" hx-get="/catalog/data" hx-target="#catalog-panel" hx-swap="outerHTML" hx-trigger="submit, keyup changed delay:350ms from:input[name=filter]">
       <input type="hidden" name="schema" value="{{ schema_name }}">
@@ -15,6 +17,8 @@
     </form>
     {% if can_edit %}<button class="btn on" type="button" data-row-add>+ Add row</button>{% endif %}
     <button class="btn" type="button" data-pop="colpop" aria-controls="colpop" aria-expanded="false">Columns</button>
+    <button class="btn" type="button" data-ai-table title="Ask the AI assistant about this table">✦ Ask AI</button>
+    <button class="btn ico" type="button" data-pop="fpop" aria-controls="fpop" aria-expanded="false" title="Filters and table tools" aria-label="Filters and table tools"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg></button>
     <button class="btn" type="button" id="dn" data-density aria-label="Toggle compact rows">Compact</button>
     <button class="btn" type="button" data-pop="exppop" aria-controls="exppop" aria-expanded="false">Export ▾</button>
     {% include "components/relation_tabs.html" %}
@@ -26,15 +30,14 @@
       <a class="ci" href="{{ export_zip_2 }}" download><span><b>Download ZIP, 2 hops</b><small>Also the tables those reach; relationships in meta.json</small></span></a>
       <button class="ci" type="button" data-copy-csv><span><b>Copy as CSV</b><small>This page, to clipboard</small></span></button>
     </div>
+    <div class="pop" id="fpop" role="dialog" aria-label="Filters"></div>
     <div class="pop" id="colpop">
       <div class="pq"><button class="btn" type="button" data-columns-all>Show all</button><button class="btn" type="button" data-columns-none>Hide all</button></div>
-      {% for column in available_columns %}<label class="pl"><input type="checkbox" data-column-choice="{{ column.name }}" {% if column.selected %}checked{% endif %}>{{ column.name }}<small>{{ column.native_type }}</small></label>{% endfor %}
+      {% for column in available_columns %}<label class="pl"><input type="checkbox" data-column-choice="{{ column.name }}" {% if column.selected %}checked{% endif %}><span class="pl-name" title="{{ column.name }}">{{ column.name }}</span><small title="{{ column.native_type }}">{{ column.native_type }}</small></label>{% endfor %}
     </div>
   </header>
   {% if geojson_active %}<p class="note" role="status">Spatial values remain in their stored coordinate reference system; no reprojection or map rendering is applied.</p>{% endif %}
   {% if has_spatial %}<p class="note"><a class="fk" href="{{ geojson_url }}" hx-get="{{ geojson_url }}" hx-target="#catalog-panel" hx-swap="outerHTML">{% if geojson_active %}Hide GeoJSON details{% else %}Show GeoJSON details{% endif %}</a></p>{% endif %}
-  {% if stable %}{% else %}<p class="note" role="status">No suitable unique key. Ordering is best effort; concurrent changes may repeat or skip rows.</p>{% endif %}
-  {% if truncated_columns %}<p class="note" role="status">Showing the first 24 columns; use Columns to choose others.</p>{% endif %}
   <div class="wrap">
     <div class="gw">
       <table class="grid">
@@ -50,7 +53,7 @@
           <tr tabindex="0" data-row="{{ row.number }}" data-row-key="{{ row.key_json }}">
             <td class="rn"><span class="rnum">{{ row.number }}</span><input class="rck" type="checkbox" aria-label="Select row {{ row.number }}" tabindex="-1"></td>
             {% for cell in row.values %}
-            <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if !cell.fk_href.is_empty() %}<a class="fk" href="{{ cell.fk_href }}" title="Open the referenced row">{{ cell.text }}</a>{% else if cell.class == "bool-value" %}<span class="pill {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}">{{ cell.text }}</span>{% else if cell.class == "enum-value" %}<span class="pill">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
+            <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if !cell.fk_href.is_empty() %}<a class="fk" href="{{ cell.fk_href }}" title="Open the referenced row">{{ cell.text }}</a>{% else if cell.class == "bool-value" %}<span class="bv {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}" data-raw="{{ cell.text }}">{{ cell.text }}</span>{% else if cell.class == "enum-value" %}<span class="ev">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
             {% endfor %}
           </tr>
           {% endfor %}

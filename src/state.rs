@@ -128,7 +128,7 @@ pub struct AppState {
     default: usize,
     /// How to build connections at runtime; absent in test states.
     ctx: Option<Arc<BuildCtx>>,
-    /// Seals saved connection secrets; absent when no `CUADB_SECRET_KEY` is configured.
+    /// Seals saved connection secrets with the configured or data-directory key.
     vault: Option<crate::secrets::SecretBox>,
     auth: Option<crate::auth::AuthService>,
     sql: SqlSettings,
@@ -141,7 +141,6 @@ struct BuildCtx {
     limits: Limits,
     sqlite_root: std::path::PathBuf,
     sql_enabled: bool,
-    local_connection_management: bool,
 }
 
 /// Most connections that may exist at once (file-defined plus saved).
@@ -149,6 +148,7 @@ pub const MAX_CONNECTIONS: usize = 16;
 
 /// Database switches kept open at once; the oldest is closed beyond this.
 const MAX_DERIVED: usize = 8;
+static DEMO_DATABASE_INIT: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Why a runtime connection change was refused. Never carries a URL or driver text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,6 +160,21 @@ pub enum ManageError {
     TooMany,
     /// The address, path or options were rejected by the engine's URL validator.
     Invalid,
+}
+
+#[derive(Clone, Copy)]
+pub enum DatabaseOperation<'a> {
+    CreateDatabase(&'a str),
+    DropDatabase(&'a str),
+    DropSchema(&'a str),
+    DropTable(&'a str, &'a str),
+}
+
+fn quote_lifecycle_identifier(name: &str) -> Result<String, ManageError> {
+    if name.is_empty() || name.len() > 63 || name.chars().any(char::is_control) {
+        return Err(ManageError::Invalid);
+    }
+    Ok(format!("\"{}\"", name.replace('"', "\"\"")))
 }
 
 /// A saved connection ready to register. The URL is plaintext only inside this call.
@@ -174,6 +189,8 @@ pub struct ManagedInput {
 #[derive(Clone, Copy)]
 pub struct SqlSettings {
     pub enabled: bool,
+    /// Trusted local instance: administrator-level access without sign-in.
+    pub local: bool,
     pub max_rows: usize,
     pub query_timeout: std::time::Duration,
     pub tx_ttl: std::time::Duration,
@@ -183,6 +200,7 @@ impl Default for SqlSettings {
     fn default() -> Self {
         Self {
             enabled: false,
+            local: false,
             max_rows: 500,
             query_timeout: std::time::Duration::from_secs(15),
             tx_ttl: std::time::Duration::from_secs(60),
@@ -217,6 +235,91 @@ fn build_workspace(
     })
 }
 
+fn configured_vault(config: &Config) -> Result<crate::secrets::SecretBox, StateError> {
+    let key = if let Some(key) = &config.secret_key {
+        key.clone()
+    } else {
+        let directory = &config.data_dir;
+        std::fs::create_dir_all(directory).map_err(|_| {
+            StateError::Profiles("the application data directory is unavailable".into())
+        })?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(directory, std::fs::Permissions::from_mode(0o700)).map_err(
+                |_| {
+                    StateError::Profiles(
+                        "the application data directory permissions could not be secured".into(),
+                    )
+                },
+            )?;
+        }
+        let path = directory.join("connection.key");
+        let saved = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let generated = crate::secrets::SecretKey::generate().ok_or_else(|| {
+                    StateError::Profiles(
+                        "a connection encryption key could not be generated".into(),
+                    )
+                })?;
+                let mut options = std::fs::OpenOptions::new();
+                options.write(true).create_new(true);
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::OpenOptionsExt;
+                    options.mode(0o600);
+                }
+                match options.open(&path) {
+                    Ok(mut file) => {
+                        use std::io::Write;
+                        file.write_all(generated.to_hex().as_bytes())
+                            .and_then(|()| file.sync_all())
+                            .map_err(|_| {
+                                StateError::Profiles(
+                                    "the connection encryption key could not be saved".into(),
+                                )
+                            })?;
+                        generated.to_hex()
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                        std::fs::read_to_string(&path).map_err(|_| {
+                            StateError::Profiles(
+                                "the connection encryption key could not be read".into(),
+                            )
+                        })?
+                    }
+                    Err(_) => {
+                        return Err(StateError::Profiles(
+                            "the connection encryption key could not be saved".into(),
+                        ));
+                    }
+                }
+            }
+            Err(_) => {
+                return Err(StateError::Profiles(
+                    "the connection encryption key could not be read".into(),
+                ));
+            }
+        };
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).map_err(
+                |_| {
+                    StateError::Profiles(
+                        "the connection encryption key permissions could not be secured".into(),
+                    )
+                },
+            )?;
+        }
+        crate::secrets::SecretKey::parse_hex(&saved).ok_or_else(|| {
+            StateError::Profiles("the saved connection encryption key is invalid".into())
+        })?
+    };
+    Ok(crate::secrets::SecretBox::new(&key))
+}
+
 fn build_runtime(
     url: &str,
     root: &std::path::Path,
@@ -240,7 +343,8 @@ fn build_runtime(
 }
 
 impl AppState {
-    pub fn from_config(config: &Config) -> Result<Self, StateError> {
+    pub async fn from_config(config: &Config) -> Result<Self, StateError> {
+        let vault = configured_vault(config)?;
         let set = if let Some(path) = config.profiles_file() {
             let text = std::fs::read_to_string(path).map_err(|_| {
                 StateError::Profiles("CUADB_PROFILES_FILE cannot be read as UTF-8 text".into())
@@ -258,18 +362,16 @@ impl AppState {
                 limits: config.limits.clone(),
                 sqlite_root: config.sqlite_root.clone(),
                 sql_enabled: config.sql_workspace,
-                local_connection_management: config.local_connection_management,
             }));
             state.sql = SqlSettings {
                 enabled: config.sql_workspace,
+                local: config.local_mode,
                 max_rows: config.sql_max_rows,
                 query_timeout: config.limits.query_timeout,
                 tx_ttl: std::time::Duration::from_secs(config.tx_timeout_seconds),
             };
-            state.vault = config
-                .secret_key
-                .as_ref()
-                .map(crate::secrets::SecretBox::new);
+            state.vault = Some(vault.clone());
+            state.add_demo_database(config).await?;
             return Ok(state);
         };
         // Divide the pool budget so many profiles cannot multiply open connections.
@@ -297,29 +399,112 @@ impl AppState {
                 workspace,
             });
         }
-        Ok(Self {
+        let mut state = Self {
             entries: Arc::new(RwLock::new(entries)),
             default: set.default,
             ctx: Some(Arc::new(BuildCtx {
                 limits: config.limits.clone(),
                 sqlite_root: config.sqlite_root.clone(),
                 sql_enabled: config.sql_workspace,
-                local_connection_management: config.local_connection_management,
             })),
-            vault: config
-                .secret_key
-                .as_ref()
-                .map(crate::secrets::SecretBox::new),
+            vault: Some(vault),
             auth: None,
             sql: SqlSettings {
                 enabled: config.sql_workspace,
+                local: config.local_mode,
                 max_rows: config.sql_max_rows,
                 query_timeout: config.limits.query_timeout,
                 tx_ttl: std::time::Duration::from_secs(config.tx_timeout_seconds),
             },
             cancels: Default::default(),
             txs: Default::default(),
-        })
+        };
+        state.add_demo_database(config).await?;
+        Ok(state)
+    }
+
+    async fn add_demo_database(&mut self, config: &Config) -> Result<(), StateError> {
+        let _initialization = DEMO_DATABASE_INIT.lock().await;
+        std::fs::create_dir_all(&config.sqlite_root)
+            .map_err(|_| StateError::Profiles("the SQLite data folder is unavailable".into()))?;
+        let root = std::fs::canonicalize(&config.sqlite_root)
+            .map_err(|_| StateError::Profiles("the SQLite data folder is unavailable".into()))?;
+        let path = root.join("cuadb-demo.db");
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .map_err(|_| {
+                StateError::Profiles("the demo SQLite database could not be created".into())
+            })?;
+        let url = format!(
+            "sqlite:///{}",
+            path.display().to_string().trim_start_matches('/')
+        );
+        let runtime = build_runtime(&url, &config.sqlite_root, &config.limits)?;
+        let Runtime::Sqlite(manager) = &runtime else {
+            return Err(StateError::Profiles(
+                "the demo SQLite database could not be opened".into(),
+            ));
+        };
+        let writer = manager.workspace(true);
+        let limits = crate::sql::exec::ExecLimits::default();
+        let initialized = async {
+            use crate::sql::exec::Workspace;
+            let mut tx = writer.begin(&limits).await.map_err(|_| ())?;
+            for statement in [
+                "CREATE TABLE IF NOT EXISTS projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)",
+                "INSERT OR IGNORE INTO projects (id, name, status, created_at) VALUES (1, 'CuaDB sample', 'ready', '2025-01-01')",
+                "CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL REFERENCES projects(id), title TEXT NOT NULL, complete INTEGER NOT NULL)",
+                "INSERT OR IGNORE INTO tasks (id, project_id, title, complete) VALUES (1, 1, 'Explore a table', 0)",
+            ] {
+                tx.execute(statement, &[]).await.map_err(|_| ())?;
+            }
+            tx.commit().await.map_err(|_| ())
+        };
+        initialized.await.map_err(|_| {
+            StateError::Profiles("the demo database could not be initialized".into())
+        })?;
+        let workspace = if config.sql_workspace {
+            let profile = crate::profiles::Profile {
+                id: "demo".into(),
+                label: "Demo database".into(),
+                url: crate::config::SecretUrl::new(url.clone()),
+                writable: false,
+            };
+            build_workspace(&runtime, &profile, &config.limits)?
+        } else {
+            None
+        };
+        let demo = Entry {
+            derived: false,
+            writable: false,
+            url: Some(crate::config::SecretUrl::new(url)),
+            database: "cuadb-demo".into(),
+            managed: true,
+            id: "demo".into(),
+            label: "Demo database".into(),
+            catalog: runtime.catalog(),
+            runtime: Some(runtime),
+            workspace,
+        };
+        let (old, was_empty) = {
+            let mut entries = self.write();
+            if let Some(index) = entries.iter().position(|entry| entry.id == "demo") {
+                (Some(std::mem::replace(&mut entries[index], demo)), false)
+            } else {
+                let was_empty = entries.is_empty();
+                entries.push(demo);
+                (None, was_empty)
+            }
+        };
+        if was_empty {
+            self.default = 0;
+        }
+        if let Some(runtime) = old.and_then(|entry| entry.runtime) {
+            runtime.close().await;
+        }
+        Ok(())
     }
 
     pub fn disconnected() -> Self {
@@ -394,6 +579,10 @@ impl AppState {
     /// Roll back transactions that expired or whose session ended. Run periodically.
     pub async fn sweep_transactions(&self) -> usize {
         let mut alive = std::collections::HashSet::new();
+        if self.local_mode() {
+            // The trusted local instance has one built-in session with no stored hash.
+            alive.insert(Vec::new());
+        }
         if let Some(auth) = self.auth() {
             for hash in self.txs.sessions().await {
                 if auth.session_alive(&hash).await {
@@ -402,6 +591,10 @@ impl AppState {
             }
         }
         self.txs.sweep(|session| alive.contains(session)).await
+    }
+
+    pub fn local_mode(&self) -> bool {
+        self.sql.local
     }
 
     pub fn sql_settings(&self) -> SqlSettings {
@@ -452,20 +645,14 @@ impl AppState {
         self.auth.as_ref()
     }
 
-    /// Open CuaDB's own state store when it exists (or when `CUADB_AUTH=required`).
-    /// A store that exists but cannot be opened fails startup rather than silently
-    /// running without authentication.
+    /// Open or create CuaDB's own store for user state and saved connections.
     pub async fn with_auth_from_config(self, config: &Config) -> Result<Self, StateError> {
         use crate::{
-            auth::{AuthService, AuthStore, service::SessionPolicy, store::DB_FILE},
+            auth::{AuthService, AuthStore, service::SessionPolicy},
             config::AuthMode,
         };
         let required = config.auth_mode == AuthMode::Required;
-        let present = config.data_dir.join(DB_FILE).is_file();
-        if !present && !required && !config.local_connection_management {
-            return Ok(self);
-        }
-        let store = AuthStore::open(&config.data_dir, required)
+        let store = AuthStore::open(&config.data_dir, true)
             .await
             .map_err(|e| StateError::Profiles(format!("authentication store: {e}")))?;
         let secure = config.cookie_secure.unwrap_or(!config.host.is_loopback());
@@ -508,21 +695,55 @@ impl AppState {
             ));
         };
         for row in rows {
-            let url = vault
+            let is_demo = row.id == "demo";
+            let id = row.id.clone();
+            let Some(url) = vault
                 .open(&row.id, &row.url_enc)
                 .and_then(|bytes| String::from_utf8(bytes).ok())
-                .ok_or_else(|| {
-                    StateError::Profiles(
-                        "a saved connection cannot be decrypted; check CUADB_SECRET_KEY".into(),
-                    )
-                })?;
-            self.add_managed(&ManagedInput {
+            else {
+                eprintln!("level=warn event=saved_connection_skipped id={id} reason=undecryptable");
+                continue;
+            };
+            let input = ManagedInput {
                 id: row.id,
                 label: row.label,
                 url,
                 writable: row.writable,
-            })
-            .map_err(|_| StateError::Profiles("a saved connection is no longer valid".into()))?;
+            };
+            let loaded = if is_demo {
+                self.replace_demo_connection(&input).await.is_ok()
+            } else {
+                self.add_managed(&input).is_ok()
+            };
+            if !loaded {
+                eprintln!("level=warn event=saved_connection_skipped id={id} reason=invalid");
+            }
+        }
+        Ok(())
+    }
+
+    async fn replace_demo_connection(&self, input: &ManagedInput) -> Result<(), StateError> {
+        let entry = self.build_entry(input).map_err(|_| {
+            StateError::Profiles("the saved demo connection is no longer valid".into())
+        })?;
+        let old = {
+            let mut entries = self.write();
+            if let Some(slot) = entries.iter_mut().find(|entry| entry.id == "demo") {
+                Some(std::mem::replace(slot, entry))
+            } else {
+                if entries.len() >= MAX_CONNECTIONS {
+                    return Err(StateError::Profiles(
+                        "the saved connection limit has been reached".into(),
+                    ));
+                }
+                entries.push(entry);
+                None
+            }
+        };
+        if let Some(old) = old
+            && let Some(runtime) = old.runtime
+        {
+            runtime.close().await;
         }
         Ok(())
     }
@@ -631,6 +852,22 @@ impl AppState {
             .collect()
     }
 
+    pub fn public_principal(&self) -> crate::auth::Principal {
+        let profiles = self.profiles();
+        crate::auth::Principal::public_connections(
+            profiles.into_iter().map(|profile| (profile.id, false)),
+        )
+    }
+
+    pub fn public_managed_principal(&self) -> crate::auth::Principal {
+        crate::auth::Principal::public_connections(
+            self.profiles()
+                .into_iter()
+                .filter(|profile| profile.managed && profile.id != "demo")
+                .map(|profile| (profile.id, true)),
+        )
+    }
+
     pub fn default_profile_id(&self) -> Option<String> {
         self.default_entry().map(|entry| entry.id)
     }
@@ -669,6 +906,130 @@ impl AppState {
             .list_databases()
             .await
             .map_err(|_| ManageError::Unavailable)
+    }
+
+    pub async fn database_sizes_of(&self, base: &str) -> Result<Vec<(String, u64)>, ManageError> {
+        let entry = self.entry(Some(base)).ok_or(ManageError::Unknown)?;
+        if entry.derived {
+            return Err(ManageError::Unknown);
+        }
+        entry
+            .catalog
+            .database_sizes()
+            .await
+            .map_err(|_| ManageError::Unavailable)
+    }
+
+    /// Execute a narrowly scoped PostgreSQL lifecycle command. Names are quoted here, and the
+    /// caller must separately authorize the profile-wide SQL capability.
+    pub async fn database_lifecycle(
+        &self,
+        base: &str,
+        operation: DatabaseOperation<'_>,
+    ) -> Result<(), ManageError> {
+        let entry = self.entry(Some(base)).ok_or(ManageError::Unknown)?;
+        if !entry.writable {
+            return Err(ManageError::Unavailable);
+        }
+        let raw = entry.url.as_ref().ok_or(ManageError::Unavailable)?.expose();
+        if !raw.starts_with("postgres://") && !raw.starts_with("postgresql://") {
+            return Err(ManageError::Unavailable);
+        }
+        let ctx = self.ctx.as_ref().ok_or(ManageError::Unavailable)?;
+        let (url, statement) = match operation {
+            DatabaseOperation::CreateDatabase(name) | DatabaseOperation::DropDatabase(name) => {
+                let name = quote_lifecycle_identifier(name)?;
+                let mut url = url::Url::parse(raw).map_err(|_| ManageError::Invalid)?;
+                url.set_path("/postgres");
+                let statement = if matches!(operation, DatabaseOperation::CreateDatabase(_)) {
+                    format!("CREATE DATABASE {name}")
+                } else {
+                    format!("DROP DATABASE {name} WITH (FORCE)")
+                };
+                (url, statement)
+            }
+            DatabaseOperation::DropSchema(schema) => {
+                let schema = quote_lifecycle_identifier(schema)?;
+                (
+                    url::Url::parse(raw).map_err(|_| ManageError::Invalid)?,
+                    format!("DROP SCHEMA {schema} CASCADE"),
+                )
+            }
+            DatabaseOperation::DropTable(schema, table) => {
+                let schema = quote_lifecycle_identifier(schema)?;
+                let table = quote_lifecycle_identifier(table)?;
+                (
+                    url::Url::parse(raw).map_err(|_| ManageError::Invalid)?,
+                    format!("DROP TABLE {schema}.{table} CASCADE"),
+                )
+            }
+        };
+        let manager = crate::db::postgres::PgManager::with_access(url.as_str(), &ctx.limits, true)
+            .map_err(|_| ManageError::Invalid)?;
+        let result = sqlx::query(&statement).execute(&manager.pool()).await;
+        manager.close().await;
+        result.map(|_| ()).map_err(|_| ManageError::Unavailable)
+    }
+
+    /// Run schema-changing statements in one transaction on a writable connection of a
+    /// writable profile. The error text is the database's own message.
+    pub async fn run_ddl(
+        &self,
+        base: &str,
+        statements: &[String],
+        server_level: bool,
+    ) -> Result<(), String> {
+        let entry = self
+            .entry(Some(base))
+            .ok_or_else(|| "unknown connection".to_string())?;
+        if !entry.writable {
+            return Err("this connection is read-only; enable changes on it first".into());
+        }
+        match entry.runtime.as_ref() {
+            Some(Runtime::Sqlite(manager)) => manager.execute_ddl(statements).await,
+            Some(Runtime::PostgreSql(_)) => {
+                let raw = entry
+                    .url
+                    .as_ref()
+                    .ok_or_else(|| "connection is unavailable".to_string())?
+                    .expose();
+                let ctx = self
+                    .ctx
+                    .as_ref()
+                    .ok_or_else(|| "connection is unavailable".to_string())?;
+                let mut url = raw.to_string();
+                if server_level {
+                    let mut parsed =
+                        url::Url::parse(raw).map_err(|_| "connection is invalid".to_string())?;
+                    parsed.set_path("/postgres");
+                    url = parsed.into();
+                }
+                let manager = crate::db::postgres::PgManager::with_access(&url, &ctx.limits, true)
+                    .map_err(|_| "connection is invalid".to_string())?;
+                let result = async {
+                    if server_level {
+                        // CREATE/DROP DATABASE cannot run inside a transaction.
+                        for statement in statements {
+                            sqlx::query(statement).execute(&manager.pool()).await?;
+                        }
+                        return Ok(());
+                    }
+                    let mut tx = manager.pool().begin().await?;
+                    for statement in statements {
+                        sqlx::query(statement).execute(&mut *tx).await?;
+                    }
+                    tx.commit().await
+                }
+                .await
+                .map_err(|error| match error {
+                    sqlx::Error::Database(db) => db.message().to_string(),
+                    other => other.to_string(),
+                });
+                manager.close().await;
+                result
+            }
+            _ => Err("this engine does not support schema changes here".into()),
+        }
     }
 
     /// Register (or reuse) a switch to another database on the same server and return its
@@ -723,12 +1084,6 @@ impl AppState {
     /// Whether this state can build connections at runtime.
     pub fn can_manage(&self) -> bool {
         self.ctx.is_some()
-    }
-
-    pub fn local_connection_management(&self) -> bool {
-        self.ctx
-            .as_ref()
-            .is_some_and(|ctx| ctx.local_connection_management)
     }
 
     pub fn is_managed(&self, id: &str) -> bool {
@@ -793,6 +1148,54 @@ impl AppState {
             std::mem::replace(slot, entry)
         };
         if let Some(runtime) = old.runtime {
+            runtime.close().await;
+        }
+        Ok(())
+    }
+
+    pub async fn reconnect(&self, id: &str) -> Result<(), ManageError> {
+        let old = self.entry(Some(id)).ok_or(ManageError::Unknown)?;
+        let url = old
+            .url
+            .as_ref()
+            .ok_or(ManageError::Unavailable)?
+            .expose()
+            .to_string();
+        let replacement = self.build_entry(&ManagedInput {
+            id: old.id.clone(),
+            label: old.label.clone(),
+            url,
+            writable: old.writable,
+        })?;
+        let old = {
+            let mut entries = self.write();
+            let slot = entries
+                .iter_mut()
+                .find(|entry| entry.id == id)
+                .ok_or(ManageError::Unknown)?;
+            std::mem::replace(slot, replacement)
+        };
+        if let Some(runtime) = old.runtime {
+            runtime.close().await;
+        }
+        Ok(())
+    }
+
+    pub async fn disconnect_profile(&self, id: &str) -> Result<(), ManageError> {
+        let old = {
+            let mut entries = self.write();
+            let slot = entries
+                .iter_mut()
+                .find(|entry| entry.id == id)
+                .ok_or(ManageError::Unknown)?;
+            if slot.runtime.is_none() {
+                return Ok(());
+            }
+            let old_runtime = slot.runtime.take();
+            slot.runtime = None;
+            old_runtime
+        };
+        if let Some(runtime) = old {
             runtime.close().await;
         }
         Ok(())
@@ -950,23 +1353,20 @@ mod tests {
     #[tokio::test]
     async fn no_url_remains_disconnected_without_network() {
         let config = Config::from_values(&[]).unwrap();
-        let state = AppState::from_config(&config).unwrap();
-        assert!(!state.is_configured());
-        assert_eq!(
-            state.connection_snapshot().await.status,
-            ConnectionStatus::Disconnected
-        );
+        let state = AppState::from_config(&config).await.unwrap();
+        assert!(state.is_configured());
+        assert_eq!(state.profiles()[0].id, "demo");
         state.close().await;
     }
 
-    #[test]
-    fn malformed_connection_url_fails_at_startup_without_echoing_password() {
+    #[tokio::test]
+    async fn malformed_connection_url_fails_at_startup_without_echoing_password() {
         let config = Config::from_values(&[(
             "CUADB_DATABASE_URL",
             "postgresql://viewer:secret@db/db?options=-c+bad",
         )])
         .unwrap();
-        let outcome = AppState::from_config(&config).err().unwrap();
+        let outcome = AppState::from_config(&config).await.err().unwrap();
         assert!(!format!("{outcome:?}").contains("secret"));
     }
     #[test]

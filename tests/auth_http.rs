@@ -262,7 +262,7 @@ async fn without_an_administrator_the_local_shell_stays_open_but_read_only() {
 }
 
 #[tokio::test]
-async fn once_enforced_every_data_route_requires_a_session() {
+async fn once_enforced_only_shared_managed_profiles_are_public() {
     let w = world(true).await;
     for path in [
         "/catalog/schemas",
@@ -271,20 +271,14 @@ async fn once_enforced_every_data_route_requires_a_session() {
         "/catalog/structure?schema=main&relation=t",
         "/catalog/export?schema=main&relation=t&format=csv",
         "/catalog/overview",
-        "/connection/profiles",
-        "/connection/status",
-        "/admin/users",
-        "/",
     ] {
         let r = get(&w.router, path, None).await;
         assert_eq!(
             r.status,
-            StatusCode::SEE_OTHER,
-            "{path} navigations redirect to login"
+            StatusCode::FORBIDDEN,
+            "{path} has no public profile grant"
         );
-        assert_eq!(r.headers.get(header::LOCATION).unwrap(), "/login");
         assert!(!r.body.contains("Alpha"));
-        // HTMX requests get 401 plus a redirect hint instead of a swapped login page.
         let hx = send(
             &w.router,
             Request::get(path)
@@ -293,10 +287,22 @@ async fn once_enforced_every_data_route_requires_a_session() {
                 .unwrap(),
         )
         .await;
-        assert_eq!(hx.status, StatusCode::UNAUTHORIZED, "{path}");
-        assert_eq!(hx.headers.get("hx-redirect").unwrap(), "/login");
+        assert_eq!(hx.status, StatusCode::FORBIDDEN, "{path}");
     }
-    // Public routes stay reachable.
+    // The shared connection shell is public; unrelated administration remains protected.
+    assert_eq!(get(&w.router, "/", None).await.status, StatusCode::OK);
+    assert_eq!(
+        get(&w.router, "/connection/profiles", None).await.status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        get(&w.router, "/connection/status", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        get(&w.router, "/admin/users", None).await.status,
+        StatusCode::SEE_OTHER
+    );
     assert_eq!(get(&w.router, "/health", None).await.status, StatusCode::OK);
     assert_eq!(get(&w.router, "/login", None).await.status, StatusCode::OK);
     // Garbage, forged and wrong-shaped cookies never authenticate.
@@ -310,7 +316,7 @@ async fn once_enforced_every_data_route_requires_a_session() {
             get(&w.router, "/catalog/schemas", Some(cookie))
                 .await
                 .status,
-            StatusCode::SEE_OTHER
+            StatusCode::FORBIDDEN
         );
     }
 }
@@ -376,7 +382,7 @@ async fn login_sets_a_safe_cookie_and_a_new_session_every_time() {
         get(&w.router, "/catalog/schemas", Some(&planted))
             .await
             .status,
-        StatusCode::SEE_OTHER
+        StatusCode::FORBIDDEN
     );
 }
 
@@ -534,7 +540,7 @@ async fn logout_revokes_the_session_and_expired_sessions_are_rejected() {
         get(&w.router, "/catalog/schemas", Some(&cookie))
             .await
             .status,
-        StatusCode::SEE_OTHER,
+        StatusCode::FORBIDDEN,
         "revoked"
     );
     let second = w.svc.login("admin", PW).await.unwrap();
@@ -547,7 +553,7 @@ async fn logout_revokes_the_session_and_expired_sessions_are_rejected() {
         get(&w.router, "/catalog/schemas", Some(&cookie2))
             .await
             .status,
-        StatusCode::SEE_OTHER,
+        StatusCode::FORBIDDEN,
         "expired"
     );
 }
@@ -994,7 +1000,7 @@ async fn local_mode_has_no_sign_out_and_no_administration_entry() {
     let w = world(false).await;
     let page = get(&w.router, "/", None).await;
     assert_eq!(page.status, StatusCode::OK);
-    assert!(page.body.contains("Trusted local session"));
+    assert!(page.body.contains("Public shared workspace"));
     assert!(!page.body.contains("Sign out"));
     assert!(!page.body.contains("Administration"));
     assert_csp_clean(&page.body, "local explorer page");
@@ -1237,7 +1243,7 @@ async fn roles_change_and_members_are_deleted_with_last_admin_and_self_protectio
         )
         .await
         .status,
-        StatusCode::SEE_OTHER,
+        StatusCode::FORBIDDEN,
         "their session ended"
     );
     let audit = get(&w.router, "/admin/audit", Some(&cookie)).await.body;

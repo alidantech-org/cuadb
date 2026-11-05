@@ -1,0 +1,72 @@
+<div class="mc oa" role="dialog" aria-modal="true" aria-labelledby="oa-title" data-oa data-scope="{{ scope }}" data-engine="{{ engine }}">
+  <header class="oa-head">
+    <h3 id="oa-title">{% if scope == "table" %}<span class="mu">Table</span> {% else if scope == "schema" %}<span class="mu">Schema</span> {% endif %}{{ title }}</h3>
+    <button class="oa-x" type="button" data-modal-close aria-label="Close">✕</button>
+  </header>
+  <nav class="oa-tabs" role="tablist" aria-label="Actions">
+    {% for tab in tabs %}<button class="oa-tab{% if loop.first %} on{% endif %}" type="button" role="tab" data-oa-tab="{{ tab.id }}" aria-selected="{% if loop.first %}true{% else %}false{% endif %}">{{ tab.label }}</button>{% endfor %}
+  </nav>
+  <form id="oa-form" class="mb oa-body" autocomplete="off" onsubmit="return false">
+    <input type="hidden" name="profile" value="{{ profile }}">
+    <input type="hidden" name="scope" value="{{ scope }}">
+    <input type="hidden" name="schema" value="{{ schema }}">
+    <input type="hidden" name="relation" value="{{ relation }}">
+    <input type="hidden" name="database" value="{{ database }}">
+    <input type="hidden" name="action" value="{% if let Some(first) = tabs.first() %}{{ first.id }}{% endif %}">
+
+    <div data-oa-pane="rename"{% if let Some(first) = tabs.first() %}{% if first.id != "rename" %} hidden{% endif %}{% endif %}>
+      <label class="fl"><span>New name</span><input class="inp" name="new_name" value="{% if scope == "table" %}{{ relation }}{% else %}{{ schema }}{% endif %}" maxlength="128"></label>
+    </div>
+    <div data-oa-pane="add-column" hidden>
+      <div class="adm-row"><label class="fl"><span>Column name</span><input class="inp" name="col_name" maxlength="128" placeholder="created_at"></label>
+      <label class="fl"><span>Type</span><input class="inp" name="col_type" list="oa-types" maxlength="64" placeholder="text" value="text"></label></div>
+      <datalist id="oa-types"><option value="text"><option value="integer"><option value="bigint"><option value="boolean"><option value="numeric(12,2)"><option value="timestamptz"><option value="date"><option value="uuid"><option value="jsonb"><option value="real"><option value="blob"></datalist>
+      <label class="fl"><span>Default (optional SQL expression)</span><input class="inp" name="col_default" maxlength="200" placeholder="now()"></label>
+      <label class="chk-row"><input type="checkbox" name="col_notnull"> Not null</label>
+    </div>
+    <div data-oa-pane="rename-column" hidden>
+      <div class="adm-row"><label class="fl"><span>Column</span><select class="inp" name="column">{% for c in columns %}<option>{{ c }}</option>{% endfor %}</select></label>
+      <label class="fl"><span>New name</span><input class="inp" name="new_name" maxlength="128"></label></div>
+    </div>
+    <div data-oa-pane="drop-column" hidden>
+      <label class="fl"><span>Column to drop</span><select class="inp" name="column">{% for c in columns %}<option>{{ c }}</option>{% endfor %}</select></label>
+    </div>
+    <div data-oa-pane="comment" hidden>
+      <label class="fl"><span>Comment</span><textarea class="inp" name="comment_text" rows="3" maxlength="1000"></textarea></label>
+    </div>
+    <div data-oa-pane="truncate" hidden>
+      <p class="hint">Deletes every row but keeps the table and its structure.</p>
+      {% if engine == "postgresql" %}<label class="chk-row"><input type="checkbox" name="cascade"> Also empty tables that reference this one (CASCADE)</label>{% endif %}
+    </div>
+    <div data-oa-pane="drop" hidden>
+      <p class="hint">Removes {% if scope == "table" %}the table{% else %}the schema{% endif %} from the database.</p>
+      {% if engine == "postgresql" %}<label class="chk-row"><input type="checkbox" name="cascade"{% if scope == "schema" %} checked{% endif %}> Also drop dependent objects (CASCADE)</label>{% endif %}
+    </div>
+    <div data-oa-pane="create-schema" hidden>
+      <label class="fl"><span>Schema name</span><input class="inp" name="new_name" maxlength="128" placeholder="analytics"></label>
+    </div>
+    <div data-oa-pane="create-database" hidden>
+      <label class="fl"><span>Database name</span><input class="inp" name="new_name" maxlength="128" placeholder="my_app"></label>
+      <p class="hint">Created on this server. Switch to it afterwards from the database selector.</p>
+    </div>
+    <div data-oa-pane="drop-database" hidden>
+      <p class="hint">Permanently removes <b>{{ database }}</b> and everything in it from the server.</p>
+    </div>
+    <div data-oa-pane="create-table" hidden>
+      <label class="fl"><span>Table name</span><input class="inp" name="new_name" maxlength="128" placeholder="events"></label>
+      <label class="fl"><span>Columns</span><textarea class="inp mono" name="col_defs" rows="3" maxlength="1000" placeholder="{% if engine == "postgresql" %}id bigserial PRIMARY KEY, name text NOT NULL{% else %}id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL{% endif %}"></textarea></label>
+    </div>
+    {% if local %}<div data-oa-pane="sql" hidden>
+      <label class="fl"><span>SQL to run on {{ title }} (local instance: full access)</span><textarea class="inp mono" name="sql" id="oa-sql-in" rows="5" spellcheck="false" maxlength="20000">{{ default_sql }}</textarea></label>
+    </div>{% endif %}
+
+    <div class="oa-prev"><div class="oa-prev-h"><span>SQL that will run</span><button class="btn" type="button" data-oa-copy>Copy</button></div><pre id="oa-sql" class="oa-pre" aria-live="polite">Choose an action…</pre></div>
+    <div id="oa-warn" class="notice denied oa-warn" role="alert" hidden></div>
+    <label class="fl oa-confirm" id="oa-confirm-row" hidden><span id="oa-confirm-label">Type to confirm</span><input class="inp" id="oa-confirm" name="confirm" autocomplete="off"></label>
+    <div id="oa-out" class="oa-out" role="status" aria-live="polite"></div>
+  </form>
+  <div class="mf">
+    <button class="btn" type="button" data-modal-close>Cancel</button>
+    <button class="btn on" type="button" id="oa-run" data-oa-run>Run</button>
+  </div>
+</div>

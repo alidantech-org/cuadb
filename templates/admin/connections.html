@@ -1,28 +1,36 @@
-<div class="adm" data-tab="connections" data-src="/admin/connections">
-  <div class="adm-head"><h4>Connections</h4>
-    {% if can_manage && key_set %}<button class="btn on" type="button" hx-get="/admin/connections/form" hx-target="#modal" hx-swap="innerHTML">+ New connection</button>{% endif %}
+<section class="panel adm conn" data-tab="connections" data-src="/admin/connections" aria-label="Connections">
+  <header class="bar">
+    <h1><i class="ic-slot" data-ic="overview" aria-hidden="true"></i>Connections</h1>
+    <span class="meta">{{ rows.len() }} configured</span>
+    <span class="sp"></span>
+    <input class="inp" type="search" placeholder="Filter connections…" aria-label="Filter connections" data-conn-filter>
+    {% if can_manage %}<button class="btn on" type="button" hx-get="/admin/connections/form" hx-target="#modal" hx-swap="innerHTML">+ New connection</button>{% endif %}
+  </header>
+  <div id="adm-msg" class="adm-msg note" role="status" aria-live="polite"></div>
+  <div class="wrap">
+    <div class="gw conn-gw">
+      <div class="cl">
+        {% for row in rows %}
+        <article class="cx" data-conn-row data-id="{{ row.id }}" data-search="{{ row.label }} {{ row.id }} {{ row.engine }} {{ row.database }}">
+          <span class="cx-ic" aria-hidden="true">{% if row.engine == "SQLite" %}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>{% else %}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>{% endif %}</span>
+          <div class="cx-main">
+            <div class="cx-t"><b>{{ row.label }}</b>{% if row.is_default %}<span class="tag">default</span>{% endif %}{% if row.managed %}<span class="tag">saved here</span>{% else %}<span class="tag ro">server configuration</span>{% endif %}</div>
+            <small>{{ row.engine }}{% if !row.database.is_empty() %} · {{ row.database }}{% endif %} · <span class="mono">{{ row.id }}</span></small>
+          </div>
+          <span class="cx-st" data-st="pend" role="status"><i class="dot pend" aria-hidden="true"></i><span>Checking…</span></span>
+          <div class="cx-act">
+            <a class="btn on" href="/?profile={{ row.id }}" title="Open this connection in the explorer">Open</a>
+            {% if row.managed %}<button class="btn" type="button" hx-post="/connection/reconnect" hx-vals='{"id":"{{ row.id }}"}' hx-target="#adm-msg" hx-swap="innerHTML">Reconnect</button>{% endif %}
+            {% if row.managed && row.id != "demo" %}
+            <button class="btn" type="button" hx-get="/admin/connections/form?id={{ row.id }}" hx-target="#modal" hx-swap="innerHTML">Edit</button>
+            <button class="btn dg" type="button" hx-confirm="Remove {{ row.label }} and every permission that names it?" hx-post="/admin/connections/delete" hx-vals='{"id": "{{ row.id }}"}' hx-target="#adm-msg" hx-swap="innerHTML">Remove</button>
+            {% endif %}
+          </div>
+        </article>
+        {% endfor %}
+        {% if rows.is_empty() %}<div class="conn-empty">No connection is configured yet. Add one with <b>+ New connection</b>.</div>{% endif %}
+      </div>
+      <p class="hint conn-foot">Passwords are encrypted before they are stored. Removing a connection also removes the permissions that name it.</p>
+    </div>
   </div>
-  <div id="adm-msg" class="adm-msg" role="status" aria-live="polite"></div>
-  {% if !key_set %}<p class="hint">Saving connections needs an encryption key. Run <code>openssl rand -hex 32</code> and set it as <code>CUADB_SECRET_KEY</code> on the server, then restart CuaDB. Connections defined in the server configuration are listed below.</p>{% endif %}
-  <table class="w">
-    <thead><tr><th>Name</th><th>Engine</th><th>Defined in</th><th></th></tr></thead>
-    <tbody>
-      {% for row in rows %}
-      <tr>
-        <td class="who"><b>{{ row.label }}</b><small>{{ row.id }}{% if row.is_default %} · default{% endif %}</small></td>
-        <td>{{ row.engine }}</td>
-        <td>{% if row.managed %}<span class="tag">saved here</span>{% else %}<span class="tag ro">server configuration</span>{% endif %}</td>
-        <td class="acts">
-          <button class="btn" type="button" hx-get="/connection/status?profile={{ row.id }}" hx-target="#adm-msg" hx-swap="innerHTML">Check</button>
-          {% if row.managed %}
-          <button class="btn" type="button" hx-get="/admin/connections/form?id={{ row.id }}" hx-target="#modal" hx-swap="innerHTML">Edit</button>
-          <button class="btn dg" type="button" hx-confirm="Remove {{ row.label }} and every permission that names it?" hx-post="/admin/connections/delete" hx-vals='{"id": "{{ row.id }}"}' hx-target="#adm-msg" hx-swap="innerHTML">Remove</button>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-      {% if rows.is_empty() %}<tr><td colspan="4" class="empty-row">No connection is configured.</td></tr>{% endif %}
-    </tbody>
-  </table>
-  <p class="hint">Passwords are encrypted before they are stored and are never shown again. Removing a connection also removes the permissions that name it.</p>
-</div>
+</section>

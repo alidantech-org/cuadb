@@ -35,6 +35,16 @@ impl SecretKey {
         }
         Some(Self(key))
     }
+
+    pub fn generate() -> Option<Self> {
+        let mut key = [0u8; 32];
+        ring::rand::SystemRandom::new().fill(&mut key).ok()?;
+        Some(Self(key))
+    }
+
+    pub fn to_hex(&self) -> String {
+        self.0.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
 }
 
 #[derive(Clone)]

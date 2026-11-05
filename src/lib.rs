@@ -3,6 +3,7 @@
 //! Keep the server router testable without binding a port or connecting to SQL.
 
 pub mod app;
+pub mod assets;
 pub mod auth;
 pub mod config;
 pub mod connections;

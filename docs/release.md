@@ -1,3 +1,21 @@
+# Releasing
+
+## One-time setup
+1. Repository secrets: `CARGO_REGISTRY_TOKEN` (crates.io API token with publish scope). Without it the crates.io step is skipped.
+2. After the first image is pushed, open the package at `github.com/orgs/alidantech-org/packages` → *Package settings* → set visibility to **Public** so anyone can `docker pull` without logging in.
+3. Check that the crate name `cuadb` is free on crates.io (`cargo search cuadb`), otherwise rename the package in `Cargo.toml`.
+
+## Cutting a release
+1. Move the *Unreleased* notes in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`.
+2. Set `version = "X.Y.Z"` in `Cargo.toml`, run `cargo check` so `Cargo.lock` updates, commit.
+3. Tag and push: `git tag vX.Y.Z && git push origin main vX.Y.Z`.
+4. The **Release** workflow then: verifies the tag matches `Cargo.toml`, runs the tests, builds `linux/amd64` and `linux/arm64` images and pushes `ghcr.io/alidantech-org/cuadb:{X.Y.Z,X.Y,X,latest}` with provenance and SBOM, builds binaries for Linux, macOS and Windows, creates the GitHub release with the CHANGELOG section and the archives, and publishes the crate to crates.io.
+5. Verify: `docker run --rm ghcr.io/alidantech-org/cuadb:X.Y.Z --version`, `cargo install cuadb --version X.Y.Z`.
+
+Pre-release tags such as `v0.2.0-rc.1` publish images and a GitHub pre-release but never move `latest` and skip crates.io.
+
+Every push and pull request runs the **CI** workflow (format, clippy, tests, asset build, smoke test, container build).
+
 # Supported engines, compatibility and release checklist
 
 ## Compatibility matrix (what was actually run)

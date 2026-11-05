@@ -1,0 +1,26 @@
+# CuaDB on your own computer, reachable only from this computer (http://localhost:4848).
+#   docker compose up -d
+#
+# Databases on this computer: use host.docker.internal as the host in a connection.
+# Databases on your network (router/LAN) work as they are: use their LAN address.
+# To use "localhost" for databases or to reach everything the host can, see
+# docker-compose.host.yml (Linux) and docs/docker.md.
+services:
+  cuadb:
+    image: ghcr.io/alidantech-org/cuadb:latest
+    container_name: cuadb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4848:4848" # loopback only: do not publish to 0.0.0.0 in local mode
+    environment:
+      # Trusted local mode (full access, no sign-in) is safe because the port is
+      # published on 127.0.0.1 only. Remove it to use sign-in and permissions.
+      CUADB_LOCAL_MODE: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # lets the container reach this computer on Linux
+    volumes:
+      - cuadb-data:/data
+      # Open SQLite files from a folder on this computer:
+      # - ./databases:/data/sqlite
+volumes:
+  cuadb-data:

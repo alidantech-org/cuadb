@@ -28,6 +28,27 @@ fn is_safe_method(method: &Method) -> bool {
     matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS)
 }
 
+fn is_anonymous_app_path(path: &str) -> bool {
+    path == "/health"
+        || path.starts_with("/static/")
+        || path.starts_with("/icons/")
+        || path == "/manifest.webmanifest"
+        || path == "/sw.js"
+        || path == "/login"
+        || path == "/"
+        || path.starts_with("/catalog/")
+        || path.starts_with("/table/")
+        || path.starts_with("/overview")
+        || path.starts_with("/object/")
+        || path.starts_with("/connection/")
+        || path.starts_with("/admin/connections")
+        || path == "/workspace/admin/connections"
+        || path == "/sql"
+        || path.starts_with("/sql/")
+        || path.starts_with("/data/")
+        || path.starts_with("/tx/")
+}
+
 /// Browsers send `Origin` on unsafe requests; it must be this server's own authority.
 fn same_origin(request: &Request) -> bool {
     let headers = request.headers();
@@ -68,17 +89,42 @@ fn deny(request_is_html_navigation: bool, htmx: bool, kind: ErrorKind) -> Respon
 /// Resolve the session cookie into a `Principal` (or the open local principal when
 /// auth is not enforced) and enforce CSRF on every unsafe request.
 pub async fn authenticate(State(state): State<AppState>, request: Request, next: Next) -> Response {
+    let path = request.uri().path().to_string();
     let Some(auth) = state.auth().filter(|auth| auth.is_enforced()) else {
+        if !is_safe_method(request.method()) && !same_origin(&request) {
+            return AppError::new(ErrorKind::Forbidden).into_response();
+        }
         let mut request = request;
-        request.extensions_mut().insert(Principal::open());
+        let path = request.uri().path();
+        let public = is_anonymous_app_path(path);
+        let principal = if state.local_mode() {
+            crate::auth::Principal::local_admin()
+        } else if public && state.is_configured() {
+            crate::auth::Principal::public_connections(
+                state
+                    .profiles()
+                    .iter()
+                    .map(|profile| (profile.id.clone(), profile.managed && profile.id != "demo")),
+            )
+        } else if public {
+            crate::auth::Principal::public_open()
+        } else {
+            crate::auth::Principal::open()
+        };
+        request.extensions_mut().insert(principal);
         return next.run(request).await;
     };
-    let path = request.uri().path().to_string();
     let method = request.method().clone();
     let htmx = request.headers().contains_key("hx-request");
     let navigation = method == Method::GET && !htmx;
-    let public = path == "/health" || path.starts_with("/static/") || path == "/login";
+    let public = is_anonymous_app_path(&path);
 
+    let has_session_cookie = request
+        .headers()
+        .get(header::COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(session::token_from_cookie_header)
+        .is_some();
     let principal = match request
         .headers()
         .get(header::COOKIE)
@@ -100,16 +146,46 @@ pub async fn authenticate(State(state): State<AppState>, request: Request, next:
     }
 
     let Some(principal) = principal else {
-        if public {
+        if public && (!has_session_cookie || path == "/login") {
             let mut request = request;
-            request.extensions_mut().insert(Principal::open());
-            // Mark as anonymous: handlers for public routes ignore it.
+            let anonymous = crate::auth::Principal::public_connections(
+                state
+                    .profiles()
+                    .into_iter()
+                    .filter(|profile| profile.managed && profile.id != "demo")
+                    .map(|profile| (profile.id, true)),
+            );
+            request.extensions_mut().insert(anonymous);
             return next.run(request).await;
         }
-        return deny(navigation, htmx, ErrorKind::Unauthorized);
+        return deny(
+            navigation,
+            htmx,
+            if public && has_session_cookie && is_safe_method(&method) {
+                ErrorKind::Forbidden
+            } else {
+                ErrorKind::Unauthorized
+            },
+        );
     };
 
     let mut request = request;
+    let public_shell = public && !principal.is_admin();
+    let principal = if public_shell {
+        if principal.is_open() {
+            principal
+        } else {
+            principal.with_public_connections(
+                state
+                    .profiles()
+                    .into_iter()
+                    .filter(|profile| profile.managed && profile.id != "demo")
+                    .map(|profile| (profile.id, true)),
+            )
+        }
+    } else {
+        principal
+    };
     if !is_safe_method(&method) {
         // CSRF: header, or a `csrf` form field. Buffer the (small) form body once.
         let (parts, body) = request.into_parts();
@@ -168,8 +244,11 @@ impl Auth {
         action: Action,
         profile: &str,
     ) -> Result<(), AppError> {
-        if self.0.allows_wide(action, profile, None)
-            && (!self.0.is_open() || matches!(action, Action::View | Action::Export))
+        let unconfigured_read = !state.is_configured()
+            && self.0.is_open()
+            && matches!(action, Action::View | Action::Export);
+        if (unconfigured_read || self.0.allows_wide(action, profile, None))
+            && (!self.0.is_open() || self.0.has_shared_connection_grants() || unconfigured_read)
         {
             return Ok(());
         }
@@ -186,7 +265,12 @@ impl Auth {
         action: Action,
         resource: &Resource<'_>,
     ) -> Result<(), AppError> {
-        if self.0.allows(action, resource) {
+        let unconfigured_read = !state.is_configured()
+            && self.0.is_open()
+            && matches!(action, Action::View | Action::Export);
+        if (unconfigured_read || self.0.allows(action, resource))
+            && (!self.0.is_open() || self.0.has_shared_connection_grants() || unconfigured_read)
+        {
             return Ok(());
         }
         self.denied(state, action, &resource.describe()).await;

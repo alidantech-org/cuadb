@@ -258,6 +258,24 @@ impl PgCatalog {
         rows.iter().take(200).map(|r| get(r, "name")).collect()
     }
 
+    pub async fn connectable_database_sizes(&self) -> Result<Vec<(String, u64)>, DbError> {
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    "SELECT datname::text AS name, pg_catalog.pg_database_size(datname)::bigint AS bytes \
+                     FROM pg_catalog.pg_database WHERE datallowconn AND NOT datistemplate \
+                       AND pg_catalog.has_database_privilege(datname, 'CONNECT') \
+                     ORDER BY datname LIMIT 201",
+                )
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        rows.iter()
+            .take(200)
+            .map(|row| Ok((get(row, "name")?, get::<i64>(row, "bytes")?.max(0) as u64)))
+            .collect()
+    }
+
     /// Estimated rows (`reltuples`) and total size of each table in a schema.
     pub async fn table_sizes(
         &self,
@@ -826,6 +844,9 @@ impl DatabaseAdapter for PgCatalog {
     }
     async fn list_databases(&self) -> Result<Vec<String>, DbError> {
         self.connectable_databases().await
+    }
+    async fn database_sizes(&self) -> Result<Vec<(String, u64)>, DbError> {
+        self.connectable_database_sizes().await
     }
     async fn schema_summaries(&self) -> Result<Vec<crate::db::types::SchemaSummary>, DbError> {
         self.schema_totals().await

@@ -1,20 +1,49 @@
-<section id="catalog-panel" class="panel" aria-label="SQL workspace" hx-history="false" data-panel="sql">
-  <header class="bar">
+<section id="catalog-panel" class="panel sqlp" aria-label="SQL workspace" hx-history="false" data-panel="sql">
+  <header class="bar sqlbar">
     <h1><i class="ic-slot" data-ic="bolt" aria-hidden="true"></i><span>sql.</span>{{ profile_label }}</h1>
     <span class="tag {% if can_write %}m-write{% else %}m-read{% endif %}">{% if can_write %}can write{% else %}read only{% endif %}</span>
     <span class="sp"></span>
-    {% if can_write %}<button class="btn" type="button" id="sql-begin" hx-post="/tx/begin" hx-target="#sql-tx" hx-swap="innerHTML">Begin transaction</button>{% endif %}
-    <button class="btn" type="button" id="sql-cancel" hx-post="/sql/cancel" hx-target="#sql-note" hx-swap="innerHTML" hidden>Cancel</button>
-    <button class="btn on" type="submit" form="sqlform" id="sqlrun" title="Run (Ctrl/⌘ Enter)">Run ⌘↵</button>
+    <button class="btn" type="button" data-sheet="builder" title="Build a query with options">Query builder</button>
+    <button class="btn" type="button" data-sheet="examples" title="Example and suggested queries">Examples</button>
+    <button class="btn" type="button" data-sheet="history" title="Recent and saved queries">History</button>
+    <button class="btn" type="button" data-sheet="ai" title="Ask the AI assistant">✦ AI</button>
+    <button class="btn" type="button" data-sql-format title="Tidy keywords and line breaks">Format</button>
   </header>
-  <div class="sqlw">
-    <form id="sqlform" hx-post="/sql/execute" hx-target="#sqlout" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#sqlform">
-      <input type="hidden" name="statement_id" id="sql-sid" value="">
-      <textarea id="sql" name="sql" spellcheck="false" autocomplete="off" aria-label="SQL statement" placeholder="SELECT * FROM … LIMIT 100" required maxlength="65536"></textarea>
-    </form>
-    <div class="sqlh">One statement at a time · {{ max_rows }}-row cap · {{ timeout_secs }} s timeout · reads run in a read-only transaction{% if !can_write %} · this connection or your access does not allow changes{% endif %}</div>
-    <div id="sql-note" class="adm-msg" role="status" aria-live="polite"></div>
-    <section id="sql-tx" aria-label="Transaction" aria-live="polite"></section>
-    <div id="sqlout" aria-live="polite"><div class="sqle mu">Results appear here.</div></div>
+  <form id="sqlform" class="sqlcode" hx-post="/sql/execute" hx-target="#sqlout" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#sqlform">
+    <input type="hidden" name="statement_id" id="sql-sid" value="">
+    <div class="sqled" id="sqled">
+      <pre class="sqlhl" id="sqlhl" aria-hidden="true"></pre>
+      <textarea id="sql" name="sql" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="SQL statement" aria-autocomplete="list" placeholder="SELECT * FROM … LIMIT 100   ·   Ctrl+Space suggests names   ·   Ctrl/⌘ Enter runs" required maxlength="65536"></textarea>
+      <ul class="sqlsug" id="sqlsug" role="listbox" aria-label="Suggestions" hidden></ul>
+    </div>
+  </form>
+  <div class="sqlrb" id="sqlrb">
+    <span class="sql-sum" id="sql-sum" role="status" aria-live="polite">Ready</span>
+    <span class="sp"></span>
+    <span class="sql-hint mu">{% if local %}Reads run directly · changes run in a transaction you can roll back{% else %}One statement{% endif %} · {{ max_rows }} rows · {{ timeout_secs }} s</span>
+    {% if can_write && !local %}<button class="btn" type="button" id="sql-begin" hx-post="/tx/begin" hx-target="#sql-tx" hx-swap="innerHTML" title="Group several statements; commit or roll back at the end">Begin transaction</button>{% endif %}
+    <button class="btn" type="button" id="sql-cancel" hx-post="/sql/cancel" hx-target="#sql-note" hx-swap="innerHTML" hidden>Cancel</button>
+    <button class="btn on" type="submit" form="sqlform" id="sqlrun" title="Run (Ctrl/⌘ Enter)">Run <kbd>⌘↵</kbd></button>
   </div>
+  <nav class="sql-otabs" id="sql-otabs" aria-label="Query outputs" hidden></nav>
+  <div class="sql-osum" id="sql-osum" hidden>
+    <span class="os-st" id="os-st" aria-hidden="true"></span>
+    <code class="os-sql" id="os-sql"></code>
+    <span class="os-meta mu" id="os-meta"></span>
+    <span class="sp"></span>
+    <nav class="sql-views" id="sql-views" aria-label="Output view">
+      <button type="button" class="on" data-sqlview="table">Table</button>
+      <button type="button" data-sqlview="chart">Chart</button>
+      <button type="button" data-sqlview="stats">Stats</button>
+    </nav>
+    <input class="inp sql-find" id="sql-find" type="search" placeholder="Filter rows…" aria-label="Filter rows">
+    <button class="btn" type="button" data-osum-copy="csv" title="Copy this output as CSV">CSV</button>
+    <button class="btn" type="button" data-osum-copy="json" title="Copy this output as JSON">JSON</button>
+  </div>
+  <div id="sql-note" class="adm-msg" role="status" aria-live="polite"></div>
+  <section id="sql-tx" aria-label="Transaction" aria-live="polite"></section>
+  <div id="sqlout" class="sqlo" aria-live="polite"><div class="sqlempty"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M4 12h10M4 19h16"/><path d="m17 10 4 2-4 2z"/></svg><b>Run a query to see output here</b><small>Results, charts and column stats appear in this space.</small></div></div>
+  <div id="sheet-bk" hidden></div>
+  <aside id="insp" class="sheet" aria-label="Row details"></aside>
+  <aside id="sqlsheet" class="sqlsheet" hidden aria-label="Query tools"></aside>
 </section>

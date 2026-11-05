@@ -147,7 +147,7 @@ pub struct Grant {
     pub actions: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PrincipalData {
     pub user_id: Option<i64>,
     pub login: String,
@@ -158,6 +158,8 @@ pub struct PrincipalData {
     pub grants: Vec<Grant>,
     /// Auth is not configured: the local shell is open and read-only.
     pub open: bool,
+    /// Anonymous visitors may manage saved shared connections and use their scoped grants.
+    pub public_connection_manager: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -174,7 +176,91 @@ impl Principal {
             session_hash: Vec::new(),
             grants: Vec::new(),
             open: true,
+            public_connection_manager: false,
         }))
+    }
+
+    pub fn public_connections(profiles: impl IntoIterator<Item = (String, bool)>) -> Self {
+        let grants = profiles
+            .into_iter()
+            .map(|(profile, managed)| Grant {
+                id: if managed { 0 } else { 1 },
+                profile,
+                schema: String::new(),
+                relation: String::new(),
+                actions: if managed { 15 } else { 3 },
+            })
+            .collect();
+        Self(Arc::new(PrincipalData {
+            user_id: None,
+            login: "public".into(),
+            role: Role::Editor,
+            csrf: String::new(),
+            session_hash: Vec::new(),
+            grants,
+            open: false,
+            public_connection_manager: true,
+        }))
+    }
+
+    /// A trusted local instance: administrator-level access without sign-in.
+    pub fn local_admin() -> Self {
+        Self(Arc::new(PrincipalData {
+            user_id: None,
+            login: "local".into(),
+            role: Role::Admin,
+            csrf: String::new(),
+            session_hash: Vec::new(),
+            grants: Vec::new(),
+            open: false,
+            public_connection_manager: true,
+        }))
+    }
+
+    pub fn public_open() -> Self {
+        Self(Arc::new(PrincipalData {
+            user_id: None,
+            login: "public".into(),
+            role: Role::Viewer,
+            csrf: String::new(),
+            session_hash: Vec::new(),
+            grants: Vec::new(),
+            open: true,
+            public_connection_manager: true,
+        }))
+    }
+
+    pub fn has_shared_connection_grants(&self) -> bool {
+        self.0.grants.iter().any(|grant| grant.id == 0)
+    }
+
+    pub fn with_shared_public_mode(&self) -> Self {
+        let mut data = self.0.as_ref().clone();
+        data.open = false;
+        data.role = Role::Editor;
+        data.login = "public".into();
+        data.user_id = None;
+        data.csrf.clear();
+        data.session_hash.clear();
+        data.public_connection_manager = true;
+        Self(Arc::new(data))
+    }
+
+    pub fn with_public_connections(
+        &self,
+        profiles: impl IntoIterator<Item = (String, bool)>,
+    ) -> Self {
+        let mut data = self.0.as_ref().clone();
+        data.grants
+            .extend(profiles.into_iter().map(|(profile, managed)| Grant {
+                id: if managed { 0 } else { 1 },
+                profile,
+                schema: String::new(),
+                relation: String::new(),
+                actions: if managed && !data.open { 15 } else { 3 },
+            }));
+        data.public_connection_manager = true;
+        Self(Arc::new(data))
     }
 
     pub fn is_open(&self) -> bool {
@@ -183,6 +269,10 @@ impl Principal {
 
     pub fn is_admin(&self) -> bool {
         !self.0.open && self.0.role == Role::Admin
+    }
+
+    pub fn is_public_connection_manager(&self) -> bool {
+        self.0.public_connection_manager
     }
 
     pub fn login(&self) -> &str {
@@ -282,6 +372,7 @@ mod tests {
             session_hash: vec![],
             grants,
             open: false,
+            public_connection_manager: false,
         }))
     }
 
@@ -360,6 +451,19 @@ mod tests {
         assert!(!p.allows(Action::Edit, &Resource::profile("x")));
         assert!(!p.allows(Action::Sql, &Resource::profile("x")));
         assert!(!p.is_admin());
+    }
+
+    #[test]
+    fn public_shared_connections_get_profile_scoped_full_access() {
+        let public =
+            Principal::public_connections([("managed".into(), true), ("configured".into(), false)]);
+        assert!(public.is_public_connection_manager());
+        assert!(public.allows_wide(Action::View, "managed", None));
+        assert!(public.allows_wide(Action::Edit, "managed", None));
+        assert!(public.allows_wide(Action::Sql, "managed", None));
+        assert!(public.allows_wide(Action::View, "configured", None));
+        assert!(!public.allows_wide(Action::Edit, "configured", None));
+        assert!(!public.allows_wide(Action::Sql, "configured", None));
     }
 
     #[test]

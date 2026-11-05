@@ -3,6 +3,7 @@
 .env.*
 node_modules
 target
+data
 public
 .DS_Store
 .vscode

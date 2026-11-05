@@ -1,0 +1,16 @@
+<div class="orun" data-status="{{ status }}" data-headline="{{ headline }}">
+{% for step in steps %}
+<section class="opane" data-i="{{ loop.index }}" data-status="{{ step.status }}" data-kind="{{ step.kind }}" data-sql="{{ step.sql }}" data-meta="{{ step.meta }}" data-rows="{{ step.row_count }}"{% if !loop.first %} hidden{% endif %}>
+  {% if let Some(message) = step.error %}<div class="notice error" role="alert">{{ message }}</div>{% endif %}
+  {% if !step.cols.is_empty() %}
+  <div class="wrap"><div class="gw">
+    <table class="grid">
+      <thead><tr><th class="rn" scope="col"><span class="rnum">#</span></th>{% for col in step.cols %}<th scope="col" class="{% if col.numeric %}num{% endif %}" data-col="{{ col.name }}" data-type="{{ col.ty }}" aria-sort="none"><span>{{ col.name }}</span><small>{{ col.ty }}</small></th>{% endfor %}</tr></thead>
+      <tbody>{% for row in step.rows %}<tr tabindex="0" data-row="{{ loop.index }}"><td class="rn"><span class="rnum">{{ loop.index }}</span></td>{% for cell in row %}<td class="{{ cell.class }}" data-detail="{{ cell.text }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else if cell.class == "bool-value" %}<span class="bv {% if cell.yes %}y{% else %}n{% endif %}" data-raw="{% if cell.yes %}true{% else %}false{% endif %}">{% if cell.yes %}true{% else %}false{% endif %}</span>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table>
+  </div></div>
+  {% if step.truncated %}<div class="otrunc" role="status">Showing the first {{ step.row_count }} rows: result truncated at the row limit.</div>{% endif %}
+  {% else if step.error.is_none() %}<div class="ofree"><b>{{ step.meta }}</b></div>{% endif %}
+</section>
+{% endfor %}
+</div>

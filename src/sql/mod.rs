@@ -4,3 +4,4 @@
 pub mod crud;
 pub mod exec;
 pub mod policy;
+pub mod script;

@@ -74,7 +74,7 @@ async fn fixture(name: &str) -> Fixture {
     Fixture { root, profiles }
 }
 
-fn state(f: &Fixture) -> (Router, AppState) {
+async fn state(f: &Fixture) -> (Router, AppState) {
     let config = Config::from_values(&[
         ("CUADB_PROFILES_FILE", f.profiles.to_str().unwrap()),
         ("CUADB_SQLITE_ROOT", f.root.to_str().unwrap()),
@@ -83,7 +83,7 @@ fn state(f: &Fixture) -> (Router, AppState) {
         ("CUADB_MAX_POOL_CONNECTIONS", "6"),
     ])
     .unwrap();
-    let state = AppState::from_config(&config).unwrap();
+    let state = AppState::from_config(&config).await.unwrap();
     (router_with_state(&config.limits, state.clone()), state)
 }
 
@@ -101,7 +101,7 @@ async fn get(router: &Router, path: &str) -> (StatusCode, String) {
 #[tokio::test]
 async fn profiles_resolve_by_id_and_default_to_the_configured_one() {
     let f = fixture("resolve").await;
-    let (router, state) = state(&f);
+    let (router, state) = state(&f).await;
     let (_, default_tree) = get(&router, "/catalog/relations?schema=main").await;
     assert!(default_tree.contains("alpha_items") && !default_tree.contains("beta_items"));
     let (_, alpha) = get(&router, "/catalog/relations?schema=main&profile=alpha").await;
@@ -121,14 +121,14 @@ async fn profiles_resolve_by_id_and_default_to_the_configured_one() {
     )
     .await;
     assert!(status.is_client_error());
-    assert_eq!(state.profiles().len(), 3);
+    assert_eq!(state.profiles().len(), 4, "configured profiles plus demo");
     state.close().await;
 }
 
 #[tokio::test]
 async fn unknown_removed_and_malformed_profile_ids_are_rejected_without_details() {
     let f = fixture("unknown").await;
-    let (router, state) = state(&f);
+    let (router, state) = state(&f).await;
     for bad in [
         "nope",
         "removed-profile",
@@ -151,7 +151,9 @@ async fn unknown_removed_and_malformed_profile_ids_are_rejected_without_details(
         ] {
             let (status, body) = get(&router, &format!("{route}profile={bad}")).await;
             assert!(
-                status == StatusCode::NOT_FOUND || status == StatusCode::BAD_REQUEST,
+                status == StatusCode::NOT_FOUND
+                    || status == StatusCode::BAD_REQUEST
+                    || status == StatusCode::FORBIDDEN,
                 "{route}{bad} -> {status}"
             );
             assert!(
@@ -162,7 +164,7 @@ async fn unknown_removed_and_malformed_profile_ids_are_rejected_without_details(
         }
     }
     let (status, body) = get(&router, "/catalog/schemas?profile=nope").await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(status == StatusCode::NOT_FOUND || status == StatusCode::FORBIDDEN);
     assert!(body.contains("unknown_profile"));
     // Duplicate profile parameters and connection-like parameters are not accepted.
     for path in [
@@ -179,7 +181,7 @@ async fn unknown_removed_and_malformed_profile_ids_are_rejected_without_details(
 #[tokio::test]
 async fn navigation_links_keep_the_selected_profile() {
     let f = fixture("links").await;
-    let (router, state) = state(&f);
+    let (router, state) = state(&f).await;
     let (_, tree) = get(&router, "/catalog/relations?schema=main&profile=beta").await;
     assert!(
         tree.contains("profile=beta"),
@@ -216,7 +218,7 @@ async fn navigation_links_keep_the_selected_profile() {
 #[tokio::test]
 async fn profile_list_exposes_labels_engine_and_state_but_never_urls_or_paths() {
     let f = fixture("list").await;
-    let (router, state) = state(&f);
+    let (router, state) = state(&f).await;
     let (status, html) = get(&router, "/connection/profiles").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Alpha (SQLite)") && html.contains("Offline PG"));
@@ -261,7 +263,7 @@ async fn profile_list_exposes_labels_engine_and_state_but_never_urls_or_paths() 
 #[tokio::test]
 async fn an_offline_profile_fails_alone_and_rapid_switching_never_mixes_rows() {
     let f = fixture("rapid").await;
-    let (router, state) = state(&f);
+    let (router, state) = state(&f).await;
     let (status, body) = get(&router, "/catalog/schemas?profile=down").await;
     assert!(status.is_success() || status.is_server_error(), "{status}");
     assert!(!body.contains("super-secret-pw") && !body.contains("127.0.0.1"));
@@ -309,18 +311,19 @@ async fn single_url_configuration_still_works_as_the_default_profile() {
     let url = sqlite_url(&f.root.join("alpha.db"));
     let config = Config::from_values(&[
         ("CUADB_DATABASE_URL", url.as_str()),
+        ("CUADB_LOCAL_MODE", "false"),
         ("CUADB_SQLITE_ROOT", f.root.to_str().unwrap()),
     ])
     .unwrap();
-    let state = AppState::from_config(&config).unwrap();
+    let state = AppState::from_config(&config).await.unwrap();
     let router = router_with_state(&config.limits, state.clone());
-    assert_eq!(state.profiles().len(), 1);
+    assert_eq!(state.profiles().len(), 2, "configured profile plus demo");
     assert_eq!(state.default_profile_id(), Some("default".to_string()));
     let (_, plain) = get(&router, "/catalog/relations?schema=main").await;
     let (_, named) = get(&router, "/catalog/relations?schema=main&profile=default").await;
     assert!(plain.contains("alpha_items") && named.contains("alpha_items"));
     let (status, _) = get(&router, "/catalog/relations?schema=main&profile=alpha").await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(status, StatusCode::FORBIDDEN);
     state.close().await;
 }
 
@@ -336,7 +339,11 @@ async fn startup_rejects_conflicting_missing_and_invalid_profile_configuration()
     assert!(Config::from_values(&[("CUADB_PROFILES_FILE", "")]).is_err());
     let missing =
         Config::from_values(&[("CUADB_PROFILES_FILE", "/nonexistent/profiles.json")]).unwrap();
-    let error = AppState::from_config(&missing).err().unwrap().to_string();
+    let error = AppState::from_config(&missing)
+        .await
+        .err()
+        .unwrap()
+        .to_string();
     assert!(!error.contains("/nonexistent"), "paths are not echoed");
     // An invalid URL inside a profile fails startup without echoing it.
     fs::write(
@@ -345,7 +352,7 @@ async fn startup_rejects_conflicting_missing_and_invalid_profile_configuration()
     )
     .unwrap();
     let bad = Config::from_values(&[("CUADB_PROFILES_FILE", file)]).unwrap();
-    let error = AppState::from_config(&bad).err().unwrap();
+    let error = AppState::from_config(&bad).await.err().unwrap();
     assert!(
         !error.to_string().contains("topsecret") && !format!("{error:?}").contains("topsecret")
     );
@@ -359,14 +366,15 @@ async fn startup_rejects_conflicting_missing_and_invalid_profile_configuration()
     )
     .unwrap();
     let config = Config::from_values(&[
+        ("CUADB_LOCAL_MODE", "false"),
         ("CUADB_PROFILES_FILE", file),
         ("CUADB_SQLITE_ROOT", f.root.to_str().unwrap()),
     ])
     .unwrap();
-    let state = AppState::from_config(&config).unwrap();
+    let state = AppState::from_config(&config).await.unwrap();
     let router = router_with_state(&config.limits, state.clone());
     let (status, _) = get(&router, "/catalog/relations?schema=main&profile=beta").await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(status, StatusCode::FORBIDDEN);
     state.close().await;
 }
 
@@ -385,7 +393,7 @@ async fn pagination_cursors_are_scoped_to_the_profile_that_issued_them() {
         ),
     )
     .unwrap();
-    let (router, state) = state(&f);
+    let (router, state) = state(&f).await;
     let base = "/catalog/data?schema=cuadb_fixture&relation=paging&size=50";
     let (status, first) = get(&router, &format!("{base}&profile=one")).await;
     assert_eq!(status, StatusCode::OK);

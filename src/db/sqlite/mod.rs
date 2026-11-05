@@ -88,6 +88,34 @@ impl SqliteManager {
         workspace::SqliteWorkspace::new(&self.path, writable, &self.limits)
     }
 
+    /// Run schema-changing statements in one transaction on a one-off writable connection.
+    pub async fn execute_ddl(&self, statements: &[String]) -> Result<(), String> {
+        use sqlx::{ConnectOptions, Connection};
+        let mut connection = SqliteConnectOptions::new()
+            .filename(&self.path)
+            .create_if_missing(false)
+            .foreign_keys(true)
+            .busy_timeout(self.limits.connection_timeout)
+            .disable_statement_logging()
+            .connect()
+            .await
+            .map_err(|error| error.to_string())?;
+        let result = async {
+            let mut tx = connection.begin().await?;
+            for statement in statements {
+                sqlx::query(statement).execute(&mut *tx).await?;
+            }
+            tx.commit().await
+        }
+        .await
+        .map_err(|error| match error {
+            sqlx::Error::Database(db) => db.message().to_string(),
+            other => other.to_string(),
+        });
+        let _ = connection.close().await;
+        result
+    }
+
     pub fn catalog(&self) -> catalog::SqliteCatalog {
         catalog::SqliteCatalog::new(
             self.pool.clone(),
