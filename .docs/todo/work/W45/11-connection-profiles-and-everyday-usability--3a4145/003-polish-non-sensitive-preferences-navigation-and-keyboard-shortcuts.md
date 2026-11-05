@@ -40,3 +40,9 @@ The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switche
 
 ### Amendment acceptance
 - [ ] The settings popover matches the updated demo (Account block with Sign out and Administration, Explorer, Theme, Type, Grid, Sidebar, Tables) and preferences persist only non-sensitive choices.
+
+## Comments
+
+### 2026-11-05T01:20:59.129Z · PETER IRUNGU
+
+Focused mobile acceptance (2026-11-05): At 390x844, the settings dialog is centered with its section navigation horizontally scrollable and its General controls visible without clipping. The sidebar options menu fits in the viewport when opened from the mobile drawer. This pass used the trusted local shell and a disposable PostgreSQL fixture. The broader preference persistence, keyboard-only, import/export privacy, and full settings-control checklist still needs its own verification, so no broad acceptance boxes are ticked.

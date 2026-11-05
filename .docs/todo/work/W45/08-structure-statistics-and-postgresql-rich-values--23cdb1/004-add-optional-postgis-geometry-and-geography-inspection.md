@@ -1,5 +1,5 @@
 ---
-{id: TSK-58382C325F5F,name: Add optional PostGIS geometry and geography inspection,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.352Z,updated_at: 2026-11-05T00:19:30.142Z,tags: [cuadb,inspectors],depends_on: [TSK-11615BE5E97B,TSK-725618F4E684],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.994Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.643Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.260Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:30.142Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-58382C325F5F/1793791788996-start,started_at: 2026-11-04T11:29:49.010Z,end_ref: refs/tracking/TSK-58382C325F5F/1793808860645-end,ended_at: 2026-11-04T16:14:20.644Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-58382C325F5F/1793837970144-start,started_at: 2026-11-05T00:19:30.171Z}]}},links: [{type: blocks,task: TSK-A7B0DFC23314}]}
+{id: TSK-58382C325F5F,name: Add optional PostGIS geometry and geography inspection,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:07.352Z,updated_at: 2026-11-05T01:21:00.758Z,tags: [cuadb,inspectors],depends_on: [TSK-11615BE5E97B,TSK-725618F4E684],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.994Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.643Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.260Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:30.142Z},{from: in-progress,to: completed,at: 2026-11-05T01:21:00.758Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-58382C325F5F/1793791788996-start,started_at: 2026-11-04T11:29:49.010Z,end_ref: refs/tracking/TSK-58382C325F5F/1793808860645-end,ended_at: 2026-11-04T16:14:20.644Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-58382C325F5F/1793837970144-start,started_at: 2026-11-05T00:19:30.171Z,end_ref: refs/tracking/TSK-58382C325F5F/1793841660760-end,ended_at: 2026-11-05T01:21:00.758Z,summary: {files: 45,insertions: 3220,deletions: 339}}]}},links: [{type: blocks,task: TSK-A7B0DFC23314}]}
 ---
 
 # Add optional PostGIS geometry and geography inspection
@@ -18,9 +18,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 ## Acceptance checklist
 - [x] Detect PostGIS extension availability and geometry/geography columns per database.
 - [x] Expose safe geometry type, SRID and optional bounded GeoJSON detail.
-- [ ] Handle invalid, huge and non-4326 spatial values without crashes or misleading coordinates.
+- [x] Handle invalid, huge and non-4326 spatial values without crashes or misleading coordinates.
 - [x] Do not introduce map rendering or expensive bulk geometry conversion by default.
-- [ ] Test on both PostGIS-enabled and plain PostgreSQL fixture databases.
+- [x] Test on both PostGIS-enabled and plain PostgreSQL fixture databases.
 
 ## Canonical UI fidelity
 
@@ -53,3 +53,7 @@ Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and ty
 ### 2026-11-05T00:19:39.555Z · PETER IRUNGU
 
 Phase 2 (2026-11-05): with the PostGIS fixture, geometry columns show type and SRID, the inspector shows the geometry text and bounded GeoJSON, the header and layout are unchanged, and nothing spatial appears without the extension. Items 3 (invalid and huge geometries) and 5 (a plain PostgreSQL fixture) stay open.
+
+### 2026-11-05T01:20:58.714Z · PETER IRUNGU
+
+Phase 2 closeout (2026-11-05): Extended the additive PostGIS fixture with a self-intersecting polygon (topologically invalid). The live tests exercise that row alongside a 10,001-vertex geometry, empty point, EPSG:3857 geometry, and geography, in normal and opt-in GeoJSON views; requests stay successful and bounded, empty coordinates are preserved, projected coordinates keep their CRS label, and huge GeoJSON detail is refused. Added a separate guarded plain-PostgreSQL fixture and test confirming PostGIS metadata and extension list are absent there. `cargo test --locked --test rich_live_http -- --test-threads=1` passed 6/6; `cargo test --locked --test postgres_catalog -- --test-threads=1` passed 5/5.

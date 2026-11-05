@@ -37,6 +37,14 @@ CREATE TABLE cuadb_fixture.events (
 ) PARTITION BY RANGE (recorded_on);
 CREATE TABLE cuadb_fixture.events_2026 PARTITION OF cuadb_fixture.events
   FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');
+CREATE TABLE cuadb_fixture.empty_stats_fixture (id integer PRIMARY KEY, note text);
+
+-- Foreign relation used by the statistics UI test. The catalog metadata is
+-- readable without granting server-file access, and the file itself is empty.
+CREATE EXTENSION IF NOT EXISTS file_fdw;
+CREATE SERVER IF NOT EXISTS cuadb_fixture_files FOREIGN DATA WRAPPER file_fdw;
+CREATE FOREIGN TABLE cuadb_fixture.foreign_stats_fixture (id integer)
+  SERVER cuadb_fixture_files OPTIONS (filename '/dev/null', format 'csv');
 
 CREATE VIEW cuadb_fixture.accounts_view AS SELECT id, account_name
   FROM cuadb_fixture.accounts;
@@ -63,6 +71,7 @@ REFRESH MATERIALIZED VIEW cuadb_fixture.accounts_mat;
 ANALYZE cuadb_fixture.accounts;
 ANALYZE cuadb_fixture.orders;
 ANALYZE cuadb_fixture.events_2026;
+ANALYZE cuadb_fixture.empty_stats_fixture;
 
 -- Before granting, create a dedicated reader role on this disposable server
 -- and adjust it to your environment, then run the following as an admin:
@@ -71,3 +80,4 @@ ANALYZE cuadb_fixture.events_2026;
 -- GRANT SELECT ON ALL TABLES IN SCHEMA cuadb_fixture, "CuaDB Mixed" TO cuadb_reader;
 -- GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA cuadb_fixture TO cuadb_reader;
 -- GRANT USAGE ON TYPE cuadb_fixture.review_state, cuadb_fixture.nonnegative TO cuadb_reader;
+-- GRANT SELECT ON cuadb_fixture.foreign_stats_fixture TO cuadb_reader;

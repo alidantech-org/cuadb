@@ -1,5 +1,5 @@
 ---
-{id: TSK-0AA246B508ED,name: Implement Table Info tab with honest statistics and storage,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.130Z,updated_at: 2026-11-05T00:19:29.602Z,tags: [cuadb,inspectors],depends_on: [TSK-CFEA5F712D4B,TSK-FFD6A5B94574],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.662Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.983Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.179Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.602Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-0AA246B508ED/1793791788664-start,started_at: 2026-11-04T11:29:48.680Z,end_ref: refs/tracking/TSK-0AA246B508ED/1793808859985-end,ended_at: 2026-11-04T16:14:19.983Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-0AA246B508ED/1793837969605-start,started_at: 2026-11-05T00:19:29.634Z}]}}}
+{id: TSK-0AA246B508ED,name: Implement Table Info tab with honest statistics and storage,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:07.130Z,updated_at: 2026-11-05T01:21:00.482Z,tags: [cuadb,inspectors],depends_on: [TSK-CFEA5F712D4B,TSK-FFD6A5B94574],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.662Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.983Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.179Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.602Z},{from: in-progress,to: completed,at: 2026-11-05T01:21:00.482Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-0AA246B508ED/1793791788664-start,started_at: 2026-11-04T11:29:48.680Z,end_ref: refs/tracking/TSK-0AA246B508ED/1793808859985-end,ended_at: 2026-11-04T16:14:19.983Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-0AA246B508ED/1793837969605-start,started_at: 2026-11-05T00:19:29.634Z,end_ref: refs/tracking/TSK-0AA246B508ED/1793841660486-end,ended_at: 2026-11-05T01:21:00.482Z,summary: {files: 45,insertions: 3220,deletions: 339}}]}}}
 ---
 
 # Implement Table Info tab with honest statistics and storage
@@ -19,8 +19,8 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [x] Render adapter-provided sizes, estimated rows and relation classification clearly.
 - [x] Explain estimates, unknown values and partition-related size caveats in the UI.
 - [x] Provide a bounded refresh action without forcing SELECT COUNT(*) over large tables.
-- [ ] Test empty, partitioned, foreign and permission-restricted fixture scenarios.
-- [ ] Use the same capability flags that other database adapters will expose.
+- [x] Test empty, partitioned, foreign and permission-restricted fixture scenarios.
+- [x] Use the same capability flags that other database adapters will expose.
 
 ## Canonical UI fidelity
 
@@ -57,3 +57,7 @@ Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and ty
 ### 2026-11-05T00:19:39.178Z · PETER IRUNGU
 
 Phase 2 (2026-11-05): Indexes lists unique and primary markers, a Storage table with a Refresh estimates button (no COUNT scan) and Referenced by (same schema, first 50 relations); the Advanced Overview shows cards, size bars, largest tables and extensions. Items 4 (foreign-table and permission-restricted fixtures) and 5 (capability-flag audit) stay open.
+
+### 2026-11-05T01:20:58.543Z · PETER IRUNGU
+
+Phase 2 closeout (2026-11-05): Added an empty statistics table and a metadata-only file_fdw foreign table to the disposable fixture, plus a separate denied-schema fixture database. The PostgreSQL reader can inspect the foreign relation metadata without file access; its relation kind is ForeignTable and data/index sizes are Unavailable. The live route covers a zero-row table and partitioned parent; the catalog test covers the foreign table and denied schema. Audited the shared Capability::EstimatedRows and Capability::StorageSizes flags: PostgreSQL and MySQL/MariaDB adapters report supported capabilities, SQLite reports unsupported, and handlers render each metric from Availability so unsupported values stay unavailable. `cargo test --locked --test rich_live_http -- --test-threads=1` passed 6/6; `cargo test --locked --test postgres_catalog -- --test-threads=1` passed 5/5 with disposable PostGIS, plain PostgreSQL, and denied-role URLs.

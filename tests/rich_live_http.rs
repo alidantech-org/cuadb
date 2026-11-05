@@ -59,7 +59,11 @@ fn text(html: &str) -> String {
             _ => {}
         }
     }
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
+    out.replace("&#39;", "'")
+        .replace("&#34;", "\"")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[tokio::test]
@@ -74,10 +78,10 @@ async fn live_structure_shows_composite_keys_defaults_generation_and_fk_targets(
     assert_eq!(status, StatusCode::OK);
     let t = text(&html);
     assert!(
-        t.contains("1 ID integer No Primary key Identity ALWAYS"),
+        t.contains("1 ID integer no Primary key — Identity ALWAYS"),
         "{t}"
     );
-    assert!(t.contains("2 Code character varying(20) No Primary key"));
+    assert!(t.contains("2 Code character varying(20) no Primary key"));
     assert!(t.contains("Generated STORED"));
     assert!(t.contains("enum (new, approved)") && t.contains("domain cuadb_fixture.nonnegative"));
     assert!(t.contains("orders_account_id_fkey ForeignKey account_id cuadb_fixture.accounts (id)"));
@@ -148,6 +152,12 @@ async fn live_storage_stats_are_estimates_with_unavailable_partition_values_and_
     )
     .await;
     assert_eq!(text(&again), orders);
+    let (_, empty) = fetch(
+        &router,
+        "/catalog/stats?schema=cuadb_fixture&relation=empty_stats_fixture",
+    )
+    .await;
+    assert!(text(&empty).contains("Estimated rows 0"));
     manager.close().await;
 }
 
@@ -213,7 +223,8 @@ async fn live_postgis_geometry_reports_type_srid_and_bounded_geojson() {
     .await;
     assert!(text(&structure).contains("geometry"));
     let (_, overview) = fetch(&router, "/catalog/overview").await;
-    assert!(text(&overview).contains("Extension · postgis"));
+    let overview = text(&overview);
+    assert!(overview.contains("Extensions") && overview.contains("postgis"));
     manager.close().await;
 }
 
@@ -236,6 +247,10 @@ async fn live_spatial_edge_cases_never_crash_or_mislead_and_stay_bounded() {
         );
         assert!(html.contains("geography") && html.contains("geometry"));
         assert!(html.contains("EMPTY"), "empty geometry keeps its meaning");
+        assert!(
+            html.contains("POLYGON"),
+            "self-intersecting polygon stays readable"
+        );
         if query.is_empty() {
             assert!(!html.contains("coordinates"));
         } else {

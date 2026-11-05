@@ -69,6 +69,7 @@ async fn disposable_catalog_fixtures() {
     assert_eq!(find("accounts_mat"), RelationKind::MaterializedView);
     assert_eq!(find("events"), RelationKind::PartitionedTable);
     assert_eq!(find("events_2026"), RelationKind::Partition);
+    assert_eq!(find("foreign_stats_fixture"), RelationKind::ForeignTable);
     let quoted = catalog.list_relations("CuaDB Mixed").await.unwrap();
     assert!(quoted.items.iter().any(|r| r.id.name == "Ünicode Table"));
 
@@ -133,6 +134,16 @@ async fn disposable_catalog_fixtures() {
         .await
         .unwrap();
     assert_eq!(view.estimated_rows, Availability::Unavailable);
+    let foreign = catalog
+        .relation_statistics(&id("foreign_stats_fixture"))
+        .await
+        .unwrap();
+    assert_eq!(
+        foreign.relation_kind,
+        Availability::Available(RelationKind::ForeignTable)
+    );
+    assert_eq!(foreign.table_bytes, Availability::Unavailable);
+    assert_eq!(foreign.index_bytes, Availability::Unavailable);
 
     let advanced = catalog.list_advanced("cuadb_fixture").await.unwrap();
     assert!(
@@ -220,6 +231,32 @@ async fn disposable_postgis_metadata_fixture() {
             .detail
             .as_deref()
             .is_some_and(|detail| detail.contains("\"coordinates\""))
+    );
+    manager.close().await;
+}
+
+#[tokio::test]
+async fn plain_postgres_fixture_reports_postgis_as_unavailable() {
+    let Ok(url) = std::env::var("CUADB_TEST_CATALOG_PLAIN_URL") else {
+        return;
+    };
+    let parsed = url::Url::parse(&url).unwrap();
+    assert!(
+        parsed
+            .path()
+            .trim_start_matches('/')
+            .starts_with("cuadb_fixture_")
+    );
+    let config = Config::from_values(&[]).unwrap();
+    let manager = PgManager::new(&url, &config.limits).unwrap();
+    let catalog = manager.catalog();
+    assert!(catalog.postgis_schema().await.unwrap().is_none());
+    let overview = catalog.advanced_overview().await.unwrap();
+    assert!(
+        !overview
+            .extensions
+            .iter()
+            .any(|extension| extension == "postgis")
     );
     manager.close().await;
 }

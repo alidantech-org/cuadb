@@ -35,4 +35,8 @@ WHERE NOT EXISTS (SELECT 1 FROM cuadb_fixture.spatial_edges WHERE id = 3);
 INSERT INTO cuadb_fixture.spatial_edges
 SELECT 4, NULL, ST_GeogFromText('SRID=4326;POINT(36.82 -1.29)')
 WHERE NOT EXISTS (SELECT 1 FROM cuadb_fixture.spatial_edges WHERE id = 4);
+-- A self-intersecting polygon is structurally readable but topologically invalid.
+INSERT INTO cuadb_fixture.spatial_edges
+SELECT 5, ST_GeomFromText('POLYGON((0 0,2 2,0 2,2 0,0 0))',4326), NULL
+WHERE NOT EXISTS (SELECT 1 FROM cuadb_fixture.spatial_edges WHERE id = 5);
 -- GRANT SELECT ON cuadb_fixture.spatial_edges TO <reader role>; (run by the owner)

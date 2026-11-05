@@ -13,7 +13,7 @@ The pickers list only profiles and databases the principal may see and show the 
 This task belongs to **15 — Authenticated application UI, administration and connection management**. The look, feel and density come from `assets/cuadb-ui-demo.html` and `.docs/docs/frontend-interactions.md`. No inline scripts or styles are allowed by the CSP, and acceptance is a manual side-by-side browser comparison plus focused PostgreSQL and SQLite Rust tests; MySQL and MariaDB are out of scope until the frontend milestone.
 
 ## Acceptance checklist
-- [ ] Render the connection picker, database picker and access tags from real grants, with the demo's popovers, keyboard and Escape behavior.
+- [x] Render the connection picker, database picker and access tags from real grants, with the demo's popovers, keyboard and Escape behavior.
 - [x] Build the connection modal with create, edit, test and remove flows, inline validation messages and focus trapping.
 - [x] Verify server responses never contain connection URLs or passwords and add a Rust test for the picker fragments.
 - [ ] Compare pickers and modal with the demo in the built-in browser in light and dark at 1440x900, 1280x800 and 390x844.
@@ -26,3 +26,7 @@ Run the focused tests for this slice, run `bun run format:check` and `bun run ch
 ### 2026-11-05T00:03:53.223Z · PETER IRUNGU
 
 Progress (2026-11-05): the connection picker lists only the connections the user may see and the dialog (create, edit, test, remove) works with inline messages, Escape, a Tab focus trap and focus restore. No separate database picker or per-database access tags yet: a connection is one connection plus one database in the current backend, and grants are per connection, schema and relation. Item 1 and the screenshot matrix (item 4) remain open.
+
+### 2026-11-05T01:20:58.916Z · PETER IRUNGU
+
+Focused mobile acceptance (2026-11-05): At 390x844 against the disposable PostgreSQL fixture, the database picker listed the databases accessible to the read-only connection, showed the current selection and read-access badge, and stayed within the viewport when opened from the mobile drawer. Switched from `cuadb_fixture_catalog` to `cuadb_fixture_plain_pg` and back; the catalog refreshed for each, and Escape closed both connection and database popovers. The sidebar options menu was also fully visible from the open drawer. Remaining matrix item 4 stays open because this pass did not compare the connection modal across all desktop/mobile and light/dark combinations.
