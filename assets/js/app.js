@@ -187,9 +187,12 @@ function setDrawer(/** @type {boolean} */ open) {
 }
 
 /* ------------------------------------------------------------ modal */
+/** @type {Element | null} */
+let modalOpener = null;
 function openModal() {
   const modal = document.getElementById('modal');
   if (!modal) return;
+  if (!modal.classList.contains('show')) modalOpener = document.activeElement;
   modal.classList.add('show');
   /** @type {HTMLElement | null} */ (
     modal.querySelector('input:not([type=hidden]),select,textarea')
@@ -200,6 +203,8 @@ function closeModal() {
   if (!modal) return;
   modal.classList.remove('show');
   modal.replaceChildren();
+  if (modalOpener instanceof HTMLElement && document.contains(modalOpener)) modalOpener.focus();
+  modalOpener = null;
 }
 
 /** Bar widths come from data attributes so no inline style is needed. */
@@ -910,6 +915,29 @@ document.addEventListener('keydown', (event) => {
     const input = /** @type {HTMLInputElement | null} */ (document.getElementById('f'));
     input?.focus();
     input?.select();
+    return;
+  }
+  if (event.key === 'Tab' && document.getElementById('modal')?.classList.contains('show')) {
+    // Keep keyboard focus inside the open dialog.
+    const focusable = Array.from(
+      document.querySelectorAll(
+        '#modal input:not([type=hidden]):not(:disabled), #modal select:not(:disabled), #modal textarea:not(:disabled), #modal button:not(:disabled)',
+      ),
+    ).filter((el) => el instanceof HTMLElement && el.offsetParent !== null);
+    const first = /** @type {HTMLElement | undefined} */ (focusable[0]);
+    const last = /** @type {HTMLElement | undefined} */ (focusable[focusable.length - 1]);
+    if (first && last) {
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!document.getElementById('modal')?.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
     return;
   }
   if (event.key === 'Escape') {

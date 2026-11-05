@@ -25,3 +25,7 @@ Mount database files read-only: `-v "$PWD/data:/data:ro"`. Tests emulate a `:ro`
 ## Tests
 
 `cargo test --test sqlite_live` builds throw-away databases under `target/tmp` and always runs (no external service). `cargo test --test sqlite_catalog` uses the committed fixture `tests/fixtures/sqlite-data/cuadb_fixture_sqlite.db`. A running-container check of the `:ro` mount is part of the Group 12 Docker verification.
+
+## Advanced explorer
+
+SQLite has no functions, procedures, sequences, types or catalog statistics to list, so `/catalog/objects` returns an empty fragment and the Advanced Overview reports what the adapter can (counts); the sidebar simply shows no object groups.

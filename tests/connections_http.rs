@@ -379,3 +379,42 @@ async fn saved_connections_come_back_after_a_restart_and_need_the_same_key() {
     }
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[tokio::test]
+async fn the_test_endpoint_reaches_a_real_postgres_fixture_and_reports_only_a_category() {
+    // Returns early (not evidence) unless a disposable cuadb_fixture_* database is named.
+    let Ok(url) = std::env::var("CUADB_TEST_CATALOG_URL") else {
+        return;
+    };
+    let parsed = url::Url::parse(&url).unwrap();
+    assert!(
+        parsed
+            .path()
+            .trim_start_matches('/')
+            .starts_with("cuadb_fixture_")
+    );
+    let w = world("pgtest", true).await;
+    let form = format!(
+        "engine=postgresql&host={}&port={}&user={}&database={}&tls=disable",
+        parsed.host_str().unwrap(),
+        parsed.port().unwrap_or(5432),
+        parsed.username(),
+        parsed.path().trim_start_matches('/')
+    );
+    let (status, ok) = post(&w, &w.admin, "/admin/connections/test", &form).await;
+    assert_eq!(status, StatusCode::OK, "{ok}");
+    assert!(ok.contains("Connected in"));
+    // Wrong database: a category, never the host, user or driver text.
+    let wrong = form.replace(
+        parsed.path().trim_start_matches('/'),
+        "cuadb_fixture_does_not_exist",
+    );
+    let (status, bad) = post(&w, &w.admin, "/admin/connections/test", &wrong).await;
+    assert_eq!(status, StatusCode::BAD_GATEWAY);
+    assert!(
+        bad.contains("Could not connect")
+            && !bad.contains(parsed.username())
+            && !bad.contains("127.0.0.1")
+    );
+    let _ = fs::remove_dir_all(&w.dir);
+}

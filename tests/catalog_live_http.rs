@@ -73,3 +73,32 @@ async fn live_relation_search_handles_unicode_case_and_empty_results() {
         assert!(kinds.contains(expected), "{expected}");
     }
 }
+
+#[tokio::test]
+async fn live_overview_and_metadata_objects_render_without_inline_code() {
+    let Some(url) = url() else { return };
+    let (status, overview) = fetch(&url, "/catalog/overview").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(overview.contains("Size by schema") && overview.contains("Largest tables"));
+    assert!(overview.contains("data-pct=") && !overview.contains(" style="));
+    let (status, objects) = fetch(&url, "/catalog/objects?schema=cuadb_fixture").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(!objects.contains(" style=") && !objects.contains("<script"));
+    // Whatever kinds exist link to a detail page that shows inert definition text.
+    let link = objects
+        .split("hx-get=\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .map(|l| l.replace("&#38;", "&").replace("&amp;", "&"));
+    if let Some(link) = link {
+        let (status, page) = fetch(&url, &link).await;
+        assert_eq!(status, StatusCode::OK, "{link}");
+        assert!(page.contains("metadata only, never executed") && page.contains("class=\"src\""));
+    }
+    for bad in [
+        "/catalog/object?schema=cuadb_fixture&kind=table&name=x",
+        "/catalog/object?schema=cuadb_fixture&kind=function&name=%00",
+    ] {
+        assert!(fetch(&url, bad).await.0.is_client_error(), "{bad}");
+    }
+}
