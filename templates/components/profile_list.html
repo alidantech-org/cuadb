@@ -10,6 +10,8 @@
 {% endfor %}
 {% endif %}
 <div id="cpop-msg" class="adm-msg" role="status" aria-live="polite"></div>
-{% if admin %}<div class="sep-line"></div>
+{% if local_setup %}<div class="sep-line"></div><div class="note" role="status">Add connections after admin setup, or enable trusted local connection management with CUADB_LOCAL_CONNECTIONS=enabled and CUADB_SECRET_KEY.</div>{% endif %}
+{% if admin && key_set %}<div class="sep-line"></div>
 <button class="ci" type="button" hx-get="/admin/connections/form" hx-target="#modal" hx-swap="innerHTML"><span><b>＋ Add connection…</b><small>PostgreSQL or SQLite, saved encrypted on the server</small></span></button>
-<button class="ci" type="button" data-view="admin-connections"><span><b>Manage connections…</b></span></button>{% endif %}
+{% if full_admin %}<button class="ci" type="button" data-view="admin-connections"><span><b>Manage connections…</b></span></button>{% endif %}{% endif %}
+{% if admin && !key_set %}<div class="note" role="status">Set CUADB_SECRET_KEY before adding saved connections.</div>{% endif %}

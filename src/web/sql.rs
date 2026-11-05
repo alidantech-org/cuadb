@@ -970,8 +970,7 @@ fn editor_field(detail: crate::db::types::ColumnDetail, insert: bool) -> EditorF
         || native.contains("bytea")
         || native.contains("blob")
         || native.contains("binary")
-        || native.starts_with("geometry")
-        || native.starts_with("geography")
+        || crate::db::postgres::row_query::is_spatial_type(&native)
         || native.contains("tsvector")
         || native.contains("xml");
     let options = match &detail.enum_values {

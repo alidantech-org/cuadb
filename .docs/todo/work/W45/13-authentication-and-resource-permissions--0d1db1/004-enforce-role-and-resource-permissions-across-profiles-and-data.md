@@ -1,5 +1,5 @@
 ---
-{id: TSK-FF6C70D26908,name: Enforce role and resource permissions across profiles and data,type: task,status: completed,priority: medium,created_at: 2026-11-04T16:14:15.031Z,updated_at: 2026-11-04T16:33:02.085Z,tags: [cuadb,auth],depends_on: [TSK-D91E3CD3D4C6],order: 4096,links: [{type: blocks,task: TSK-54598487D0CE}],extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T16:33:02.085Z}]}}
+{id: TSK-FF6C70D26908,name: Enforce role and resource permissions across profiles and data,type: task,status: completed,priority: medium,created_at: 2026-11-04T16:14:15.031Z,updated_at: 2026-11-05T01:44:28.767Z,tags: [cuadb,auth],depends_on: [TSK-D91E3CD3D4C6],order: 4096,links: [{type: blocks,task: TSK-54598487D0CE}],extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T16:33:02.085Z}]}}
 ---
 
 # Enforce role and resource permissions across profiles and data

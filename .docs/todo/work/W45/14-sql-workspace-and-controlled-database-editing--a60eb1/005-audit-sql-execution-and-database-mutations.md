@@ -1,5 +1,5 @@
 ---
-{id: TSK-CAE8F98AF33E,name: Audit SQL execution and database mutations,type: task,status: completed,priority: medium,created_at: 2026-11-04T16:14:16.138Z,updated_at: 2026-11-04T16:47:56.816Z,tags: [cuadb,sql-workspace],depends_on: [TSK-32BD4CD19E43,TSK-92AB61E4D8C0],order: 5120,links: [{type: blocks,task: TSK-54598487D0CE}],extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T16:47:56.816Z}]}}
+{id: TSK-CAE8F98AF33E,name: Audit SQL execution and database mutations,type: task,status: completed,priority: medium,created_at: 2026-11-04T16:14:16.138Z,updated_at: 2026-11-05T01:44:28.936Z,tags: [cuadb,sql-workspace],depends_on: [TSK-32BD4CD19E43,TSK-92AB61E4D8C0],order: 5120,links: [{type: blocks,task: TSK-54598487D0CE}],extra: {status_history: [{from: planned,to: completed,at: 2026-11-04T16:47:56.816Z}]}}
 ---
 
 # Audit SQL execution and database mutations

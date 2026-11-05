@@ -441,21 +441,35 @@ async fn relation_search_is_literal_case_insensitive_bounded_and_escaped() {
 }
 
 #[tokio::test]
-async fn many_relations_render_a_bounded_tree_and_search_reports_incompleteness() {
+async fn many_relations_load_in_pages_and_search_covers_the_full_catalog() {
     let (status, body) = get(Mode::Healthy, "/catalog/relations?schema=big", 5000).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(body.matches("table_").count() >= 500);
-    assert!(body.contains("incomplete"));
+    assert!(body.contains("table_199"));
+    assert!(!body.contains("table_200"));
+    assert!(body.contains("Load more tables"));
     let (_, body) = get(
         Mode::Healthy,
-        "/catalog/relations?schema=big&q=TABLE_49",
+        "/catalog/relations?schema=big&offset=200&limit=200",
+        5000,
+    )
+    .await;
+    assert!(body.contains("table_200") && body.contains("table_399"));
+    let (_, body) = get(
+        Mode::Healthy,
+        "/catalog/relations?schema=big&q=TABLE_499",
         5000,
     )
     .await;
     assert!(body.contains("table_499") && !body.contains("table_300"));
+    let (_, body) = get(
+        Mode::Healthy,
+        "/catalog/relations?schema=big&q=table_49x",
+        5000,
+    )
+    .await;
     assert!(
-        body.contains("incomplete"),
-        "search over a truncated list must say so"
+        body.contains("table_499"),
+        "typo tolerant search should find nearby names"
     );
 }
 

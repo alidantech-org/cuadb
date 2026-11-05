@@ -1578,7 +1578,7 @@ async fn grid_structure_and_tree_show_links_markers_groups_and_escape_hostile_va
         .await;
         assert_eq!(status, StatusCode::OK, "{body}");
     }
-    // Foreign-key values link to the referenced relation, filtered by the value.
+    // Foreign-key values carry the exact referenced row identity in the URL fragment.
     let (_, kids) = get(
         &w.router,
         &w.admin,
@@ -1586,11 +1586,17 @@ async fn grid_structure_and_tree_show_links_markers_groups_and_escape_hostile_va
     )
     .await;
     assert!(
-        kids.contains(r#"class="fk""#)
-            && kids.contains("relation=parents")
-            && kids.contains("filter=1"),
+        kids.contains(r#"class="fk""#) && kids.contains("#fk="),
         "{kids}"
     );
+    let (status, foreign) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/foreign?schema=main&relation=parents&key=id&value=1",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{foreign}");
+    assert!(foreign.contains(r#""relation":"parents""#) && foreign.contains(r#""value":"1""#));
     // Structure lists the target in a References column; Indexes names who references the table.
     let (_, structure) = get(
         &w.router,
@@ -1720,7 +1726,6 @@ async fn editor_cell_columns_links_and_multi_table_zip_routes() {
         "column=note&key.id=999",
         "column=nope&key.id=1",
         "column=note",
-        "column=note&key.name=alpha",
         "column=note&key.id=1&key.id=2",
         "column=note&key.id=1%00",
     ] {
@@ -1732,6 +1737,13 @@ async fn editor_cell_columns_links_and_multi_table_zip_routes() {
         .await;
         assert!(status.is_client_error(), "{bad} -> {status}");
     }
+    let (status, alternate_key) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/cell?schema=main&relation=items&column=note&key.name=alpha",
+    )
+    .await;
+    assert_eq!((status, alternate_key.as_str()), (StatusCode::OK, "first"));
     // Column previews and foreign-key links for the Advanced sidebar and the export selection.
     let (_, columns) = get(
         &w.router,

@@ -5,6 +5,18 @@ pub const MAX_PAGE_SIZE: u32 = 1000;
 pub const MAX_OFFSET: u64 = 10_000;
 pub const PREVIEW_CHARACTERS: usize = 257;
 
+/// `format_type` schema-qualifies user-defined types. Only treat the built-in
+/// PostGIS spellings as spatial; an enum named `geography.foo` is ordinary data.
+pub fn is_spatial_type(native: &str) -> bool {
+    let native = native.trim().to_ascii_lowercase();
+    ["geometry", "geography"].iter().any(|base| {
+        native == *base
+            || native
+                .strip_prefix(base)
+                .is_some_and(|rest| rest.starts_with('('))
+    })
+}
+
 fn invalid() -> DbError {
     DbError::new(DbErrorKind::InvalidIdentifier)
 }
@@ -47,8 +59,7 @@ pub struct BuiltQuery {
 pub fn sort_supported(native: &str) -> bool {
     let x = native.to_ascii_lowercase();
     !x.starts_with("json")
-        && !x.contains("geometry")
-        && !x.contains("geography")
+        && !is_spatial_type(&x)
         && !x.starts_with("xml")
         && !x.starts_with("record")
         && !x.starts_with("point")
@@ -125,9 +136,8 @@ pub fn build(
     for (n, col) in selected.iter().enumerate() {
         let name = format!("t.{}", quote(&col.column.name)?);
         let native = col.column.native_type.to_ascii_lowercase();
-        let display = if (native.starts_with("geometry") || native.starts_with("geography"))
-            && let Some(schema) = postgis_schema
-        {
+        let spatial = is_spatial_type(&native);
+        let display = if spatial && let Some(schema) = postgis_schema {
             format!("{}.ST_AsText({name})", quote(schema)?)
         } else {
             format!("{name}::text")
@@ -136,7 +146,7 @@ pub fn build(
             "CASE WHEN {name} IS NULL THEN NULL ELSE left({display},{PREVIEW_CHARACTERS}) END AS \"c{n}\""
         ));
         if options.spatial_geojson
-            && (native.starts_with("geometry") || native.starts_with("geography"))
+            && spatial
             && let Some(schema) = postgis_schema
         {
             projections.push(format!(
@@ -260,6 +270,15 @@ mod tests {
             enum_values: Availability::Unavailable,
             comment: None,
         }
+    }
+    #[test]
+    fn spatial_detection_does_not_match_schema_qualified_enums() {
+        assert!(is_spatial_type("geometry"));
+        assert!(is_spatial_type("geography(Point,4326)"));
+        assert!(!is_spatial_type(
+            "geography.boundaries_valid_from_precision_enum"
+        ));
+        assert!(!is_spatial_type("public.my_geometry_type"));
     }
     #[test]
     fn quotes_keywords_unicode_and_embedded_quotes() {

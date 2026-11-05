@@ -94,7 +94,7 @@ impl PgCatalog {
         });
         let has_spatial = details.items.iter().any(|column| {
             let native = column.column.native_type.to_ascii_lowercase();
-            native.starts_with("geometry") || native.starts_with("geography")
+            row_query::is_spatial_type(&native)
         });
         let postgis_schema = if has_spatial {
             self.postgis_schema().await?
@@ -147,16 +147,7 @@ impl PgCatalog {
                     .map_err(|_| DbError::new(DbErrorKind::Internal))?;
                 let (cell, mut preview) = normalize(raw.as_deref(), &col.column.native_type);
                 if plan.spatial_geojson
-                    && (col
-                        .column
-                        .native_type
-                        .to_ascii_lowercase()
-                        .starts_with("geometry")
-                        || col
-                            .column
-                            .native_type
-                            .to_ascii_lowercase()
-                            .starts_with("geography"))
+                    && row_query::is_spatial_type(&col.column.native_type)
                     && let Some(raw_json) = record
                         .try_get::<Option<String>, _>(format!("g{i}").as_str())
                         .map_err(|_| DbError::new(DbErrorKind::Internal))?

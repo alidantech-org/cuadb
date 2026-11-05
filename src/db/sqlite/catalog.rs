@@ -4,7 +4,6 @@ use crate::db::{adapter::DatabaseAdapter, types::*};
 use sqlx::{Row, Sqlite, SqlitePool, sqlite::SqliteRow};
 use std::time::Duration;
 use tokio::time::timeout;
-const MAX_RELATIONS: i64 = 500;
 const MAX_COLUMNS: i64 = 512;
 const MAX_DETAILS: i64 = 300;
 const MAX_VISIBLE: usize = 24;
@@ -276,14 +275,9 @@ impl DatabaseAdapter for SqliteCatalog {
     ) -> Result<crate::db::types::CellValue, DbError> {
         use crate::db::types::{CellValue, MAX_CELL_CHARS};
         let columns = self.column_details(relation).await?.items;
-        let keys: Vec<&str> = columns
-            .iter()
-            .filter(|c| c.column.primary_key)
-            .map(|c| c.column.name.as_str())
-            .collect();
-        if keys.is_empty()
-            || key.len() != keys.len()
-            || !keys.iter().all(|k| key.iter().any(|(name, _)| name == k))
+        let key_columns = key.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>();
+        if key.is_empty()
+            || !self.is_unique_key(relation, &key_columns).await?
             || !columns.iter().any(|c| c.column.name == column)
         {
             return Err(DbError::new(DbErrorKind::InvalidIdentifier));
@@ -323,6 +317,27 @@ impl DatabaseAdapter for SqliteCatalog {
                 }
             }
         })
+    }
+    async fn is_unique_key(
+        &self,
+        relation: &RelationId,
+        columns: &[String],
+    ) -> Result<bool, DbError> {
+        let details = self.details(relation).await?;
+        let primary = details
+            .items
+            .iter()
+            .filter(|detail| detail.column.primary_key)
+            .map(|detail| detail.column.name.clone())
+            .collect::<Vec<_>>();
+        if !primary.is_empty() && primary == columns {
+            return Ok(true);
+        }
+        let indexes = self.indexes_inner(relation).await?;
+        Ok(indexes
+            .items
+            .into_iter()
+            .any(|index| index.unique && index.columns_or_expressions == columns))
     }
     fn supports(&self, c: Capability) -> bool {
         matches!(
@@ -414,9 +429,8 @@ impl DatabaseAdapter for SqliteCatalog {
                 sqlx::query(
                     "SELECT name, type FROM pragma_table_list WHERE schema='main' \
                      AND type IN ('table','view','virtual') AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' \
-                     ORDER BY name LIMIT ?",
+                     ORDER BY name",
                 )
-                .bind(MAX_RELATIONS + 1)
                 .fetch_all(&self.pool),
             )
             .await?;
@@ -438,7 +452,7 @@ impl DatabaseAdapter for SqliteCatalog {
                     })
                 })
                 .collect::<Result<Vec<_>, DbError>>()?,
-            MAX_RELATIONS as usize,
+            usize::MAX,
         ))
     }
     async fn describe_columns(

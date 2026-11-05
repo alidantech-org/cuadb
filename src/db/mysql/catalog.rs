@@ -17,7 +17,6 @@ use crate::db::{
 };
 
 const MAX_SCHEMAS: i64 = 300;
-const MAX_RELATIONS: i64 = 500;
 const MAX_COLUMNS: i64 = 512;
 const MAX_DETAILS: i64 = 300;
 const MAX_VISIBLE_COLUMNS: usize = 24;
@@ -398,10 +397,9 @@ impl DatabaseAdapter for MySqlCatalog {
                 sqlx::query(
                     "SELECT table_name, table_type FROM information_schema.tables \
              WHERE table_schema=? AND table_type IN ('BASE TABLE','VIEW') \
-             ORDER BY table_name LIMIT ?",
+             ORDER BY table_name",
                 )
                 .bind(namespace)
-                .bind(MAX_RELATIONS + 1)
                 .fetch_all(&self.pool),
             )
             .await?;
@@ -423,7 +421,7 @@ impl DatabaseAdapter for MySqlCatalog {
                     })
                 })
                 .collect::<Result<Vec<_>, DbError>>()?,
-            MAX_RELATIONS as usize,
+            usize::MAX,
         ))
     }
 

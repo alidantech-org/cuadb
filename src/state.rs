@@ -141,6 +141,7 @@ struct BuildCtx {
     limits: Limits,
     sqlite_root: std::path::PathBuf,
     sql_enabled: bool,
+    local_connection_management: bool,
 }
 
 /// Most connections that may exist at once (file-defined plus saved).
@@ -257,6 +258,7 @@ impl AppState {
                 limits: config.limits.clone(),
                 sqlite_root: config.sqlite_root.clone(),
                 sql_enabled: config.sql_workspace,
+                local_connection_management: config.local_connection_management,
             }));
             state.sql = SqlSettings {
                 enabled: config.sql_workspace,
@@ -302,6 +304,7 @@ impl AppState {
                 limits: config.limits.clone(),
                 sqlite_root: config.sqlite_root.clone(),
                 sql_enabled: config.sql_workspace,
+                local_connection_management: config.local_connection_management,
             })),
             vault: config
                 .secret_key
@@ -459,7 +462,7 @@ impl AppState {
         };
         let required = config.auth_mode == AuthMode::Required;
         let present = config.data_dir.join(DB_FILE).is_file();
-        if !present && !required {
+        if !present && !required && !config.local_connection_management {
             return Ok(self);
         }
         let store = AuthStore::open(&config.data_dir, required)
@@ -720,6 +723,12 @@ impl AppState {
     /// Whether this state can build connections at runtime.
     pub fn can_manage(&self) -> bool {
         self.ctx.is_some()
+    }
+
+    pub fn local_connection_management(&self) -> bool {
+        self.ctx
+            .as_ref()
+            .is_some_and(|ctx| ctx.local_connection_management)
     }
 
     pub fn is_managed(&self, id: &str) -> bool {

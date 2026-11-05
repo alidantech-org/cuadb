@@ -30,3 +30,7 @@ Progress (2026-11-05): the connection picker lists only the connections the user
 ### 2026-11-05T01:20:58.916Z · PETER IRUNGU
 
 Focused mobile acceptance (2026-11-05): At 390x844 against the disposable PostgreSQL fixture, the database picker listed the databases accessible to the read-only connection, showed the current selection and read-access badge, and stayed within the viewport when opened from the mobile drawer. Switched from `cuadb_fixture_catalog` to `cuadb_fixture_plain_pg` and back; the catalog refreshed for each, and Escape closed both connection and database popovers. The sidebar options menu was also fully visible from the open drawer. Remaining matrix item 4 stays open because this pass did not compare the connection modal across all desktop/mobile and light/dark combinations.
+
+### 2026-11-05T02:20:40.565Z · PETER IRUNGU
+
+Implemented alongside the connection flow: opted-in loopback connection management, full paged catalogs with fuzzy search, canonical UI URL state, exact-row FK sheets, and the PostgreSQL spatial type/error classification fix. Verified with bun run check, bun run test, bun run build, live Mzizi exploration (geography.boundaries and geography.units return successfully), FK sheet reload/back, and fuzzy search for “boundries”.

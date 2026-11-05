@@ -36,12 +36,13 @@ struct Value {
     truncated: bool,
     detail: String,
     class: &'static str,
-    /// Set for single-column foreign keys: opens the referenced relation filtered by this value.
+    /// Set for single-column foreign keys whose target key is a primary key.
     fk_href: String,
 }
 #[derive(Clone)]
 struct DisplayRow {
     number: u64,
+    key_json: String,
     values: Vec<Value>,
 }
 #[derive(Template)]
@@ -474,8 +475,7 @@ pub async fn data(
                     "json-value" | "array-value" | "binary-value"
                 ) && {
                     let native = c.native_type.to_ascii_lowercase();
-                    !native.starts_with("geometry")
-                        && !native.starts_with("geography")
+                    !crate::db::postgres::row_query::is_spatial_type(&native)
                         && !native.contains("tsvector")
                         && !native.contains("xml")
                 },
@@ -530,25 +530,38 @@ pub async fn data(
             })
             .collect::<Vec<_>>();
     // Single-column foreign keys turn their cells into links (best effort, bounded).
-    let fk_targets: std::collections::HashMap<String, RelationId> = catalog
-        .list_constraints(&nav.id)
-        .await
-        .map(|list| {
-            list.items
-                .into_iter()
-                .filter(|k| {
-                    k.kind == crate::db::types::ConstraintKind::ForeignKey && k.columns.len() == 1
-                })
-                .filter_map(|k| Some((k.columns.into_iter().next()?, k.references?)))
-                .filter(|(_, target)| {
-                    auth.0.allows(
-                        crate::auth::Action::View,
-                        &crate::auth::Resource::relation(&pid, &target.namespace, &target.name),
-                    )
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let fk_targets: std::collections::HashMap<String, (RelationId, String)> = if matches!(
+        catalog.engine(),
+        crate::db::types::Engine::PostgreSql | crate::db::types::Engine::Sqlite
+    ) {
+        catalog
+            .list_constraints(&nav.id)
+            .await
+            .map(|list| {
+                list.items
+                    .into_iter()
+                    .filter(|k| {
+                        k.kind == crate::db::types::ConstraintKind::ForeignKey
+                            && k.columns.len() == 1
+                    })
+                    .filter_map(|k| {
+                        Some((
+                            k.columns.into_iter().next()?,
+                            (k.references?, k.referenced_columns.into_iter().next()?),
+                        ))
+                    })
+                    .filter(|(_, (target, _target_column))| {
+                        auth.0.allows(
+                            crate::auth::Action::View,
+                            &crate::auth::Resource::relation(&pid, &target.namespace, &target.name),
+                        )
+                    })
+                    .collect::<std::collections::HashMap<_, _>>()
+            })
+            .unwrap_or_default()
+    } else {
+        std::collections::HashMap::new()
+    };
     // Enum columns get the pill treatment (best effort, one bounded metadata read).
     let enum_columns: std::collections::HashSet<String> = catalog
         .column_details(&nav.id)
@@ -561,9 +574,22 @@ pub async fn data(
                 .collect()
         })
         .unwrap_or_default();
+    let mut fk_targets = fk_targets;
+    let target_checks = fk_targets.values().cloned().collect::<Vec<_>>();
+    for (target, target_column) in target_checks {
+        let is_unique = catalog
+            .is_unique_key(&target, std::slice::from_ref(&target_column))
+            .await
+            .unwrap_or(false);
+        if !is_unique {
+            fk_targets.retain(|_, (candidate, candidate_column)| {
+                candidate != &target || candidate_column != &target_column
+            });
+        }
+    }
     let has_spatial = page.columns.iter().any(|column| {
         let native = column.native_type.to_ascii_lowercase();
-        native.starts_with("geometry") || native.starts_with("geography")
+        crate::db::postgres::row_query::is_spatial_type(&native)
     });
     let shown_from = if page.rows.is_empty() {
         0
@@ -614,6 +640,14 @@ pub async fn data(
     };
     let mut rendered = Vec::new();
     for (index, (cells, previews)) in page.rows.into_iter().zip(page.previews).enumerate() {
+        let key_pairs = page
+            .columns
+            .iter()
+            .zip(&cells)
+            .filter(|(column, _)| column.primary_key)
+            .map(|(column, cell)| (column.name.clone(), detail_value(cell, &column.native_type)))
+            .collect::<Vec<_>>();
+        let key_json = serde_json::to_string(&key_pairs).unwrap_or_else(|_| "[]".into());
         let values = cells
             .iter()
             .zip(previews)
@@ -625,17 +659,21 @@ pub async fn data(
                     detail.push_str(spatial);
                 }
                 let fk_href = match (fk_targets.get(&column.name), cell) {
-                    (Some(target), c)
+                    (Some((target, target_column)), c)
                         if !matches!(c, crate::db::types::Cell::Null) && !preview.truncated =>
                     {
-                        let mut q = url::form_urlencoded::Serializer::new(String::new());
-                        q.append_pair("schema", &target.namespace);
-                        q.append_pair("relation", &target.name);
-                        q.append_pair("filter", &preview.text);
-                        if let Some(profile) = nav.profile.as_deref() {
-                            q.append_pair("profile", profile);
-                        }
-                        format!("/catalog/data?{}", q.finish())
+                        let payload = serde_json::json!({
+                            "schema": target.namespace,
+                            "relation": target.name,
+                            "key": target_column,
+                            "value": preview.text,
+                            "profile": nav.profile,
+                        });
+                        format!(
+                            "#fk={}",
+                            url::form_urlencoded::byte_serialize(payload.to_string().as_bytes())
+                                .collect::<String>()
+                        )
                     }
                     _ => String::new(),
                 };
@@ -656,6 +694,7 @@ pub async fn data(
             .collect();
         rendered.push(DisplayRow {
             number: shown_from + index as u64,
+            key_json,
             values,
         });
     }
@@ -741,6 +780,85 @@ pub async fn data(
     };
     let body = view.render().map_err(|_| AppError::template())?;
     let mut response = Html(body).into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ForeignRowQuery {
+    schema: String,
+    relation: String,
+    key: String,
+    value: String,
+    profile: Option<String>,
+}
+
+/// Fetch the referenced row's bounded cell values for a foreign-key sheet.
+pub async fn foreign_row(
+    State(state): State<AppState>,
+    auth: super::auth::Auth,
+    axum::extract::Query(query): axum::extract::Query<ForeignRowQuery>,
+) -> Result<Response, AppError> {
+    let schema = name(&query.schema)?;
+    let relation = name(&query.relation)?;
+    let key_name = name(&query.key)?;
+    if query.value.len() > 65_536 || query.value.chars().any(char::is_control) {
+        return Err(invalid());
+    }
+    let profile = crate::state::checked_profile(query.profile)?;
+    let pid = state.effective_profile(profile.as_deref());
+    auth.authorize(
+        &state,
+        crate::auth::Action::View,
+        &crate::auth::Resource::relation(&pid, &schema, &relation),
+    )
+    .await?;
+    let catalog = state.adapter(profile.as_deref())?;
+    let id = RelationId {
+        namespace: schema,
+        name: relation,
+    };
+    let columns = catalog
+        .describe_columns(&id)
+        .await
+        .map_err(classified)?
+        .items;
+    if !catalog
+        .is_unique_key(&id, std::slice::from_ref(&key_name))
+        .await
+        .map_err(classified)?
+    {
+        return Err(invalid());
+    }
+    let key = [(key_name, query.value)];
+    let omitted_columns = columns.len() > 64;
+    let mut values = Vec::with_capacity(columns.len().min(64));
+    let mut total_bytes = 0usize;
+    let mut truncated = omitted_columns;
+    for column in columns.into_iter().take(64) {
+        let result = catalog
+            .cell_value(&id, &column.column.name, &key)
+            .await
+            .map_err(classified)?;
+        total_bytes = total_bytes.saturating_add(result.text.as_ref().map_or(0, String::len));
+        if total_bytes > 262_144 {
+            truncated = true;
+            break;
+        }
+        values.push(serde_json::json!({
+            "name": column.column.name,
+            "type": column.column.native_type,
+            "value": result.text,
+            "truncated": result.truncated,
+        }));
+    }
+    let mut response = axum::Json(
+        serde_json::json!({ "schema": id.namespace, "relation": id.name, "values": values, "truncated": truncated }),
+    )
+    .into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

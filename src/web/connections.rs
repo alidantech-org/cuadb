@@ -23,6 +23,18 @@ fn bad(message: &str) -> Result<Response, AppError> {
     notice_status(StatusCode::BAD_REQUEST, "refused", message)
 }
 
+async fn require_connection_manager(
+    state: &AppState,
+    auth: &Auth,
+    route: &str,
+) -> Result<(), AppError> {
+    if auth.0.is_admin() || (auth.0.is_open() && state.local_connection_management()) {
+        Ok(())
+    } else {
+        auth.require_admin(state, route).await
+    }
+}
+
 fn render<T: Template>(view: T) -> Result<Response, AppError> {
     let body = view.render().map_err(|_| AppError::template())?;
     let mut response = Html(body).into_response();
@@ -51,7 +63,7 @@ struct ListTemplate {
 
 /// GET /admin/connections
 pub async fn list(State(state): State<AppState>, auth: Auth) -> Result<Response, AppError> {
-    auth.require_admin(&state, "/admin/connections").await?;
+    require_connection_manager(&state, &auth, "/admin/connections").await?;
     let rows = state
         .profiles()
         .into_iter()
@@ -92,8 +104,7 @@ pub async fn form(
     auth: Auth,
     Query(query): Query<FormQuery>,
 ) -> Result<Response, AppError> {
-    auth.require_admin(&state, "/admin/connections/form")
-        .await?;
+    require_connection_manager(&state, &auth, "/admin/connections/form").await?;
     let Some(id) = query.id.filter(|id| !id.is_empty()) else {
         return render(FormTemplate {
             editing: false,
@@ -238,7 +249,7 @@ pub async fn create(
     auth: Auth,
     axum::Form(form): axum::Form<ConnForm>,
 ) -> Result<Response, AppError> {
-    auth.require_admin(&state, "/admin/connections").await?;
+    require_connection_manager(&state, &auth, "/admin/connections").await?;
     let _ = &form.csrf;
     if let Some(message) = prerequisites(&state) {
         return bad(message);
@@ -299,8 +310,7 @@ pub async fn update(
     auth: Auth,
     axum::Form(form): axum::Form<ConnForm>,
 ) -> Result<Response, AppError> {
-    auth.require_admin(&state, "/admin/connections/update")
-        .await?;
+    require_connection_manager(&state, &auth, "/admin/connections/update").await?;
     let _ = &form.csrf;
     if let Some(message) = prerequisites(&state) {
         return bad(message);
@@ -365,8 +375,7 @@ pub async fn delete(
     auth: Auth,
     axum::Form(form): axum::Form<IdForm>,
 ) -> Result<Response, AppError> {
-    auth.require_admin(&state, "/admin/connections/delete")
-        .await?;
+    require_connection_manager(&state, &auth, "/admin/connections/delete").await?;
     let _ = &form.csrf;
     if !state.is_managed(&form.id) {
         return bad(manage_message(ManageError::Unknown));
@@ -399,8 +408,7 @@ pub async fn test(
     auth: Auth,
     axum::Form(form): axum::Form<ConnForm>,
 ) -> Result<Response, AppError> {
-    auth.require_admin(&state, "/admin/connections/test")
-        .await?;
+    require_connection_manager(&state, &auth, "/admin/connections/test").await?;
     let _ = &form.csrf;
     if let Some(message) = prerequisites(&state) {
         return bad(message);

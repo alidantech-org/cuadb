@@ -47,10 +47,10 @@
         </tr></thead>
         <tbody>
           {% for row in rows %}
-          <tr tabindex="0" data-row="{{ row.number }}">
+          <tr tabindex="0" data-row="{{ row.number }}" data-row-key="{{ row.key_json }}">
             <td class="rn"><span class="rnum">{{ row.number }}</span><input class="rck" type="checkbox" aria-label="Select row {{ row.number }}" tabindex="-1"></td>
             {% for cell in row.values %}
-            <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if !cell.fk_href.is_empty() %}<a class="fk" href="{{ cell.fk_href }}" hx-get="{{ cell.fk_href }}" hx-target="#mainbody" hx-swap="innerHTML" title="Open the referenced row">{{ cell.text }}</a>{% else if cell.class == "bool-value" %}<span class="pill {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}">{{ cell.text }}</span>{% else if cell.class == "enum-value" %}<span class="pill">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
+            <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if !cell.fk_href.is_empty() %}<a class="fk" href="{{ cell.fk_href }}" title="Open the referenced row">{{ cell.text }}</a>{% else if cell.class == "bool-value" %}<span class="pill {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}">{{ cell.text }}</span>{% else if cell.class == "enum-value" %}<span class="pill">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
             {% endfor %}
           </tr>
           {% endfor %}

@@ -21,7 +21,7 @@ use super::manager::classify;
 
 /// Explicit caps; the UI displays `truncated` rather than claiming completeness.
 const MAX_SCHEMAS: i64 = 300;
-const MAX_RELATIONS: i64 = 500;
+const MAX_ADVANCED_OBJECTS: i64 = 500;
 const MAX_COLUMNS: i64 = 512;
 const MAX_DETAILS: i64 = 300;
 const MAX_OVERVIEW: i64 = 20;
@@ -152,11 +152,9 @@ impl PgCatalog {
                   AND n.nspname <> 'information_schema'
                   AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
                   AND pg_catalog.has_table_privilege(c.oid, 'SELECT')
-                ORDER BY c.relname COLLATE "C", c.oid
-                LIMIT $2"#,
+                ORDER BY c.relname COLLATE "C", c.oid"#,
                 )
                 .bind(namespace)
-                .bind(MAX_RELATIONS + 1)
                 .fetch_all(&self.pool),
             )
             .await?;
@@ -174,7 +172,7 @@ impl PgCatalog {
                     })
                 })
                 .collect::<Result<Vec<_>, DbError>>()?,
-            MAX_RELATIONS,
+            i64::MAX,
         ))
     }
 
@@ -277,14 +275,13 @@ impl PgCatalog {
                        WHERE n.nspname = $1 AND c.relkind IN ('r','p','m')
                          AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
                          AND pg_catalog.has_table_privilege(c.oid, 'SELECT')
-                       ORDER BY c.relname LIMIT 501"#,
+                       ORDER BY c.relname"#,
                 )
                 .bind(namespace)
                 .fetch_all(&self.pool),
             )
             .await?;
         rows.iter()
-            .take(500)
             .map(|r| {
                 let rows: Option<i64> = get(r, "rows")?;
                 let bytes: Option<i64> = get(r, "bytes")?;
@@ -341,14 +338,9 @@ impl PgCatalog {
     ) -> Result<crate::db::types::CellValue, DbError> {
         use super::row_query::quote;
         let columns = self.describe_columns(id).await?.items;
-        let keys: Vec<&str> = columns
-            .iter()
-            .filter(|c| c.column.primary_key)
-            .map(|c| c.column.name.as_str())
-            .collect();
-        if keys.is_empty()
-            || key.len() != keys.len()
-            || !keys.iter().all(|k| key.iter().any(|(name, _)| name == k))
+        let key_columns = key.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>();
+        if key.is_empty()
+            || !self.is_unique_key(id, &key_columns).await?
             || !columns.iter().any(|c| c.column.name == column)
         {
             return Err(DbError::new(DbErrorKind::InvalidIdentifier));
@@ -669,7 +661,7 @@ impl PgCatalog {
             ORDER BY chosen.kind,chosen.name COLLATE "C""#,
                 )
                 .bind(namespace)
-                .bind(MAX_RELATIONS + 1)
+                .bind(MAX_ADVANCED_OBJECTS + 1)
                 .fetch_all(&self.pool),
             )
             .await?;
@@ -694,7 +686,7 @@ impl PgCatalog {
                     })
                 })
                 .collect::<Result<Vec<_>, DbError>>()?,
-            MAX_RELATIONS,
+            MAX_ADVANCED_OBJECTS,
         ))
     }
 
@@ -814,6 +806,17 @@ impl DatabaseAdapter for PgCatalog {
         key: &[(String, String)],
     ) -> Result<crate::db::types::CellValue, DbError> {
         self.cell_text(relation, column, key).await
+    }
+    async fn is_unique_key(
+        &self,
+        relation: &RelationId,
+        columns: &[String],
+    ) -> Result<bool, DbError> {
+        let indexes = self.list_indexes(relation).await?;
+        Ok(indexes
+            .items
+            .into_iter()
+            .any(|index| index.unique && index.columns_or_expressions == columns))
     }
     async fn relation_sizes(
         &self,

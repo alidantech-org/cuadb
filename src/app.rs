@@ -119,8 +119,10 @@ fn api_routes() -> Router<crate::state::AppState> {
         .route("/catalog/links", get(web::catalog::links))
         .route("/catalog/data", get(web::rows::data))
         .route("/catalog/cell", get(web::rows::cell))
+        .route("/catalog/foreign", get(web::rows::foreign_row))
         .route("/catalog/export", get(web::export::export))
         .nest_service("/static", ServeDir::new("public"))
+        .fallback(get(web::explorer))
 }
 
 /// Construct the router for an unconfigured (disconnected) server.

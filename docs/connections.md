@@ -24,7 +24,7 @@ export CUADB_SECRET_KEY=<the value>   # or keep it in an untracked .env file
 | Test | Opens a throw-away connection with a 10 s limit and reports only "Connected in N ms" or a category such as "authentication failed". Nothing is saved. |
 | Remove | Closes the pools, rolls back open transactions on it and deletes its permissions. File-defined connections and the last remaining connection cannot be removed. |
 
-Every change writes a `connection_changed` audit event (created, updated, removed, test ok/failed) with the connection id and no URL, host or password. All routes are administrator-only and CSRF-protected.
+Every change writes a `connection_changed` audit event (created, updated, removed, test ok/failed) with the connection id and no URL, host or password. All routes are CSRF-protected. They are administrator-only unless trusted local management is explicitly enabled with `CUADB_LOCAL_CONNECTIONS=enabled`; that setting is rejected unless `CUADB_HOST` is a loopback address. Saved connections still require `CUADB_SECRET_KEY`.
 
 ## Limits
 

@@ -11,10 +11,102 @@ const win = window;
 const prefs = win.cuadbPrefs;
 const S = prefs.S;
 const TP = prefs.TP;
+let restoreRequestPath = '';
 
 /** Ask HTMX for a fragment. */
 function fetchInto(/** @type {string} */ url, /** @type {string} */ target, swap = 'outerHTML') {
   win.htmx?.ajax('GET', url, { target, swap });
+}
+
+function setHash(/** @type {string} */ value) {
+  const url = new URL(location.href);
+  url.hash = value;
+  history.replaceState(history.state, '', url);
+}
+function pushHash(/** @type {string} */ value) {
+  const url = new URL(location.href);
+  url.hash = value;
+  history.pushState({}, '', url);
+}
+function encodeHash(/** @type {Record<string, unknown>} */ value) {
+  return encodeURIComponent(JSON.stringify(value));
+}
+function decodeHash(/** @type {string} */ prefix) {
+  if (!location.hash.startsWith(`#${prefix}=`)) return null;
+  try {
+    return JSON.parse(decodeURIComponent(location.hash.slice(prefix.length + 2)));
+  } catch {
+    return null;
+  }
+}
+
+function routeForRequest(/** @type {string} */ path) {
+  const url = new URL(path, location.origin);
+  const p = url.searchParams;
+  const profile = p.get('profile');
+  const extra = new URLSearchParams(p);
+  if (profile) extra.set('profile', profile);
+  let route = url.pathname;
+  if (route === '/catalog/data' || route === '/catalog/structure' || route === '/catalog/indexes') {
+    const schema = p.get('schema') ?? '';
+    const relation = p.get('relation') ?? '';
+    for (const key of ['schema', 'relation']) extra.delete(key);
+    const view = route.endsWith('/structure')
+      ? '/structure'
+      : route.endsWith('/indexes')
+        ? '/indexes'
+        : '';
+    route = `/table/${encodeURIComponent(schema)}/${encodeURIComponent(relation)}${view}`;
+  } else if (route === '/catalog/overview') route = '/overview';
+  else if (route === '/catalog/object')
+    route = `/object/${encodeURIComponent(p.get('schema') ?? '')}/${encodeURIComponent(p.get('name') ?? '')}`;
+  else if (route === '/admin') route = '/workspace/admin';
+  else if (route === '/admin/users') route = '/workspace/admin/users';
+  else if (route === '/admin/connections') route = '/workspace/admin/connections';
+  else if (route === '/admin/grants') route = '/workspace/admin/permissions';
+  else if (route === '/admin/audit') route = '/workspace/admin/audit';
+  else if (route === '/admin/security') route = '/workspace/admin/security';
+  else if (route === '/admin/connections/form') {
+    route = '/workspace/admin/connections';
+    return `${route}#connection=${encodeURIComponent(p.get('id') ?? 'add')}`;
+  } else if (route === '/sql') route = '/workspace/sql';
+  else if (
+    !route.startsWith('/table/') &&
+    !route.startsWith('/workspace/') &&
+    route !== '/overview' &&
+    !route.startsWith('/object/')
+  )
+    return null;
+  const query = extra.toString();
+  return `${route}${query ? `?${query}` : ''}`;
+}
+
+function requestForLocation() {
+  const parts = location.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  const params = new URLSearchParams(location.search);
+  params.delete('open');
+  params.delete('treeq');
+  params.delete('database');
+  const profile = params.get('profile');
+  if (parts[0] === 'table' && parts.length >= 3) {
+    const [_, schema, relation, view] = parts;
+    params.set('schema', schema ?? '');
+    params.set('relation', relation ?? '');
+    if (profile) params.set('profile', profile);
+    return `/catalog/${view === 'structure' ? 'structure' : view === 'indexes' ? 'indexes' : 'data'}?${params}`;
+  }
+  if (parts[0] === 'overview')
+    return `/catalog/overview${profile ? `?profile=${encodeURIComponent(profile)}` : ''}`;
+  if (parts[0] === 'object' && parts.length >= 3) {
+    params.set('schema', parts[1] ?? '');
+    params.set('name', parts[2] ?? '');
+    return `/catalog/object?${params}`;
+  }
+  if (parts[0] === 'workspace' && parts[1] === 'admin') return '/admin';
+  if (parts[0] === 'workspace' && parts[1] === 'sql')
+    return `/sql${profile ? `?profile=${encodeURIComponent(profile)}` : ''}`;
+  if (location.pathname !== '/') return null;
+  return null;
 }
 
 /* ------------------------------------------------------------ toast + clipboard */
@@ -348,6 +440,10 @@ async function useDatabase(/** @type {HTMLElement} */ option) {
     if (!derived) throw new Error('none');
     win.cuadbProfile = derived;
     currentDb = { ...currentDb, db: database };
+    const url = new URL('/', location.origin);
+    url.searchParams.set('profile', derived);
+    url.searchParams.set('database', database);
+    history.pushState({}, '', url);
     const name = document.getElementById('dname');
     if (name) name.textContent = database;
     closePops();
@@ -385,6 +481,7 @@ function closePops(/** @type {string} */ except = '') {
       .querySelectorAll(`[aria-controls="${id}"]`)
       .forEach((btn) => btn.setAttribute('aria-expanded', 'false'));
   });
+  if (!except && location.hash.startsWith('#popover/')) setHash('');
 }
 function togglePop(/** @type {string} */ id) {
   const el = document.getElementById(id);
@@ -395,6 +492,11 @@ function togglePop(/** @type {string} */ id) {
     .querySelectorAll(`[aria-controls="${id}"]`)
     .forEach((btn) => btn.setAttribute('aria-expanded', String(open)));
   if (open && id === 'opop') syncSettings();
+  if (open)
+    pushHash(
+      `popover/${{ cpop: 'connections', dpop: 'database', opop: 'sidebar', colpop: 'columns', exppop: 'export' }[id] ?? id}`,
+    );
+  else if (location.hash.startsWith('#popover/')) setHash('');
 }
 
 /* ------------------------------------------------------------ settings dialog */
@@ -408,6 +510,7 @@ function openSettings(/** @type {string} */ pane = '') {
   dialog.classList.add('show');
   document.getElementById('sbtn')?.setAttribute('aria-expanded', 'true');
   showSettingsPane(pane || String(win.cuadbPane || 'general'));
+  pushHash(`settings/${encodeURIComponent(String(win.cuadbPane || 'general'))}`);
   syncSettings();
   /** @type {HTMLElement | null} */ (dialog.querySelector('.snav.on'))?.focus();
 }
@@ -415,6 +518,7 @@ function closeSettings() {
   const dialog = document.getElementById('spop');
   if (!dialog?.classList.contains('show')) return;
   dialog.classList.remove('show');
+  if (location.hash.startsWith('#settings/')) setHash('');
   document.getElementById('sbtn')?.setAttribute('aria-expanded', 'false');
   if (settingsOpener instanceof HTMLElement && document.contains(settingsOpener))
     settingsOpener.focus();
@@ -557,16 +661,94 @@ function openInspector(/** @type {HTMLTableRowElement} */ row) {
     panel.append(kv);
   });
   panel.classList.add('show');
+  const key = row.dataset.rowKey;
+  const grid = document.getElementById('catalog-panel');
+  if (key && grid)
+    pushHash(
+      `row=${encodeHash({ schema: grid.dataset.schema, relation: grid.dataset.relation, key: JSON.parse(key), profile: grid.dataset.prof ?? '' })}`,
+    );
   const backdrop = document.getElementById('sheet-bk');
   if (backdrop) backdrop.hidden = false;
   panel.scrollTop = 0;
 }
-function closeInspector() {
+function closeInspector(preserveHash = false) {
   win.cuadbEditing = false;
   document.getElementById('insp')?.classList.remove('show');
+  if (!preserveHash && (location.hash.startsWith('#row=') || location.hash.startsWith('#fk=')))
+    setHash('');
   const backdrop = document.getElementById('sheet-bk');
   if (backdrop) backdrop.hidden = true;
   $$('tr.sel').forEach((el) => el.classList.remove('sel'));
+}
+
+async function openForeignRow(/** @type {Any} */ item, updateHash = true) {
+  if (
+    !item ||
+    typeof item.schema !== 'string' ||
+    typeof item.relation !== 'string' ||
+    typeof item.key !== 'string' ||
+    typeof item.value !== 'string'
+  )
+    return;
+  if (updateHash) pushHash(`fk=${encodeHash(item)}`);
+  const params = new URLSearchParams({
+    schema: item.schema,
+    relation: item.relation,
+    key: item.key,
+    value: item.value,
+  });
+  if (item.profile) params.set('profile', item.profile);
+  try {
+    const response = await fetch(`/catalog/foreign?${params}`, {
+      headers: { accept: 'application/json' },
+    });
+    if (!response.ok) throw new Error('unavailable');
+    const data = await response.json();
+    const panel = document.getElementById('insp');
+    if (!panel) return;
+    panel.replaceChildren();
+    const title = document.createElement('h3');
+    title.textContent = `${data.schema}.${data.relation}`;
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'btn ico';
+    close.dataset.closeInsp = '';
+    close.setAttribute('aria-label', 'Close row details');
+    close.textContent = '×';
+    const actions = document.createElement('span');
+    actions.className = 'ia';
+    actions.append(close);
+    title.append(actions);
+    panel.append(title);
+    for (const field of data.values) {
+      const kv = document.createElement('div');
+      kv.className = 'kv';
+      const label = document.createElement('label');
+      const name = document.createElement('span');
+      name.textContent = field.name;
+      const type = document.createElement('span');
+      type.textContent = field.type;
+      label.append(name, type);
+      const pre = document.createElement('pre');
+      pre.textContent =
+        field.value === null ? 'NULL' : String(field.value) + (field.truncated ? '…' : '');
+      kv.append(label, pre);
+      panel.append(kv);
+    }
+    if (data.truncated) {
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = 'Some fields were omitted to keep the row preview bounded.';
+      panel.append(note);
+    }
+    panel.classList.add('show');
+    const backdrop = document.getElementById('sheet-bk');
+    if (backdrop) backdrop.hidden = false;
+    panel.scrollTop = 0;
+    win.cuadbRow = null;
+  } catch {
+    toast('The referenced row could not be opened.');
+  }
 }
 
 /** Fetch the whole text of a truncated cell (by primary key) and show it in the sheet. */
@@ -1326,7 +1508,13 @@ function rememberLast(/** @type {string} */ path) {
   }
 }
 function restoreLast() {
-  if (!S.restore || document.getElementById('catalog-panel')) return;
+  if (
+    !S.restore ||
+    document.getElementById('catalog-panel') ||
+    location.pathname !== '/' ||
+    location.search
+  )
+    return;
   try {
     const last = JSON.parse(localStorage.getItem('cuadb:last') || 'null');
     if (!last?.s || !last?.r) return;
@@ -1344,25 +1532,20 @@ function openSchema(/** @type {Element} */ holder, /** @type {boolean} */ open) 
   holder.setAttribute('aria-expanded', String(open));
 }
 function autoOpenSchema() {
-  if (!S.autoOpen) return;
-  const schemas = $$('#tree .sch');
-  const first =
-    schemas.find((el) => el.getAttribute('data-schema-name') === 'public') ?? schemas[0];
-  const button = first?.querySelector('[data-s]');
-  if (first && button instanceof HTMLElement && !first.classList.contains('o')) {
-    button.click();
-  }
+  // Schemas open only by user choice or explicit URL state.
 }
 function filterTree() {
   const input = /** @type {HTMLInputElement | null} */ (document.getElementById('f'));
   const needle = (input?.value ?? '').trim().toLocaleLowerCase();
   $$('#tree .sch').forEach((schema) => {
     const schemaName = (schema.getAttribute('data-schema-name') ?? '').toLocaleLowerCase();
-    const schemaHit = needle !== '' && schemaName.includes(needle);
+    const schemaHit = needle !== '' && fuzzyMatch(needle, schemaName);
     let any = false;
     schema.querySelectorAll('[data-relation-name]').forEach((relation) => {
       const name = (relation.getAttribute('data-relation-name') ?? '').toLocaleLowerCase();
-      const hit = needle === '' || schemaHit || name.includes(needle);
+      const qualified = `${schemaName}.${name}`;
+      const hit =
+        needle === '' || schemaHit || fuzzyMatch(needle, name) || fuzzyMatch(needle, qualified);
       relation.toggleAttribute('hidden', !hit);
       any ||= hit;
     });
@@ -1389,6 +1572,105 @@ function filterTree() {
       );
     none.hidden = needle === '' || anyVisible;
   }
+}
+/** Search every visible schema on the server so paging and unloaded relations are included. */
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let treeSearchTimer;
+function searchServerTree() {
+  clearTimeout(treeSearchTimer);
+  treeSearchTimer = setTimeout(() => {
+    const needle =
+      /** @type {HTMLInputElement | null} */ (document.getElementById('f'))?.value.trim() ?? '';
+    for (const schema of $$('#tree .sch')) {
+      const button = schema.querySelector('[data-s]');
+      const sub = schema.querySelector('.sub');
+      const href = button?.getAttribute('hx-get');
+      const name = schema.getAttribute('data-schema-name') ?? '';
+      if (!(sub instanceof HTMLElement) || !href) continue;
+      if (!needle && !schema.classList.contains('o')) continue;
+      const url = new URL(href, location.origin);
+      url.searchParams.set('offset', '0');
+      url.searchParams.set('limit', '200');
+      if (needle) url.searchParams.set('q', needle);
+      else url.searchParams.delete('q');
+      if (S.mode === 'advanced') url.searchParams.set('group', '1');
+      openSchema(schema, !!needle || schema.classList.contains('o'));
+      fetchInto(
+        `${url.pathname}${url.search}`,
+        `#tree .sch[data-schema-name="${CSS.escape(name)}"] .sub`,
+        'innerHTML',
+      );
+    }
+  }, 120);
+}
+function fuzzyMatch(/** @type {string} */ query, /** @type {string} */ value) {
+  if (!query) return true;
+  if (value.includes(query)) return true;
+  const distance = (/** @type {string} */ a, /** @type {string} */ b) => {
+    let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      const row = [i];
+      for (let j = 1; j <= b.length; j++)
+        row[j] = Math.min(
+          (row[j - 1] ?? Infinity) + 1,
+          (prev[j] ?? Infinity) + 1,
+          (prev[j - 1] ?? Infinity) + (a[i - 1] === b[j - 1] ? 0 : 1),
+        );
+      prev = row;
+    }
+    return prev[b.length] ?? Infinity;
+  };
+  const tolerance = Math.max(1, Math.floor(query.length / 4));
+  return value.split(/[._\s-]+/).some((part) => distance(query, part) <= tolerance);
+}
+function syncSidebarUrl() {
+  const url = new URL(location.href);
+  const opened = $$('#tree .sch.o')
+    .map((node) => node.getAttribute('data-schema-name') ?? '')
+    .filter(Boolean);
+  const search =
+    /** @type {HTMLInputElement | null} */ (document.getElementById('f'))?.value.trim() ?? '';
+  if (opened.length) url.searchParams.set('open', JSON.stringify(opened));
+  else url.searchParams.delete('open');
+  if (search) url.searchParams.set('treeq', search);
+  else url.searchParams.delete('treeq');
+  history.replaceState(history.state, '', url);
+}
+function restoreSidebarState() {
+  const params = new URLSearchParams(location.search);
+  const search = /** @type {HTMLInputElement | null} */ (document.getElementById('f'));
+  if (search && params.has('treeq')) search.value = params.get('treeq') ?? '';
+  let opened = new Set();
+  try {
+    const saved = JSON.parse(params.get('open') ?? '[]');
+    if (Array.isArray(saved)) opened = new Set(saved.filter((name) => typeof name === 'string'));
+  } catch {
+    /* malformed URL state is ignored */
+  }
+  const active = location.pathname.match(/^\/table\/([^/]+)\/([^/]+)/);
+  if (active?.[1]) opened.add(decodeURIComponent(active[1]));
+  for (const schema of $$('#tree .sch')) {
+    const name = schema.getAttribute('data-schema-name') ?? '';
+    if (!opened.has(name)) continue;
+    const button = schema.querySelector('[data-s]');
+    openSchema(schema, true);
+    const sub = schema.querySelector('.sub');
+    const href = button?.getAttribute('hx-get');
+    if (sub && href && !sub.querySelector('[data-relation-name]'))
+      fetchInto(href, `#tree .sch[data-schema-name="${CSS.escape(name)}"] .sub`, 'innerHTML');
+  }
+  if (search?.value) filterTree();
+  selectActiveTable();
+}
+function selectActiveTable() {
+  const active = location.pathname.match(/^\/table\/([^/]+)\/([^/]+)/);
+  if (!active) return;
+  const schema = decodeURIComponent(active[1] ?? '');
+  const relation = decodeURIComponent(active[2] ?? '');
+  const link = document.querySelector(
+    `#tree .relw[data-schema="${CSS.escape(schema)}"][data-rel="${CSS.escape(relation)}"] a.row`,
+  );
+  if (link instanceof Element) markActiveRow(link);
 }
 function markActiveRow(/** @type {Element | null} */ link) {
   $$('#tree .row.act').forEach((el) => {
@@ -1421,6 +1703,17 @@ function columnsRequest(/** @type {boolean | null} */ all) {
 document.addEventListener('click', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  const foreignLink = target.closest('a.fk[href^="#fk="]');
+  if (foreignLink instanceof HTMLAnchorElement) {
+    event.preventDefault();
+    try {
+      const fragment = new URL(foreignLink.href).hash.slice(4);
+      void openForeignRow(JSON.parse(decodeURIComponent(fragment)));
+    } catch {
+      toast('The referenced row link is invalid.');
+    }
+    return;
+  }
   // The sheet closes on any click outside it. That click only closes: it never opens another
   // row, so a double-click on a row opens the sheet and the second click closes it.
   if (sheetOpen() && !target.closest('#insp, [data-row-add], .pop')) {
@@ -1513,6 +1806,7 @@ document.addEventListener('click', (event) => {
   const paneBtn = target.closest('[data-sp]');
   if (paneBtn instanceof HTMLElement) {
     showSettingsPane(paneBtn.dataset.sp ?? 'general');
+    setHash(`settings/${encodeURIComponent(paneBtn.dataset.sp ?? 'general')}`);
     return;
   }
   const popBtn = target.closest('[data-pop]');
@@ -1527,6 +1821,9 @@ document.addEventListener('click', (event) => {
     const name = document.getElementById('cname');
     if (name) name.textContent = label;
     win.cuadbProfile = profile.dataset.profile ?? '';
+    const url = new URL('/', location.origin);
+    if (win.cuadbProfile) url.searchParams.set('profile', win.cuadbProfile);
+    history.pushState({}, '', url);
     syncDatabase(profile);
     closePops();
     document.getElementById('f')?.focus();
@@ -1557,11 +1854,13 @@ document.addEventListener('click', (event) => {
   if (schemaBtn) {
     const holder = schemaBtn.closest('.sch');
     if (holder) openSchema(holder, !holder.classList.contains('o'));
+    syncSidebarUrl();
     return;
   }
   const rowLink = target.closest('#tree a.row');
   if (rowLink) {
     markActiveRow(rowLink);
+    syncSidebarUrl();
     if (innerWidth < 761) setDrawer(false);
     return;
   }
@@ -1762,7 +2061,11 @@ document.addEventListener('change', (event) => {
 
 document.addEventListener('input', (event) => {
   const el = event.target;
-  if (el instanceof HTMLInputElement && el.id === 'f') filterTree();
+  if (el instanceof HTMLInputElement && el.id === 'f') {
+    filterTree();
+    searchServerTree();
+    syncSidebarUrl();
+  }
 });
 
 /** Visible, focusable rows of the sidebar tree, in order. */
@@ -1896,6 +2199,13 @@ document.addEventListener('htmx:afterSwap', (event) => {
       if (selected instanceof HTMLElement && name)
         name.textContent = selected.dataset.label ?? 'Connection';
       if (selected instanceof HTMLElement) syncDatabase(selected);
+      const remembered = new URLSearchParams(location.search).get('database');
+      if (remembered) {
+        currentDb = { ...currentDb, db: remembered };
+        const databaseName = document.getElementById('dname');
+        if (databaseName) databaseName.textContent = remembered;
+      }
+      if (document.getElementById('dpop')?.classList.contains('show')) renderDatabasePop();
       const dot = document.getElementById('cdot');
       if (selected instanceof HTMLElement && dot) {
         const ready = selected.dataset.ready === 'true';
@@ -1907,17 +2217,42 @@ document.addEventListener('htmx:afterSwap', (event) => {
     }
     if (event.target.id === 'tree') {
       applyTreeView();
+      restoreSidebarState();
       restoreLast();
     }
+    if (event.target.id === 'mainbody' || event.target.id === 'catalog-panel') {
+      const route = `/table/${encodeURIComponent(document.getElementById('catalog-panel')?.getAttribute('data-schema') ?? '')}/${encodeURIComponent(document.getElementById('catalog-panel')?.getAttribute('data-relation') ?? '')}`;
+      const path = location.pathname;
+      const match = path.match(/^\/table\/([^/]+)\/([^/]+)(?:\/(structure|indexes))?$/);
+      if (match) {
+        const selected = document.querySelector(
+          `#tree .relw[data-schema="${CSS.escape(decodeURIComponent(match[1] ?? ''))}"][data-rel="${CSS.escape(decodeURIComponent(match[2] ?? ''))}"] a.row`,
+        );
+        if (selected instanceof Element) markActiveRow(selected);
+      }
+      void route;
+      if (location.hash.startsWith('#fk=')) {
+        const foreign = decodeHash('fk');
+        if (foreign) void openForeignRow(foreign, false);
+      }
+      if (location.hash.startsWith('#row=')) {
+        const row = decodeHash('row');
+        if (row) setTimeout(() => restoreRowSheet(row), 0);
+      }
+      if (event.target.id === 'mainbody' && partsAdminTab()) setTimeout(restoreAdminTab, 0);
+    }
     if (event.target.matches('.sub')) {
+      const more = Array.from(event.target.querySelectorAll('[data-load-relations]'));
+      more.slice(0, -1).forEach((button) => button.remove());
       filterTree();
       loadObjects();
       applyTreeView();
+      selectActiveTable();
     }
     decorateBars(event.target);
     // A new page replaces the sheet's row; swaps inside the sheet itself (the editor form,
     // its messages) and elsewhere must leave it open.
-    if (event.target.id === 'mainbody' || event.target.id === 'catalog-panel') closeInspector();
+    if (event.target.id === 'mainbody' || event.target.id === 'catalog-panel') closeInspector(true);
   }
 });
 
@@ -1957,6 +2292,30 @@ document.addEventListener('htmx:afterSwap', (event) => {
 document.addEventListener('htmx:afterRequest', (event) => {
   const detail = /** @type {Any} */ (event).detail;
   const path = String(detail.pathInfo?.requestPath ?? '');
+  const restoring = !!restoreRequestPath && path === restoreRequestPath;
+  if (restoring) restoreRequestPath = '';
+  const finalRoute = routeForRequest(String(detail.pathInfo?.finalRequestPath ?? path));
+  if (
+    !restoring &&
+    finalRoute &&
+    Number(detail.xhr?.status ?? 0) >= 200 &&
+    Number(detail.xhr?.status ?? 0) < 400
+  ) {
+    const url = new URL(finalRoute, location.origin);
+    const openSchemas = $$('#tree .sch.o')
+      .map((node) => node.getAttribute('data-schema-name') ?? '')
+      .filter(Boolean);
+    const search = /** @type {HTMLInputElement | null} */ (
+      document.getElementById('f')
+    )?.value.trim();
+    if (openSchemas.length) url.searchParams.set('open', JSON.stringify(openSchemas));
+    if (search) url.searchParams.set('treeq', search);
+    if (currentDb.db) url.searchParams.set('database', currentDb.db);
+    // Initial deep-link restoration reissues the current view through HTMX. Keep its
+    // fragment so row/settings sheets remain addressable after the fragment loads.
+    if (url.pathname === location.pathname) url.hash = location.hash;
+    history.pushState({}, '', url);
+  }
   const cancel = document.getElementById('sql-cancel');
   if (path.startsWith('/catalog/data')) {
     const finalPath = String(detail.pathInfo?.finalRequestPath ?? path);
@@ -1993,6 +2352,100 @@ document.addEventListener('htmx:afterRequest', (event) => {
     win.cuadbTx = '';
   }
 });
+
+function restoreLocation() {
+  if (!location.hash.startsWith('#row=') && !location.hash.startsWith('#fk=')) closeInspector(true);
+  const rememberedDatabase = new URLSearchParams(location.search).get('database');
+  if (rememberedDatabase) {
+    currentDb = { ...currentDb, db: rememberedDatabase };
+    const dbName = document.getElementById('dname');
+    if (dbName) dbName.textContent = rememberedDatabase;
+  }
+  const profile = new URLSearchParams(location.search).get('profile');
+  if (profile) {
+    win.cuadbProfile = profile;
+    const tree = document.getElementById('tree');
+    tree?.setAttribute('hx-get', `/catalog/schemas?profile=${encodeURIComponent(profile)}`);
+    document
+      .getElementById('cpop')
+      ?.setAttribute('hx-get', `/connection/profiles?profile=${encodeURIComponent(profile)}`);
+  }
+  const request = requestForLocation();
+  if (request) {
+    restoreRequestPath = request;
+    fetchInto(request, '#mainbody', 'innerHTML');
+  }
+  if (!location.hash.startsWith('#row=') && !location.hash.startsWith('#fk=')) closeInspector(true);
+  const settings = location.hash.match(/^#settings\/(.*)$/);
+  if (settings) openSettings(decodeURIComponent(settings[1] ?? ''));
+  const pop = location.hash.match(/^#popover\/(.*)$/);
+  if (pop) {
+    const id = {
+      connections: 'cpop',
+      database: 'dpop',
+      sidebar: 'opop',
+      columns: 'colpop',
+      export: 'exppop',
+    }[decodeURIComponent(pop[1] ?? '')];
+    if (id === 'dpop') renderDatabasePop();
+    const node = document.getElementById(id ?? '');
+    if (node) node.classList.add('show');
+  }
+  const foreign = decodeHash('fk');
+  if (foreign) void openForeignRow(foreign, false);
+  const row = decodeHash('row');
+  if (row) restoreRowSheet(row);
+  if (document.querySelector('#tree .sch')) restoreSidebarState();
+}
+function restoreRowSheet(/** @type {Any} */ row) {
+  const expected = JSON.stringify(row.key ?? []);
+  const match = $$('#catalog-panel tr[data-row-key]').find(
+    (tr) => tr.getAttribute('data-row-key') === expected,
+  );
+  if (match instanceof HTMLTableRowElement) openInspector(match);
+}
+function partsAdminTab() {
+  return location.pathname.startsWith('/workspace/admin/');
+}
+function restoreAdminTab() {
+  const tab = decodeURIComponent(location.pathname.split('/').pop() ?? '');
+  const key = tab === 'permissions' ? 'permissions' : tab;
+  const button = document.querySelector(`#adm-seg [data-tab="${CSS.escape(key)}"]`);
+  if (button instanceof HTMLElement) button.click();
+  if (location.hash.startsWith('#connection=')) {
+    const id = decodeURIComponent(location.hash.slice('#connection='.length));
+    fetchInto(
+      `/admin/connections/form${id === 'add' ? '' : `?id=${encodeURIComponent(id)}`}`,
+      '#modal',
+      'innerHTML',
+    );
+  }
+}
+window.addEventListener('popstate', restoreLocation);
+window.addEventListener('hashchange', () => {
+  if (location.hash.startsWith('#settings/')) {
+    const match = location.hash.match(/^#settings\/(.*)$/);
+    if (match) openSettings(decodeURIComponent(match[1] ?? ''));
+  } else if (location.hash.startsWith('#fk=')) {
+    const foreign = decodeHash('fk');
+    if (foreign) void openForeignRow(foreign, false);
+  } else if (location.hash.startsWith('#popover/')) {
+    restoreLocation();
+  } else if (location.hash.startsWith('#row=')) {
+    const row = decodeHash('row');
+    if (row) {
+      const expected = JSON.stringify(row.key ?? []);
+      const match = $$('#catalog-panel tr[data-row-key]').find(
+        (tr) => tr.getAttribute('data-row-key') === expected,
+      );
+      if (match instanceof HTMLTableRowElement) openInspector(match);
+    }
+  } else {
+    closeSettings();
+    closeInspector(true);
+  }
+});
+restoreLocation();
 document.addEventListener('htmx:beforeRequest', (event) => {
   const detailBefore = /** @type {Any} */ (event).detail;
   if (

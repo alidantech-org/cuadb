@@ -130,6 +130,7 @@ struct RelationTreeTemplate {
     note: String,
     /// The bounded catalog list was cut off; tell the user even when rows exist.
     truncated: bool,
+    next_href: String,
 }
 struct RelationItem {
     name: String,
@@ -409,6 +410,41 @@ pub struct SchemaQuery {
     profile: Option<String>,
     /// Advanced explorer: group tables and views under headings.
     group: Option<String>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+}
+
+fn fuzzy_distance(a: &str, b: &str) -> usize {
+    let mut previous: Vec<usize> = (0..=b.chars().count()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut current = vec![i + 1; previous.len()];
+        for (j, cb) in b.chars().enumerate() {
+            current[j + 1] = (current[j] + 1)
+                .min(previous[j + 1] + 1)
+                .min(previous[j] + usize::from(ca != cb));
+        }
+        previous = current;
+    }
+    *previous.last().unwrap_or(&usize::MAX)
+}
+
+fn relation_match_score(query: &str, name: &str, schema: &str) -> Option<usize> {
+    let qualified = format!("{schema}.{name}");
+    if name == query || qualified == query {
+        return Some(0);
+    }
+    if name.starts_with(query) || qualified.starts_with(query) {
+        return Some(1);
+    }
+    if name.contains(query) || qualified.contains(query) {
+        return Some(2);
+    }
+    let threshold = (query.chars().count() / 3).max(1);
+    let best = [name, schema, qualified.as_str()]
+        .into_iter()
+        .map(|candidate| fuzzy_distance(query, candidate))
+        .min()?;
+    (best <= threshold).then_some(3 + best)
 }
 
 #[derive(serde::Deserialize)]
@@ -560,8 +596,7 @@ pub async fn relations(
         .await
         .map(|list| list.into_iter().map(|s| (s.name.clone(), s)).collect())
         .unwrap_or_default();
-    let truncated = entries.truncated;
-    let relations = entries
+    let mut matches = entries
         .items
         .into_iter()
         .filter(|relation| {
@@ -570,12 +605,28 @@ pub async fn relations(
                 &Resource::relation(&pid, &schema, &relation.id.name),
             )
         })
-        .filter(|relation| {
-            needle
-                .as_ref()
-                .is_none_or(|n| relation.id.name.to_lowercase().contains(n))
+        .filter_map(|relation| {
+            let score = needle.as_ref().and_then(|n| {
+                relation_match_score(n, &relation.id.name.to_lowercase(), &schema.to_lowercase())
+            });
+            (needle.is_none() || score.is_some()).then_some((score.unwrap_or(0), relation))
         })
-        .map(|relation| {
+        .collect::<Vec<_>>();
+    matches.sort_by(|(sa, a), (sb, b)| {
+        sa.cmp(sb)
+            .then_with(|| a.id.name.to_lowercase().cmp(&b.id.name.to_lowercase()))
+    });
+    let total = matches.len();
+    let offset = query.offset.unwrap_or(0).min(total);
+    let limit = query.limit.unwrap_or(200).clamp(1, 500);
+    let next_offset = (offset + limit).min(total);
+    let truncated = entries.truncated || next_offset < total;
+    let relations = matches
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .map(|(_, relation)| {
+            let relation_size = sizes.get(&relation.id.name);
             let kind = format!("{:?}", relation.kind);
             RelationItem {
                 name: relation.id.name.clone(),
@@ -584,20 +635,14 @@ pub async fn relations(
                 kind,
                 href: relation_url("data", &relation.id, profile),
                 cols_href: relation_url("columns", &relation.id, profile),
-                rows_label: sizes
-                    .get(&relation.id.name)
+                rows_label: relation_size
                     .and_then(|s| s.rows)
                     .map_or_else(String::new, |n| format!("{} rows", abbrev_count(n))),
-                size_label: sizes
-                    .get(&relation.id.name)
+                size_label: relation_size
                     .and_then(|s| s.bytes)
                     .map_or_else(String::new, human_bytes),
-                rows: sizes
-                    .get(&relation.id.name)
-                    .and_then(|s| s.rows)
-                    .unwrap_or(-1),
-                bytes: sizes
-                    .get(&relation.id.name)
+                rows: relation_size.and_then(|s| s.rows).unwrap_or(-1),
+                bytes: relation_size
                     .and_then(|s| s.bytes)
                     .map_or(-1, |b| i64::try_from(b).unwrap_or(i64::MAX)),
             }
@@ -613,9 +658,27 @@ pub async fn relations(
             url_arg(&schema),
             profile_arg(profile)
         ),
-        schema,
+        schema: schema.clone(),
         relations,
         truncated,
+        next_href: if next_offset < total {
+            let mut q = url::form_urlencoded::Serializer::new(String::new());
+            q.append_pair("schema", &schema);
+            q.append_pair("offset", &next_offset.to_string());
+            q.append_pair("limit", &limit.to_string());
+            if let Some(needle) = needle.as_deref() {
+                q.append_pair("q", needle);
+            }
+            if query.group.as_deref() == Some("1") {
+                q.append_pair("group", "1");
+            }
+            if let Some(profile) = profile {
+                q.append_pair("profile", profile);
+            }
+            format!("/catalog/relations?{}", q.finish())
+        } else {
+            String::new()
+        },
         note: if truncated {
             "Only SELECT-visible relations are listed; the bounded list (and any search over it) is incomplete.".into()
         } else if needle.is_some() {

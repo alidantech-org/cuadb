@@ -227,17 +227,28 @@ impl PgManager {
 
 pub(crate) fn classify(error: sqlx::Error) -> DbError {
     let kind = match &error {
-        sqlx::Error::Database(db) => match db.code().as_deref() {
-            Some("28P01" | "28000") => DbErrorKind::AuthenticationFailed,
-            Some("42501") => DbErrorKind::PermissionDenied,
-            Some("57014") => DbErrorKind::TimedOut,
-            _ => DbErrorKind::ConnectionUnavailable,
-        },
+        sqlx::Error::Database(db) => classify_sqlstate(db.code().as_deref()),
         sqlx::Error::PoolTimedOut => DbErrorKind::TimedOut,
-        _ => DbErrorKind::ConnectionUnavailable,
+        sqlx::Error::Io(_) | sqlx::Error::Tls(_) | sqlx::Error::PoolClosed => {
+            DbErrorKind::ConnectionUnavailable
+        }
+        _ => DbErrorKind::Internal,
     };
     // The driver error may contain credentials; never store or display it.
     DbError::new(kind)
+}
+
+fn classify_sqlstate(code: Option<&str>) -> DbErrorKind {
+    match code {
+        Some("28P01" | "28000") => DbErrorKind::AuthenticationFailed,
+        Some("42501") => DbErrorKind::PermissionDenied,
+        Some("57014") => DbErrorKind::TimedOut,
+        Some("40001" | "40P01") => DbErrorKind::Conflict,
+        Some(code) if code.starts_with("08") => DbErrorKind::ConnectionUnavailable,
+        Some(code) if code.starts_with("22") || code.starts_with("23") => DbErrorKind::Rejected,
+        // A server-side query or schema defect is not evidence that the database is down.
+        _ => DbErrorKind::Internal,
+    }
 }
 
 #[cfg(test)]
@@ -260,5 +271,14 @@ mod tests {
         let error = classify(sqlx::Error::PoolTimedOut);
         assert_eq!(error.kind, DbErrorKind::TimedOut);
         assert!(!format!("{error:?}").contains("secret"));
+        assert_eq!(classify_sqlstate(Some("42883")), DbErrorKind::Internal);
+        assert_eq!(
+            classify_sqlstate(Some("08006")),
+            DbErrorKind::ConnectionUnavailable
+        );
+        assert_eq!(
+            classify_sqlstate(Some("42501")),
+            DbErrorKind::PermissionDenied
+        );
     }
 }

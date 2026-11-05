@@ -173,6 +173,9 @@ struct ProfileRow {
 struct ProfileListTemplate {
     profiles: Vec<ProfileRow>,
     admin: bool,
+    full_admin: bool,
+    local_setup: bool,
+    key_set: bool,
 }
 
 /// Trusted profiles configured on the server: ids, labels, engine family and
@@ -184,13 +187,16 @@ pub async fn connection_profiles(
     axum::extract::Query(query): axum::extract::Query<StatusQuery>,
 ) -> Result<Response, AppError> {
     let chosen = crate::state::checked_profile(query.profile)?;
+    let chosen_base = chosen
+        .as_deref()
+        .map(|id| id.split('~').next().unwrap_or(id));
     // Profiles the user has no grant for are not even listed.
     let infos: Vec<_> = state
         .profiles()
         .into_iter()
         .filter(|info| auth.0.can_see_profile(&info.id))
         .collect();
-    if let Some(id) = chosen.as_deref()
+    if let Some(id) = chosen_base
         && !infos.iter().any(|info| info.id == id)
     {
         return Err(AppError::new(crate::error::ErrorKind::UnknownProfile));
@@ -206,7 +212,7 @@ pub async fn connection_profiles(
     let mut profiles = Vec::new();
     for (info, probe) in infos.into_iter().zip(probes) {
         let snapshot = probe.await.ok().flatten();
-        let selected = match chosen.as_deref() {
+        let selected = match chosen_base {
             Some(id) => id == info.id,
             None => info.is_default,
         };
@@ -236,7 +242,10 @@ pub async fn connection_profiles(
     }
     let mut response = html(ProfileListTemplate {
         profiles,
-        admin: auth.0.is_admin(),
+        admin: auth.0.is_admin() || (auth.0.is_open() && state.local_connection_management()),
+        full_admin: auth.0.is_admin(),
+        local_setup: auth.0.is_open() && !state.local_connection_management(),
+        key_set: state.vault().is_some(),
     })?
     .into_response();
     response

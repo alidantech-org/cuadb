@@ -65,6 +65,8 @@ pub struct Config {
     pub data_dir: std::path::PathBuf,
     /// `required`: refuse to run without an administrator; `auto`: enforce once one exists.
     pub auth_mode: AuthMode,
+    /// Allows trusted loopback users to manage saved connections without an admin account.
+    pub local_connection_management: bool,
     pub session_idle_minutes: u64,
     pub session_max_hours: u64,
     /// Add `Secure` to the session cookie (`auto`: only when not bound to loopback).
@@ -281,6 +283,22 @@ impl Config {
                 ));
             }
         };
+        let local_connection_management = match read("CUADB_LOCAL_CONNECTIONS")?.as_deref() {
+            None | Some("disabled") => false,
+            Some("enabled") => true,
+            Some(_) => {
+                return Err(ConfigError::invalid(
+                    "CUADB_LOCAL_CONNECTIONS",
+                    "must be 'enabled' or 'disabled'",
+                ));
+            }
+        };
+        if local_connection_management && !host.is_loopback() {
+            return Err(ConfigError::invalid(
+                "CUADB_LOCAL_CONNECTIONS",
+                "requires CUADB_HOST to be a loopback address",
+            ));
+        }
         let session_idle_minutes = bounded_number(
             &mut read,
             "CUADB_SESSION_IDLE_MINUTES",
@@ -372,6 +390,7 @@ impl Config {
             sqlite_root,
             data_dir,
             auth_mode,
+            local_connection_management,
             session_idle_minutes,
             session_max_hours,
             cookie_secure,
@@ -425,6 +444,20 @@ mod tests {
         assert_eq!(config.limits.max_pool_connections, 4);
         assert_eq!(config.limits.max_in_flight_requests, 64);
         assert_eq!(config.limits.max_request_body_bytes, 65_536);
+        assert!(!config.local_connection_management);
+    }
+
+    #[test]
+    fn local_connection_management_is_loopback_only_and_opt_in() {
+        let config = Config::from_values(&[("CUADB_LOCAL_CONNECTIONS", "enabled")]).unwrap();
+        assert!(config.local_connection_management);
+        assert!(
+            Config::from_values(&[
+                ("CUADB_HOST", "0.0.0.0"),
+                ("CUADB_LOCAL_CONNECTIONS", "enabled"),
+            ])
+            .is_err()
+        );
     }
 
     #[test]

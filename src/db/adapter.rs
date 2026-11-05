@@ -125,6 +125,14 @@ pub trait DatabaseAdapter: Send + Sync {
     ) -> Result<crate::db::types::CellValue, DbError> {
         Err(DbError::new(crate::db::types::DbErrorKind::Unsupported))
     }
+    /// Whether the given ordered columns identify at most one row.
+    async fn is_unique_key(
+        &self,
+        _relation: &RelationId,
+        _columns: &[String],
+    ) -> Result<bool, DbError> {
+        Ok(false)
+    }
 }
 
 #[cfg(test)]

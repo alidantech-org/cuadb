@@ -3,7 +3,7 @@
 CuaDB keeps its own state (users, sessions, grants, audit log) in a SQLite file `cuadb.db` inside `CUADB_DATA_DIR` (default `./data`; Docker: mount a volume, e.g. `-v cuadb-data:/var/lib/cuadb -e CUADB_DATA_DIR=/var/lib/cuadb`). It is never a target database. The directory is created `0700` and the file `0600`.
 
 ## Modes
-- **No administrator yet:** the local read-only explorer is open to anyone who can reach the port (startup logs a warning). Admin pages answer `403`; there is **no HTTP registration endpoint**.
+- **No administrator yet:** the local read-only explorer is open to anyone who can reach the port (startup logs a warning). Admin pages answer `403`; there is **no HTTP registration endpoint**. Saved connection management stays disabled unless the operator explicitly enables trusted loopback mode with `CUADB_LOCAL_CONNECTIONS=enabled` and configures `CUADB_SECRET_KEY`; this option is rejected for non-loopback binds. See `docs/connections.md`.
 - **Administrator exists:** authentication is enforced everywhere (pages, HTMX fragments, exports, `/connection/*`); only `/health`, `/static/*` and `/login` are public. Enforcement is never silently relaxed. `CUADB_AUTH=required` additionally refuses to start without an active administrator or an openable store (fail closed).
 
 ## First-run bootstrap (local operator only)
