@@ -1787,3 +1787,48 @@ async fn editor_cell_columns_links_and_multi_table_zip_routes() {
     let (status, _) = get(&w.router, &nobody, "/catalog/export?schema=main&relation=items&format=zip&scope=related&depth=0&with=main%1Fparents").await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+#[tokio::test]
+async fn database_switching_is_postgres_only_admin_gated_and_the_sidebar_carries_sort_data() {
+    let w = world("dbswitch", "read-write", true).await;
+    // SQLite has one database per file: the list is refused, the switch is refused.
+    let (status, _) = get(&w.router, &w.admin, "/connection/databases").await;
+    assert!(status.is_client_error(), "{status}");
+    let (status, _) = post(&w.router, &w.admin, "/connection/use", "database=other").await;
+    assert!(status.is_client_error(), "{status}");
+    // Relation-scoped members may not even ask: switching needs whole-connection access.
+    let scoped = user(&w, "sky", Role::Viewer, &[("default", "main", "items", 1)]).await;
+    assert_eq!(
+        get(&w.router, &scoped, "/connection/databases").await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        post(&w.router, &scoped, "/connection/use", "database=main")
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    // A forged database-switch id is not a profile the server knows.
+    let (status, _) = get(&w.router, &w.admin, "/catalog/schemas?profile=default~6162").await;
+    assert!(status.is_client_error(), "{status}");
+    // The tree exposes data attributes for client-side sorting and the page size is a select.
+    let (_, tree) = get(&w.router, &w.admin, "/catalog/schemas").await;
+    assert!(tree.contains("data-tables=") && tree.contains("data-bytes="));
+    let (_, rel) = get(&w.router, &w.admin, "/catalog/relations?schema=main").await;
+    assert!(rel.contains("data-rows=") && rel.contains("data-bytes="));
+    let (_, page) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/data?schema=main&relation=items",
+    )
+    .await;
+    assert!(
+        page.contains("data-size-select")
+            && page.contains("<option value=")
+            && page.contains("selected")
+    );
+    assert!(
+        page.contains(">1000</option>")
+            && !page.contains(r#"aria-label="Rows per page" class="seg""#)
+    );
+}

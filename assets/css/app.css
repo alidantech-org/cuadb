@@ -2550,4 +2550,16 @@ kbd {
 }
 
 /* the demo styled #spop as a popover; it is a dialog backdrop now */
-#spop.dlg-back{position:fixed;inset:0;width:auto;height:auto;max-height:none;padding:0;overflow:visible;background:rgba(10,14,13,.5);border:0;border-radius:0;box-shadow:none}
+#spop.dlg-back {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  background: rgba(10, 14, 13, 0.5);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}

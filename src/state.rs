@@ -960,4 +960,28 @@ mod tests {
         let outcome = AppState::from_config(&config).err().unwrap();
         assert!(!format!("{outcome:?}").contains("secret"));
     }
+    #[test]
+    fn database_switch_ids_round_trip_and_reject_junk() {
+        let id = derived_id("default", "my db-1");
+        assert_eq!(derived_parts(&id), Some(("default", "my db-1".to_string())));
+        assert!(checked_profile(Some(id)).is_ok());
+        for bad in [
+            "default~",
+            "default~zz",
+            "default~6",
+            "Bad~6162",
+            "~6162",
+            "default~6162~6162",
+        ] {
+            assert!(derived_parts(bad).is_none(), "{bad}");
+            assert!(checked_profile(Some(bad.into())).is_err(), "{bad}");
+        }
+        // A switch authorizes as its base connection.
+        let state = AppState::disconnected();
+        assert_eq!(
+            state.effective_profile(Some(&derived_id("alpha", "x"))),
+            "alpha"
+        );
+        assert_eq!(state.effective_profile(Some("alpha")), "alpha");
+    }
 }

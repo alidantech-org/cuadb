@@ -1314,4 +1314,15 @@ mod tests {
             .unwrap();
         assert!(checked_query_name(bad.relation).is_err());
     }
+    #[test]
+    fn row_estimates_and_sizes_are_short_and_honest() {
+        assert_eq!(abbrev_count(0), "~0");
+        assert_eq!(abbrev_count(9), "~9");
+        assert_eq!(abbrev_count(1_000), "~1K");
+        assert_eq!(abbrev_count(593_500), "~593.5K");
+        assert_eq!(abbrev_count(2_100_000), "~2.1M");
+        assert_eq!(abbrev_count(-5), "~0");
+        assert_eq!(human_bytes(512), "512 B");
+        assert_eq!(human_bytes(80_500_000), "76.8 MB");
+    }
 }
