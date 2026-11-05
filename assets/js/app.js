@@ -323,7 +323,11 @@ function applyPrefs() {
   });
 }
 
-/* ------------------------------------------------------------ inspector */
+/* ------------------------------------------------------------ row sheet */
+/** The row details live in a slide-over sheet; any click outside it closes it. */
+function sheetOpen() {
+  return document.getElementById('insp')?.classList.contains('show') ?? false;
+}
 function openInspector(/** @type {HTMLTableRowElement} */ row) {
   const panel = document.getElementById('insp');
   const table = row.closest('table');
@@ -338,6 +342,7 @@ function openInspector(/** @type {HTMLTableRowElement} */ row) {
   label.textContent = `Row ${row.dataset.row ?? ''}`;
   const close = document.createElement('button');
   close.type = 'button';
+  close.className = 'btn ico';
   close.setAttribute('data-close-insp', '');
   close.setAttribute('aria-label', 'Close row details');
   close.textContent = '×';
@@ -369,18 +374,95 @@ function openInspector(/** @type {HTMLTableRowElement} */ row) {
     name.textContent = head.getAttribute('data-col') ?? '';
     const type = document.createElement('span');
     type.textContent = head.getAttribute('data-type') ?? '';
-    caption.append(name, type);
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'cpy';
+    copy.setAttribute('data-copy-value', String(index));
+    copy.setAttribute('aria-label', `Copy ${name.textContent}`);
+    copy.textContent = 'Copy';
+    caption.append(name, type, copy);
     const pre = document.createElement('pre');
     pre.textContent = cell?.querySelector('[data-null]') ? 'NULL' : (cell?.dataset.detail ?? '');
     kv.append(caption, pre);
     panel.append(kv);
   });
   panel.classList.add('show');
+  const backdrop = document.getElementById('sheet-bk');
+  if (backdrop) backdrop.hidden = false;
+  panel.scrollTop = 0;
 }
 function closeInspector() {
   win.cuadbEditing = false;
   document.getElementById('insp')?.classList.remove('show');
+  const backdrop = document.getElementById('sheet-bk');
+  if (backdrop) backdrop.hidden = true;
   $$('tr.sel').forEach((el) => el.classList.remove('sel'));
+}
+
+/* ------------------------------------------------------------ row selection */
+/** The number column doubles as a checkbox: the header's # becomes check-all. */
+function gridRows() {
+  return /** @type {HTMLTableRowElement[]} */ (
+    Array.from(document.querySelectorAll('#catalog-panel table.grid tbody tr[data-row]'))
+  );
+}
+function updateSelection() {
+  const table = document.querySelector('#catalog-panel table.grid');
+  const rows = gridRows();
+  const checked = rows.filter((tr) => tr.classList.contains('ck'));
+  table?.classList.toggle('hs', checked.length > 0);
+  const all = /** @type {HTMLInputElement | null} */ (document.querySelector('.rck-all'));
+  if (all) {
+    all.checked = rows.length > 0 && checked.length === rows.length;
+    all.indeterminate = checked.length > 0 && checked.length < rows.length;
+  }
+  const info = document.getElementById('selinfo');
+  if (!info) return;
+  info.replaceChildren();
+  info.hidden = checked.length === 0;
+  if (!checked.length) return;
+  const text = document.createElement('span');
+  text.textContent = `${checked.length} selected`;
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn';
+  copy.setAttribute('data-copy-selected', '');
+  copy.textContent = 'Copy CSV';
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'btn';
+  clear.setAttribute('data-clear-selected', '');
+  clear.textContent = 'Clear';
+  info.append(text, copy, clear);
+}
+function setRowChecked(/** @type {HTMLTableRowElement} */ tr, /** @type {boolean} */ on) {
+  tr.classList.toggle('ck', on);
+  const box = /** @type {HTMLInputElement | null} */ (tr.querySelector('.rck'));
+  if (box) box.checked = on;
+}
+function selectedCsv() {
+  const quote = (/** @type {string} */ text) =>
+    /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  const table = document.querySelector('#catalog-panel table.grid');
+  if (!table) return { csv: '', count: 0 };
+  const heads = Array.from(table.querySelectorAll('thead th[data-col]')).map(
+    (th) => th.getAttribute('data-col') ?? '',
+  );
+  const lines = [heads.map(quote).join(',')];
+  gridRows()
+    .filter((tr) => tr.classList.contains('ck'))
+    .forEach((tr) => {
+      lines.push(
+        Array.from(tr.querySelectorAll('td:not(.rn)'))
+          .map((td) =>
+            td.querySelector('[data-null]')
+              ? ''
+              : quote(/** @type {HTMLElement} */ (td).dataset.detail ?? ''),
+          )
+          .join(','),
+      );
+    });
+  return { csv: lines.join('\n'), count: lines.length - 1 };
 }
 
 /* ------------------------------------------------------------ row editor */
@@ -669,57 +751,85 @@ function formatNumbers(/** @type {ParentNode} */ root = document) {
   });
 }
 
-/** Drag the right edge of a header to resize that column. */
-function addResizers(/** @type {ParentNode} */ root = document) {
-  root.querySelectorAll('table.grid thead th[data-col]:not([data-rz])').forEach((node) => {
-    const th = /** @type {HTMLElement} */ (node);
-    th.dataset.rz = '1';
-    const handle = document.createElement('span');
-    handle.className = 'rzh';
-    handle.setAttribute('role', 'separator');
-    handle.setAttribute('aria-label', `Resize column ${th.dataset.col ?? ''}`);
-    th.append(handle);
-    let startX = 0;
-    let startW = 0;
-    const apply = (/** @type {number} */ width) => {
-      const table = th.closest('table');
-      const index = Array.from(th.parentElement?.children ?? []).indexOf(th);
-      const set = (/** @type {HTMLElement} */ el) => {
-        el.style.width = `${width}px`;
-        el.style.minWidth = `${width}px`;
-        el.style.maxWidth = `${width}px`;
+/**
+ * Every table with a header gets fixed layout: header and body cells share one column
+ * width (a colgroup), and each header has a drag handle to resize its column.
+ */
+function enhanceTables(/** @type {ParentNode} */ root = document) {
+  root.querySelectorAll('table:not([data-fx])').forEach((node) => {
+    const table = /** @type {HTMLTableElement} */ (node);
+    const headRow = table.tHead?.rows[0];
+    if (!headRow || (table.closest('#modal') === null && table.offsetParent === null)) return;
+    table.dataset.fx = '1';
+    const ths = Array.from(headRow.cells);
+    // Natural widths come from the browser's own auto layout, measured once.
+    const natural = ths.map((th) => Math.ceil(th.getBoundingClientRect().width));
+    const group = document.createElement('colgroup');
+    const cols = ths.map((th, index) => {
+      const col = document.createElement('col');
+      const fixed = th.classList.contains('rn');
+      const width = fixed ? 46 : Math.max(64, Math.min(420, natural[index] ?? 120));
+      col.style.width = `${width}px`;
+      group.append(col);
+      return col;
+    });
+    table.prepend(group);
+    const total = () => cols.reduce((sum, col) => sum + parseFloat(col.style.width || '0'), 0);
+    const fit = () => {
+      table.style.width = `${total()}px`;
+    };
+    table.classList.add('fx');
+    fit();
+    ths.forEach((th, index) => {
+      if (th.classList.contains('rn') || th.classList.contains('acts-h')) return;
+      const handle = document.createElement('span');
+      handle.className = 'rzh';
+      handle.setAttribute('role', 'separator');
+      handle.setAttribute('aria-orientation', 'vertical');
+      handle.setAttribute('aria-label', `Resize column ${th.textContent?.trim() ?? ''}`);
+      th.append(handle);
+      const col = cols[index];
+      if (!col) return;
+      let startX = 0;
+      let startW = 0;
+      let dragging = false;
+      const set = (/** @type {number} */ width) => {
+        col.style.width = `${Math.max(48, Math.min(900, Math.round(width)))}px`;
+        fit();
       };
-      set(th);
-      table?.querySelectorAll('tbody tr').forEach((tr) => {
-        const cell = /** @type {HTMLElement | undefined} */ (tr.children[index]);
-        if (cell) set(cell);
+      handle.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        startX = event.clientX;
+        startW = parseFloat(col.style.width || '0');
+        dragging = true;
+        handle.classList.add('d');
+        try {
+          handle.setPointerCapture(event.pointerId);
+        } catch {
+          /* the drag still tracks while the pointer stays over the handle */
+        }
       });
-    };
-    let dragging = false;
-    handle.addEventListener('pointerdown', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      startX = event.clientX;
-      startW = th.getBoundingClientRect().width;
-      dragging = true;
-      try {
-        handle.setPointerCapture(event.pointerId);
-      } catch {
-        /* the drag still works while the pointer stays over the handle */
-      }
-    });
-    handle.addEventListener('pointermove', (event) => {
-      if (dragging) apply(Math.max(56, Math.min(720, startW + event.clientX - startX)));
-    });
-    const stop = () => {
-      dragging = false;
-    };
-    handle.addEventListener('pointerup', stop);
-    handle.addEventListener('pointercancel', stop);
-    handle.addEventListener('click', (event) => event.stopPropagation());
-    handle.addEventListener('dblclick', (event) => {
-      event.stopPropagation();
-      apply(Math.max(56, Math.min(720, th.scrollWidth)));
+      handle.addEventListener('pointermove', (event) => {
+        if (dragging) set(startW + event.clientX - startX);
+      });
+      const stop = () => {
+        dragging = false;
+        handle.classList.remove('d');
+      };
+      handle.addEventListener('pointerup', stop);
+      handle.addEventListener('pointercancel', stop);
+      handle.addEventListener('click', (event) => event.stopPropagation());
+      handle.addEventListener('dblclick', (event) => {
+        // Double-click: fit the column to its widest visible content.
+        event.stopPropagation();
+        let widest = 0;
+        table.querySelectorAll('tbody tr').forEach((tr) => {
+          const cell = /** @type {HTMLElement | undefined} */ (tr.children[index]);
+          if (cell) widest = Math.max(widest, cell.scrollWidth + 20);
+        });
+        set(Math.max(widest, th.scrollWidth + 12));
+      });
     });
   });
 }
@@ -852,6 +962,46 @@ function columnsRequest(/** @type {boolean | null} */ all) {
 document.addEventListener('click', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  // The sheet closes on any click outside it. That click only closes: it never opens another
+  // row, so a double-click on a row opens the sheet and the second click closes it.
+  if (sheetOpen() && !target.closest('#insp, [data-row-add], .pop')) {
+    closeInspector();
+    if (target.closest('tr[data-row], #sheet-bk, .gw')) return;
+  }
+  const numberCell = target.closest('td.rn, th.rn');
+  if (numberCell) {
+    if (numberCell.tagName === 'TH') {
+      const rows = gridRows();
+      const on = !rows.every((tr) => tr.classList.contains('ck'));
+      rows.forEach((tr) => setRowChecked(tr, on));
+    } else {
+      const tr = numberCell.closest('tr');
+      if (tr instanceof HTMLTableRowElement && tr.dataset.row)
+        setRowChecked(tr, !tr.classList.contains('ck'));
+    }
+    updateSelection();
+    return;
+  }
+  if (target.closest('[data-copy-selected]')) {
+    const { csv, count } = selectedCsv();
+    void copyText(csv, `Copied ${count} selected rows as CSV`);
+    return;
+  }
+  if (target.closest('[data-clear-selected]')) {
+    gridRows().forEach((tr) => setRowChecked(tr, false));
+    updateSelection();
+    return;
+  }
+  const copyBtn = target.closest('[data-copy-value]');
+  if (copyBtn instanceof HTMLElement) {
+    const index = Number(copyBtn.dataset.copyValue);
+    const cell = win.cuadbRow?.querySelectorAll('td:not(.rn)')[index];
+    void copyText(
+      cell?.querySelector('[data-null]') ? '' : (cell?.dataset.detail ?? ''),
+      'Value copied',
+    );
+    return;
+  }
   const inPop = target.closest('.pop');
   if (!inPop && !target.closest('[data-pop],#cbtn,#sbtn')) closePops();
 
@@ -1037,13 +1187,6 @@ document.addEventListener('submit', (event) => {
   }
 });
 
-document.addEventListener('dblclick', (event) => {
-  const cell = event.target instanceof Element ? event.target.closest('td:not(.rn)') : null;
-  if (cell instanceof HTMLElement && cell.closest('table.grid')) {
-    void copyText(cell.dataset.detail ?? '', 'Cell copied');
-  }
-});
-
 document.addEventListener('change', (event) => {
   const field = event.target;
   if (field instanceof HTMLSelectElement && field.matches('[data-engine-select]')) {
@@ -1222,8 +1365,9 @@ document.addEventListener('htmx:afterSwap', (event) => {
     syncAdminTabs();
   }
   if (target.id === 'modal') openModal();
-  addResizers(document);
+  enhanceTables(document);
   formatNumbers(document);
+  updateSelection();
   if (target.id === 'sql-tx') {
     const open = target.querySelector('[data-tx]');
     win.cuadbTx = open instanceof HTMLElement ? (open.dataset.tx ?? '') : '';
@@ -1233,8 +1377,28 @@ document.addEventListener('htmx:afterRequest', (event) => {
   const detail = /** @type {Any} */ (event).detail;
   const path = String(detail.pathInfo?.requestPath ?? '');
   const cancel = document.getElementById('sql-cancel');
-  if (path.startsWith('/catalog/data') && detail.successful)
-    rememberTable(String(detail.pathInfo?.finalRequestPath ?? path));
+  if (path.startsWith('/catalog/data')) {
+    const finalPath = String(detail.pathInfo?.finalRequestPath ?? path);
+    const status = Number(detail.xhr?.status ?? 0);
+    if (status >= 200 && status < 400) rememberTable(finalPath);
+    else if (status >= 400) {
+      // A remembered sort or column list may no longer fit the table: forget it and reopen plainly.
+      const params = new URLSearchParams(finalPath.split('?')[1] ?? '');
+      const key = tableKey(params);
+      if (key && TP[key]) {
+        delete TP[key];
+        prefs.save();
+        if (detail.elt instanceof Element && detail.elt.matches('#tree a.row')) {
+          const plain = new URLSearchParams();
+          for (const name of ['schema', 'relation', 'profile']) {
+            const value = params.get(name);
+            if (value) plain.set(name, value);
+          }
+          fetchInto(`/catalog/data?${plain.toString()}`, '#mainbody', 'innerHTML');
+        }
+      }
+    }
+  }
   if (path.startsWith('/catalog/data'))
     win.cuadbDataUrl = String(detail.pathInfo?.finalRequestPath ?? path);
   if (path.startsWith('/sql/execute')) {
@@ -1335,3 +1499,5 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
 });
 applyPrefs();
 decorateIcons();
+
+enhanceTables(document);

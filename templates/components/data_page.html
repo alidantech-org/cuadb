@@ -42,7 +42,7 @@
   <div class="wrap">
     <div class="gw">
       <table class="grid">
-        <thead><tr><th class="rn" scope="col">#</th>
+        <thead><tr><th class="rn" scope="col"><span class="rnum">#</span><input class="rck rck-all" type="checkbox" aria-label="Select all rows on this page"></th>
           {% for col in headers %}
           <th scope="col" class="{% if col.numeric %}num{% endif %}" data-col="{{ col.name }}" data-type="{{ col.native_type }}"{% if col.pk %} data-pk="1"{% endif %}{% if col.nullable %} data-nullable="1"{% endif %}{% if col.required %} data-required="1"{% endif %}{% if col.editable %} data-editable="1"{% endif %} aria-sort="{% match col.sort_direction %}{% when Some with (direction) %}{{ direction }}{% when None %}none{% endmatch %}">
             {% if col.pk %}<span class="pk" title="Primary key">●</span> {% endif %}{% if col.sortable %}<a class="sortlink" href="{% if col.is_ascending %}{{ col.desc }}{% else if col.is_descending %}{{ col.asc }}{% else %}{{ col.asc }}{% endif %}" hx-get="{% if col.is_ascending %}{{ col.desc }}{% else if col.is_descending %}{{ col.asc }}{% else %}{{ col.asc }}{% endif %}" hx-target="#catalog-panel" hx-swap="outerHTML" title="Sort by {{ col.name }}">{{ col.name }}</a>{% else %}<span title="Sorting is not supported for {{ col.native_type }}">{{ col.name }}</span>{% endif %}<small>{{ col.native_type }}</small>{% if col.is_ascending %}<span class="s">↑</span>{% else if col.is_descending %}<span class="s">↓</span>{% endif %}
@@ -52,7 +52,7 @@
         <tbody>
           {% for row in rows %}
           <tr tabindex="0" data-row="{{ row.number }}">
-            <td class="rn">{{ row.number }}</td>
+            <td class="rn"><span class="rnum">{{ row.number }}</span><input class="rck" type="checkbox" aria-label="Select row {{ row.number }}" tabindex="-1"></td>
             {% for cell in row.values %}
             <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if !cell.fk_href.is_empty() %}<a class="fk" href="{{ cell.fk_href }}" hx-get="{{ cell.fk_href }}" hx-target="#mainbody" hx-swap="innerHTML" title="Open the referenced row">{{ cell.text }}</a>{% else if cell.class == "bool-value" %}<span class="pill {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
             {% endfor %}
@@ -62,12 +62,14 @@
         </tbody>
       </table>
     </div>
-    <aside id="insp" aria-label="Row details"></aside>
+    <div id="sheet-bk" hidden></div>
+    <aside id="insp" class="sheet" aria-label="Row details"></aside>
   </div>
   <footer class="foot">
     {% if previous_url.is_empty() %}<button class="btn ico" type="button" disabled aria-label="Previous page">‹</button>{% else %}<a class="btn ico" href="{{ previous_url }}" hx-get="{{ previous_url }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-label="Previous page">‹</a>{% endif %}
     <span>{{ shown_from }}–{{ shown_to }} · page {{ page_number }}</span>
     {% if next_url.is_empty() %}<button class="btn ico" type="button" disabled aria-label="Next page">›</button>{% else %}<a class="btn ico" href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="#catalog-panel" hx-swap="outerHTML" aria-label="Next page">›</a>{% endif %}
+    <span class="selinfo" id="selinfo" role="status" aria-live="polite" hidden></span>
     <span class="sp"></span>
     <span>{{ headers.len() }} columns</span>
     <nav class="seg" aria-label="Rows per page">

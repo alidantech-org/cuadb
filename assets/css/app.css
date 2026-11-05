@@ -1911,3 +1911,225 @@ tr[data-row]:focus-visible td {
 .cbtn .dot {
   margin-right: 6px;
 }
+
+/* ---- uniform header bars: same surface and height as the sidebar header ---- */
+:root {
+  --hh: 44px;
+}
+.sf {
+  height: var(--hh);
+  padding: 0 8px;
+  align-items: center;
+  border-bottom: 1px solid var(--bd);
+  box-sizing: border-box;
+}
+.bar {
+  min-height: var(--hh);
+  height: var(--hh);
+  box-sizing: border-box;
+  padding: 0 10px;
+  background: var(--sf);
+  border-bottom: 1px solid var(--bd);
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.bar > * {
+  flex: none;
+}
+.bar .sp {
+  flex: 1;
+}
+.bar h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.bar .meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+#colpop,
+#exppop {
+  top: calc(var(--hh) - 2px);
+}
+.wrap {
+  border-top: 0;
+  position: relative;
+}
+.panel {
+  position: relative;
+}
+@media (max-width: 760px) {
+  .bar {
+    height: auto;
+    min-height: var(--hh);
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    white-space: normal;
+  }
+  .sf {
+    height: var(--hh);
+  }
+}
+
+/* ---- tables: one width for header and body cells, drag to resize ---- */
+table.fx {
+  table-layout: fixed;
+  border-collapse: separate;
+  min-width: 0;
+}
+table.fx th,
+table.fx td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: none;
+}
+table.fx th {
+  position: sticky;
+  padding-right: 14px;
+}
+.rzh {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+  z-index: 3;
+}
+.rzh::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: transparent;
+}
+th:hover > .rzh::after {
+  background: var(--bd);
+}
+.rzh:hover::after,
+.rzh.d::after {
+  background: var(--ac);
+  width: 2px;
+  right: 2px;
+}
+.gw.st table.fx {
+  margin: 0 0 8px;
+}
+
+/* ---- number column: number, or checkbox to select ---- */
+td.rn,
+th.rn {
+  text-align: center;
+  padding: 0;
+  cursor: pointer;
+  width: 46px;
+}
+.rck {
+  display: none;
+  margin: 0;
+  accent-color: var(--ac);
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  pointer-events: none;
+}
+.rn:hover .rnum,
+.hs .rn .rnum {
+  display: none;
+}
+.rn:hover .rck,
+.hs .rn .rck,
+th.rn .rck:checked {
+  display: inline-block;
+}
+tr.ck td {
+  background: var(--acs);
+}
+.selinfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tx);
+}
+
+/* ---- the row sheet ---- */
+#sheet-bk {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  background: transparent;
+  cursor: default;
+}
+#sheet-bk[hidden] {
+  display: none;
+}
+#insp.sheet {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(400px, 100%);
+  z-index: 15;
+  display: block;
+  transform: translateX(104%);
+  transition: transform 0.18s ease;
+  background: var(--sf);
+  border-left: 1px solid var(--bd);
+  box-shadow: var(--sh);
+  overflow: auto;
+  visibility: hidden;
+}
+#insp.sheet.show {
+  transform: none;
+  visibility: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  #insp.sheet {
+    transition: none;
+  }
+}
+#insp h3 {
+  height: var(--hh);
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 12px;
+}
+#insp .kv label {
+  align-items: center;
+  gap: 8px;
+}
+#insp .kv label span:first-child {
+  font-weight: 600;
+  color: var(--tx);
+}
+#insp .kv label span:nth-child(2) {
+  margin-left: auto;
+}
+.cpy {
+  font-size: 10.5px;
+  color: var(--mu);
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  padding: 0 6px;
+  height: 18px;
+  opacity: 0;
+}
+.kv:hover .cpy,
+.cpy:focus-visible {
+  opacity: 1;
+}
+.cpy:hover {
+  color: var(--ac);
+  border-color: var(--ac);
+}
+
+/* Tailwind generates a .grid utility (display:grid); data tables must stay real tables. */
+table.grid{display:table}
