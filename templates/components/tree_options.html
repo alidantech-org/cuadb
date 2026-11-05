@@ -1,0 +1,14 @@
+{# Sidebar options menu #}
+<div class="pop opop" id="opop" role="menu" aria-label="Sidebar options">
+  <div class="sg">Show</div>
+  <label class="orow"><span>Group by schema</span><input type="checkbox" class="tg" data-tg="tgroup"></label>
+  <label class="orow"><span>Row estimates</span><input type="checkbox" class="tg" data-tg="tcounts"></label>
+  <label class="orow"><span>Schema summaries</span><input type="checkbox" class="tg" data-tg="tsums"></label>
+  <label class="orow"><span>Hide empty schemas</span><input type="checkbox" class="tg" data-tg="hideEmpty"></label>
+  <div class="sg">Sort tables</div>
+  <div class="orow"><div class="seg"><button type="button" data-st="tsort" data-val="name">Name</button><button type="button" data-st="tsort" data-val="rows">Rows</button><button type="button" data-st="tsort" data-val="bytes">Size</button></div><div class="seg"><button type="button" data-st="tdir" data-val="asc" aria-label="Ascending">↑</button><button type="button" data-st="tdir" data-val="desc" aria-label="Descending">↓</button></div></div>
+  <div class="sg">Sort schemas</div>
+  <div class="orow"><div class="seg"><button type="button" data-st="ssort" data-val="name">Name</button><button type="button" data-st="ssort" data-val="bytes">Size</button><button type="button" data-st="ssort" data-val="tables">Tables</button></div></div>
+  <div class="sg">Tree</div>
+  <div class="orow"><button class="btn" type="button" data-tree="expand">Expand all</button><button class="btn" type="button" data-tree="collapse">Collapse all</button><button class="btn" type="button" data-tree="reload">Reload</button></div>
+</div>

@@ -100,6 +100,21 @@ pub trait DatabaseAdapter: Send + Sync {
     async fn postgis_schema(&self) -> Result<Option<String>, DbError> {
         Ok(None)
     }
+    /// Databases of this server the connection's role may connect to.
+    async fn list_databases(&self) -> Result<Vec<String>, DbError> {
+        Err(DbError::new(crate::db::types::DbErrorKind::Unsupported))
+    }
+    /// Estimated rows and size of the tables of a schema (statistics only).
+    async fn relation_sizes(
+        &self,
+        _namespace: &str,
+    ) -> Result<Vec<crate::db::types::RelationSize>, DbError> {
+        Err(DbError::new(crate::db::types::DbErrorKind::Unsupported))
+    }
+    /// Table count and estimated size per visible schema (statistics only).
+    async fn schema_summaries(&self) -> Result<Vec<crate::db::types::SchemaSummary>, DbError> {
+        Err(DbError::new(crate::db::types::DbErrorKind::Unsupported))
+    }
     /// One cell, addressed by the relation's full primary key. Engines without support
     /// report `Unsupported` and the sheet keeps the bounded value it already has.
     async fn cell_value(

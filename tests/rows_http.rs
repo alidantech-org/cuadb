@@ -24,7 +24,7 @@ async fn valid_data_route_needs_a_configured_database() {
 #[tokio::test]
 async fn rejects_browser_sql_and_invalid_navigation() {
     for path in [
-        "/catalog/data?schema=public&relation=orders&size=101",
+        "/catalog/data?schema=public&relation=orders&size=1001",
         "/catalog/data?schema=public&relation=orders&page=101",
         "/catalog/data?schema=public&relation=orders&sort=id",
         "/catalog/data?schema=public&relation=orders&sort=id&direction=sideways",

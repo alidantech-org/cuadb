@@ -397,3 +397,20 @@ pub struct CellValue {
 
 /// Longest cell text returned by a single-cell fetch.
 pub const MAX_CELL_CHARS: usize = 65_536;
+
+/// Estimated row count and total size of one table, from catalog statistics only
+/// (never a `COUNT(*)`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelationSize {
+    pub name: String,
+    pub rows: Option<i64>,
+    pub bytes: Option<u64>,
+}
+
+/// Visible table count and estimated total size of one schema.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchemaSummary {
+    pub name: String,
+    pub tables: u32,
+    pub bytes: Option<u64>,
+}

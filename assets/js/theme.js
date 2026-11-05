@@ -22,6 +22,19 @@
     side: 'rows',
     unit: 'auto',
     remember: true,
+    psize: '100',
+    restore: true,
+    confirmDiscard: true,
+    autoOpen: true,
+    motion: 'system',
+    dates: 'raw',
+    tgroup: true,
+    tcounts: true,
+    tsums: true,
+    tsort: 'name',
+    tdir: 'asc',
+    ssort: 'name',
+    hideEmpty: false,
   };
   /** @type {Record<string, string>} */
   var FONTS = {
@@ -69,6 +82,13 @@
       ['wr', S.wrap],
       ['icm', S.icons === 'mono'],
       ['exm', S.mode === 'explore'],
+      ['hide-counts', !S.tcounts],
+      ['hide-sums', !S.tsums],
+      [
+        'no-motion',
+        S.motion === 'on' ||
+          (S.motion === 'system' && window.matchMedia('(prefers-reduced-motion: reduce)').matches),
+      ],
     ].forEach(function (pair) {
       r.classList.toggle(pair[0], !!pair[1]);
     });

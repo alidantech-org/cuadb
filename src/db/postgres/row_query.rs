@@ -1,7 +1,7 @@
 //! Catalog-validated SQL generation for PostgreSQL row reads.
 use crate::db::types::{ColumnDetail, DbError, DbErrorKind, RowOptions, SortDirection};
 pub const MAX_VISIBLE_COLUMNS: usize = 24;
-pub const MAX_PAGE_SIZE: u32 = 100;
+pub const MAX_PAGE_SIZE: u32 = 1000;
 pub const MAX_OFFSET: u64 = 10_000;
 pub const PREVIEW_CHARACTERS: usize = 257;
 

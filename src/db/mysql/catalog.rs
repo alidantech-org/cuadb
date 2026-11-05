@@ -21,7 +21,7 @@ const MAX_RELATIONS: i64 = 500;
 const MAX_COLUMNS: i64 = 512;
 const MAX_DETAILS: i64 = 300;
 const MAX_VISIBLE_COLUMNS: usize = 24;
-const MAX_PAGE_SIZE: u32 = 100;
+const MAX_PAGE_SIZE: u32 = 1000;
 const MAX_OFFSET: u64 = 10_000;
 const PREVIEW_CHARS: usize = 257;
 

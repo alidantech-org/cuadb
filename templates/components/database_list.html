@@ -1,0 +1,7 @@
+{% if databases.is_empty() %}
+<div class="note" role="status">No other databases are visible to this connection.</div>
+{% else %}
+{% for db in databases %}
+<button class="ci" type="button" role="option" data-use-db="{{ db.name }}" data-base="{{ base }}" aria-selected="{% if db.current %}true{% else %}false{% endif %}"><span><b>{{ db.name }}</b></span>{% if db.current %}<span class="chk">✓</span>{% endif %}</button>
+{% endfor %}
+{% endif %}

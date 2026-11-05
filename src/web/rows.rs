@@ -67,9 +67,7 @@ struct PageTemplate {
     previous_url: String,
     next_url: String,
     page_number: u32,
-    size_25: String,
-    size_50: String,
-    size_100: String,
+    sizes: Vec<SizeOption>,
     export_view_csv: String,
     export_all_csv: String,
     export_all_json: String,
@@ -82,6 +80,13 @@ struct PageTemplate {
     shown_from: u64,
     shown_to: u64,
     approximate_total: String,
+    /// "80.5 MB" from catalog statistics, empty when unavailable.
+    size_label: String,
+}
+struct SizeOption {
+    value: u32,
+    href: String,
+    selected: bool,
 }
 #[derive(Clone)]
 struct ColumnView {
@@ -319,7 +324,7 @@ pub(super) fn parse(query: DataQuery) -> Result<Navigation, AppError> {
         })
         .transpose()?;
     let options = RowOptions {
-        limit: query.size.unwrap_or(25),
+        limit: query.size.unwrap_or(100),
         page: query.page.unwrap_or(0),
         selected_columns: query
             .column
@@ -335,7 +340,7 @@ pub(super) fn parse(query: DataQuery) -> Result<Navigation, AppError> {
         spatial_geojson,
     };
     if options.limit == 0
-        || options.limit > 100
+        || options.limit > 1000
         || (options.page > 100 && options.cursor.is_none())
         || (options.cursor.is_none() && u64::from(options.page) * u64::from(options.limit) > 10_000)
     {
@@ -570,6 +575,17 @@ pub async fn data(
     } else {
         shown_from + page.rows.len() as u64 - 1
     };
+    let size_label = catalog
+        .relation_statistics(&nav.id)
+        .await
+        .ok()
+        .and_then(|stats| match stats.total_bytes {
+            crate::db::types::Availability::Available(bytes) => {
+                Some(super::catalog::human_bytes(bytes))
+            }
+            crate::db::types::Availability::Unavailable => None,
+        })
+        .unwrap_or_default();
     let approximate_total = match (&page.approximate_total, nav.options.filter.as_ref()) {
         (_, Some(_)) | (crate::db::types::Availability::Unavailable, None) => {
             "unavailable".to_string()
@@ -643,13 +659,18 @@ pub async fn data(
             values,
         });
     }
-    let mut sizes = nav.clone();
-    sizes.options.limit = 25;
-    let size_25 = link(&sizes, 0, None, sizes.options.sort.clone());
-    sizes.options.limit = 50;
-    let size_50 = link(&sizes, 0, None, sizes.options.sort.clone());
-    sizes.options.limit = 100;
-    let size_100 = link(&sizes, 0, None, sizes.options.sort.clone());
+    let sizes: Vec<SizeOption> = [25u32, 50, 100, 250, 500, 1000]
+        .into_iter()
+        .map(|value| {
+            let mut other = nav.clone();
+            other.options.limit = value;
+            SizeOption {
+                value,
+                href: link(&other, 0, None, other.options.sort.clone()),
+                selected: value == nav.options.limit,
+            }
+        })
+        .collect();
     let export_view_csv = export_link(&nav, "csv", "page", page.page);
     let export_all_csv = export_link(&nav, "csv", "relation", 0);
     let export_all_json = export_link(&nav, "json", "relation", 0);
@@ -710,14 +731,13 @@ pub async fn data(
         previous_url,
         next_url,
         page_number: page.page.saturating_add(1),
-        size_25,
-        size_50,
-        size_100,
+        sizes,
         stable: page.stable_order,
         truncated_columns: page.truncated_columns,
         shown_from,
         shown_to,
         approximate_total,
+        size_label,
     };
     let body = view.render().map_err(|_| AppError::template())?;
     let mut response = Html(body).into_response();

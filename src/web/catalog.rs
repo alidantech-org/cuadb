@@ -113,6 +113,10 @@ struct SchemaTreeTemplate {
 struct SchemaItem {
     name: String,
     href: String,
+    /// "11 tables · 80.6 MB" when the engine reports it.
+    summary: String,
+    tables: i64,
+    bytes: i64,
 }
 #[derive(Template)]
 #[template(path = "components/relation_tree.html")]
@@ -134,6 +138,11 @@ struct RelationItem {
     href: String,
     cols_href: String,
     is_view: bool,
+    /// `~9 rows`, empty when the engine has no estimate.
+    rows_label: String,
+    size_label: String,
+    rows: i64,
+    bytes: i64,
 }
 
 fn err(db: DbError) -> AppError {
@@ -470,6 +479,11 @@ pub async fn schemas(
         }
     };
     let truncated = entries.truncated;
+    let summaries: std::collections::HashMap<String, crate::db::types::SchemaSummary> = c
+        .schema_summaries()
+        .await
+        .map(|list| list.into_iter().map(|s| (s.name.clone(), s)).collect())
+        .unwrap_or_default();
     let schemas: Vec<SchemaItem> = entries
         .items
         .into_iter()
@@ -480,6 +494,24 @@ pub async fn schemas(
                 url_arg(&schema.name),
                 profile_arg(profile)
             ),
+            summary: summaries.get(&schema.name).map_or_else(String::new, |s| {
+                let tables = if s.tables == 1 {
+                    "1 table".to_string()
+                } else {
+                    format!("{} tables", s.tables)
+                };
+                match s.bytes {
+                    Some(bytes) => format!("{tables} · {}", human_bytes(bytes)),
+                    None => tables,
+                }
+            }),
+            tables: summaries
+                .get(&schema.name)
+                .map_or(-1, |s| i64::from(s.tables)),
+            bytes: summaries
+                .get(&schema.name)
+                .and_then(|s| s.bytes)
+                .map_or(-1, |b| i64::try_from(b).unwrap_or(i64::MAX)),
             name: schema.name,
         })
         .collect();
@@ -521,10 +553,13 @@ pub async fn relations(
         Some(q) => Some(q.to_lowercase()),
         None => None,
     };
-    let entries = catalog(&state, profile)?
-        .list_relations(&schema)
+    let adapter = catalog(&state, profile)?;
+    let entries = adapter.list_relations(&schema).await.map_err(err)?;
+    let sizes: std::collections::HashMap<String, crate::db::types::RelationSize> = adapter
+        .relation_sizes(&schema)
         .await
-        .map_err(err)?;
+        .map(|list| list.into_iter().map(|s| (s.name.clone(), s)).collect())
+        .unwrap_or_default();
     let truncated = entries.truncated;
     let relations = entries
         .items
@@ -549,6 +584,22 @@ pub async fn relations(
                 kind,
                 href: relation_url("data", &relation.id, profile),
                 cols_href: relation_url("columns", &relation.id, profile),
+                rows_label: sizes
+                    .get(&relation.id.name)
+                    .and_then(|s| s.rows)
+                    .map_or_else(String::new, |n| format!("{} rows", abbrev_count(n))),
+                size_label: sizes
+                    .get(&relation.id.name)
+                    .and_then(|s| s.bytes)
+                    .map_or_else(String::new, human_bytes),
+                rows: sizes
+                    .get(&relation.id.name)
+                    .and_then(|s| s.rows)
+                    .unwrap_or(-1),
+                bytes: sizes
+                    .get(&relation.id.name)
+                    .and_then(|s| s.bytes)
+                    .map_or(-1, |b| i64::try_from(b).unwrap_or(i64::MAX)),
             }
         })
         .collect::<Vec<_>>();
@@ -910,7 +961,7 @@ pub async fn advanced(
         "Functions, procedures, sequences, types and triggers are metadata only; never executed.",
     )
 }
-fn human_bytes(bytes: u64) -> String {
+pub(super) fn human_bytes(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
     let mut value = bytes as f64;
     let mut unit = 0;
@@ -922,6 +973,20 @@ fn human_bytes(bytes: u64) -> String {
         format!("{} {}", value.round() as u64, UNITS[unit])
     } else {
         format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
+/// `~9`, `~593.5K`, `~2.1M` for a row estimate.
+pub(super) fn abbrev_count(n: i64) -> String {
+    let n = n.max(0) as f64;
+    if n < 1_000.0 {
+        format!("~{}", n as i64)
+    } else if n < 1_000_000.0 {
+        format!("~{:.1}K", n / 1_000.0).replace(".0K", "K")
+    } else if n < 1_000_000_000.0 {
+        format!("~{:.1}M", n / 1_000_000.0).replace(".0M", "M")
+    } else {
+        format!("~{:.1}B", n / 1_000_000_000.0).replace(".0B", "B")
     }
 }
 

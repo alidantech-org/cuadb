@@ -94,6 +94,8 @@ fn api_routes() -> Router<crate::state::AppState> {
         .route("/admin/security", get(web::auth::admin_security))
         .route("/sql", get(web::sql::workspace_page))
         .route("/connection/profiles", get(web::connection_profiles))
+        .route("/connection/databases", get(web::connection_databases))
+        .route("/connection/use", post(web::connection_use))
         .route("/sql/execute", post(web::sql::execute))
         .route("/sql/cancel", post(web::sql::cancel))
         .route("/data/editor", get(web::sql::editor))

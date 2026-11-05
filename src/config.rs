@@ -189,18 +189,18 @@ impl Config {
         let max_page_size = bounded_number(
             &mut read,
             "CUADB_MAX_PAGE_SIZE",
-            100,
+            1000,
             1,
-            500,
-            "must be a whole number between 1 and 500",
+            1000,
+            "must be a whole number between 1 and 1000",
         )? as usize;
         let default_page_size = bounded_number(
             &mut read,
             "CUADB_DEFAULT_PAGE_SIZE",
-            25_u64.min(max_page_size as u64),
+            100_u64.min(max_page_size as u64),
             1,
-            500,
-            "must be a whole number between 1 and 500",
+            1000,
+            "must be a whole number between 1 and 1000",
         )? as usize;
         if default_page_size > max_page_size {
             return Err(ConfigError::invalid(
@@ -420,8 +420,8 @@ mod tests {
         assert_eq!(config.limits.connection_timeout, Duration::from_secs(5));
         assert_eq!(config.limits.query_timeout, Duration::from_secs(15));
         assert_eq!(config.limits.request_timeout, Duration::from_secs(30));
-        assert_eq!(config.limits.default_page_size, 25);
-        assert_eq!(config.limits.max_page_size, 100);
+        assert_eq!(config.limits.default_page_size, 100);
+        assert_eq!(config.limits.max_page_size, 1000);
         assert_eq!(config.limits.max_pool_connections, 4);
         assert_eq!(config.limits.max_in_flight_requests, 64);
         assert_eq!(config.limits.max_request_body_bytes, 65_536);
@@ -462,7 +462,7 @@ mod tests {
             ("CUADB_CONNECTION_TIMEOUT_MS", "0"),
             ("CUADB_QUERY_TIMEOUT_MS", "120001"),
             ("CUADB_REQUEST_TIMEOUT_MS", "499"),
-            ("CUADB_MAX_PAGE_SIZE", "501"),
+            ("CUADB_MAX_PAGE_SIZE", "1001"),
             ("CUADB_DEFAULT_PAGE_SIZE", "0"),
             ("CUADB_MAX_POOL_CONNECTIONS", "33"),
             ("CUADB_MAX_IN_FLIGHT_REQUESTS", "0"),

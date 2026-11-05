@@ -61,6 +61,9 @@ document.addEventListener('htmx:configRequest', (event) => {
     detail.elt.matches('#tree a.row')
   ) {
     detail.path = recallTable(path);
+    if (Number(S.psize) !== 100 && !/[?&]size=/.test(detail.path)) {
+      detail.path += `${detail.path.includes('?') ? '&' : '?'}size=${encodeURIComponent(String(S.psize))}`;
+    }
   }
   if (path.startsWith('/catalog/relations') && S.mode === 'advanced') {
     setParam(detail.parameters, 'group', '1');
@@ -271,22 +274,33 @@ function renderDatabasePop() {
   const pop = document.getElementById('dpop');
   if (!pop) return;
   pop.replaceChildren();
-  const rows = [
-    ['Database', currentDb.db || 'not named'],
-    ['Connection', currentDb.label],
-    ['Engine', currentDb.engine],
-    ['State', currentDb.state],
-  ];
-  for (const [label, value] of rows) {
-    const line = document.createElement('div');
-    line.className = 'sr';
+  const title = document.createElement('div');
+  title.className = 'sg';
+  title.textContent = 'Databases on this server';
+  const list = document.createElement('div');
+  list.id = 'dblist';
+  list.className = 'dblist';
+  const loading = document.createElement('div');
+  loading.className = 'note';
+  loading.textContent = 'Loading…';
+  list.append(loading);
+  const info = document.createElement('div');
+  info.className = 'dbinfo';
+  const line = (/** @type {string} */ label, /** @type {string} */ value) => {
+    const row = document.createElement('div');
+    row.className = 'sr';
     const a = document.createElement('span');
-    a.textContent = String(label);
+    a.textContent = label;
     const b = document.createElement('b');
-    b.textContent = String(value);
-    line.append(a, b);
-    pop.append(line);
-  }
+    b.textContent = value;
+    row.append(a, b);
+    return row;
+  };
+  info.append(
+    line('Connection', currentDb.label),
+    line('Engine', currentDb.engine),
+    line('State', currentDb.state),
+  );
   const access = document.createElement('div');
   access.className = 'sr';
   const text = document.createElement('span');
@@ -296,15 +310,71 @@ function renderDatabasePop() {
   tag.textContent =
     { read: 'read', write: 'can edit', full: 'can edit and run SQL' }[currentDb.access] ?? 'read';
   access.append(text, tag);
-  const hint = document.createElement('p');
-  hint.className = 'hint dnote';
-  hint.textContent =
-    'A connection points at one database. To browse another database, add it as its own connection.';
-  pop.append(access, hint);
+  info.append(access);
+  pop.append(title, list, info);
+  const profile = String(win.cuadbProfile || '');
+  const query = profile ? `?profile=${encodeURIComponent(profile)}` : '';
+  fetch(`/connection/databases${query}`)
+    .then(async (response) => {
+      if (!response.ok) throw new Error('unsupported');
+      list.innerHTML = await response.text();
+    })
+    .catch(() => {
+      list.replaceChildren();
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = `${currentDb.db || 'This database'} is the only one this connection can open.`;
+      list.append(note);
+    });
+}
+
+/** Switch to another database of the same server through a server-side derived connection. */
+async function useDatabase(/** @type {HTMLElement} */ option) {
+  const database = option.dataset.useDb ?? '';
+  const base = option.dataset.base ?? '';
+  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+  const body = new URLSearchParams({ database });
+  if (win.cuadbProfile) body.set('profile', String(win.cuadbProfile).split('~')[0] ?? '');
+  else if (base) body.set('profile', base);
+  try {
+    const response = await fetch('/connection/use', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-csrf-token': token },
+      body,
+    });
+    if (!response.ok) throw new Error('refused');
+    const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const derived = doc.getElementById('use-result')?.getAttribute('data-derived');
+    if (!derived) throw new Error('none');
+    win.cuadbProfile = derived;
+    currentDb = { ...currentDb, db: database };
+    const name = document.getElementById('dname');
+    if (name) name.textContent = database;
+    closePops();
+    closeInspector();
+    setMainHint(`Connected to ${database}. Choose a table from the sidebar.`);
+    fetchInto(`/catalog/schemas?profile=${encodeURIComponent(derived)}`, '#tree', 'innerHTML');
+  } catch {
+    toast('That database could not be opened.');
+  }
+}
+
+function setMainHint(/** @type {string} */ message) {
+  const main = document.getElementById('mainbody');
+  if (!main) return;
+  main.replaceChildren();
+  const hint = document.createElement('section');
+  hint.className = 'es';
+  const h = document.createElement('h2');
+  h.textContent = 'Pick a table to explore';
+  const p = document.createElement('p');
+  p.textContent = message;
+  hint.append(h, p);
+  main.append(hint);
 }
 
 /* ------------------------------------------------------------ popovers */
-const POPS = ['cpop', 'dpop', 'spop', 'colpop', 'exppop'];
+const POPS = ['cpop', 'dpop', 'opop', 'colpop', 'exppop'];
 function closePops(/** @type {string} */ except = '') {
   POPS.forEach((id) => {
     if (id === except) return;
@@ -324,13 +394,53 @@ function togglePop(/** @type {string} */ id) {
   document
     .querySelectorAll(`[aria-controls="${id}"]`)
     .forEach((btn) => btn.setAttribute('aria-expanded', String(open)));
-  if (open && id === 'spop') syncSettings();
+  if (open && id === 'opop') syncSettings();
+}
+
+/* ------------------------------------------------------------ settings dialog */
+/** @type {Element | null} */
+let settingsOpener = null;
+function openSettings(/** @type {string} */ pane = '') {
+  const dialog = document.getElementById('spop');
+  if (!dialog) return;
+  closePops();
+  settingsOpener = document.activeElement;
+  dialog.classList.add('show');
+  document.getElementById('sbtn')?.setAttribute('aria-expanded', 'true');
+  showSettingsPane(pane || String(win.cuadbPane || 'general'));
+  syncSettings();
+  /** @type {HTMLElement | null} */ (dialog.querySelector('.snav.on'))?.focus();
+}
+function closeSettings() {
+  const dialog = document.getElementById('spop');
+  if (!dialog?.classList.contains('show')) return;
+  dialog.classList.remove('show');
+  document.getElementById('sbtn')?.setAttribute('aria-expanded', 'false');
+  if (settingsOpener instanceof HTMLElement && document.contains(settingsOpener))
+    settingsOpener.focus();
+}
+function showSettingsPane(/** @type {string} */ pane) {
+  win.cuadbPane = pane;
+  document.querySelectorAll('#spop [data-sp]').forEach((node) => {
+    const on = node.getAttribute('data-sp') === pane;
+    node.classList.toggle('on', on);
+    node.setAttribute('aria-selected', String(on));
+  });
+  document.querySelectorAll('#spop [data-sp-pane]').forEach((node) => {
+    /** @type {HTMLElement} */ (node).hidden = node.getAttribute('data-sp-pane') !== pane;
+  });
 }
 
 /* ------------------------------------------------------------ settings */
 function syncSettings() {
-  const pop = document.getElementById('spop');
+  for (const id of ['spop', 'opop']) syncSettingsIn(document.getElementById(id));
+}
+function syncSettingsIn(/** @type {HTMLElement | null} */ pop) {
   if (!pop) return;
+  pop.querySelectorAll('select[data-ss]').forEach((node) => {
+    const select = /** @type {HTMLSelectElement} */ (node);
+    select.value = String(S[select.dataset.ss ?? ''] ?? '');
+  });
   pop.querySelectorAll('[data-st]').forEach((node) => {
     const btn = /** @type {HTMLElement} */ (node);
     btn.classList.toggle('on', String(S[btn.dataset.st ?? '']) === btn.dataset.val);
@@ -355,6 +465,8 @@ let lastMode = S.mode;
 function applyPrefs() {
   prefs.apply();
   formatNumbers(document);
+  formatDates(document);
+  applyTreeView();
   if (S.mode !== lastMode) {
     lastMode = S.mode;
     // Grouping and metadata objects depend on the mode: rebuild the tree.
@@ -1052,12 +1164,187 @@ function downloadZip() {
   toast(`Exporting ${picked.size} table${picked.size === 1 ? '' : 's'} as ZIP`);
 }
 
+/* ------------------------------------------------------------ sidebar view options */
+function sortValue(/** @type {HTMLElement} */ el, /** @type {string} */ key) {
+  const raw = Number(el.dataset[key === 'bytes' ? 'bytes' : key]);
+  return Number.isFinite(raw) ? raw : -1;
+}
+function sortChildren(
+  /** @type {Element} */ parent,
+  /** @type {string} */ selector,
+  /** @type {string} */ key,
+  /** @type {string} */ dir,
+  /** @type {(el: HTMLElement) => string} */ nameOf,
+) {
+  const items = /** @type {HTMLElement[]} */ (
+    Array.from(parent.children).filter((el) => el instanceof HTMLElement && el.matches(selector))
+  );
+  const sign = dir === 'desc' ? -1 : 1;
+  items.sort((a, b) => {
+    if (key === 'name')
+      return (
+        sign * nameOf(a).localeCompare(nameOf(b), undefined, { numeric: true, sensitivity: 'base' })
+      );
+    const x = sortValue(a, key);
+    const y = sortValue(b, key);
+    if (x < 0 && y >= 0) return 1;
+    if (y < 0 && x >= 0) return -1;
+    return sign * (x - y) || nameOf(a).localeCompare(nameOf(b));
+  });
+  items.forEach((el) => parent.append(el));
+}
+const relName = (/** @type {HTMLElement} */ el) => el.dataset.relationName ?? '';
+
+/** Apply grouping, sorting and empty-schema hiding to whatever the tree currently holds. */
+function applyTreeView() {
+  const tree = document.getElementById('tree');
+  if (!tree) return;
+  const holder = tree.querySelector('.schema-tree');
+  if (holder) {
+    sortChildren(
+      holder,
+      '.sch',
+      S.ssort === 'name' ? 'name' : S.ssort,
+      S.ssort === 'name' ? 'asc' : 'desc',
+      (el) => el.dataset.schemaName ?? '',
+    );
+    holder.querySelectorAll('.sch').forEach((node) => {
+      const sch = /** @type {HTMLElement} */ (node);
+      sch.classList.toggle('empty-hide', !!S.hideEmpty && sch.dataset.tables === '0');
+    });
+  }
+  const flat = !S.tgroup;
+  tree.classList.toggle('flat', flat);
+  const loaded = $$('#tree .sch').filter((el) => el.querySelector('.relw, .grp'));
+  let box = document.getElementById('flatbox');
+  if (flat) {
+    // Flat mode: every schema's tables in one list, prefixed with their schema.
+    $$('#tree .sch').forEach((sch) => {
+      const button = sch.querySelector('[data-s]');
+      if (
+        !sch.querySelector('.relw, .grp') &&
+        !sch.classList.contains('o') &&
+        button instanceof HTMLElement
+      )
+        button.click();
+    });
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'flatbox';
+      box.className = 'flatbox';
+      holder?.after(box);
+    }
+    loaded.forEach((sch) => {
+      sch.querySelectorAll('.relw').forEach((node) => {
+        const rel = /** @type {HTMLElement} */ (node);
+        if (!rel.querySelector('.sq')) {
+          const q = document.createElement('span');
+          q.className = 'sq';
+          q.textContent = `${rel.dataset.schema ?? ''}.`;
+          rel.querySelector('a.row .n')?.before(q);
+        }
+        box?.append(rel);
+      });
+    });
+    if (box) sortChildren(box, '.relw', S.tsort, S.tdir, relName);
+  } else {
+    if (box) {
+      box.remove();
+      // Tables were moved out of their schemas: reload the tree to put them back.
+      const profile = win.cuadbProfile ? `?profile=${encodeURIComponent(win.cuadbProfile)}` : '';
+      fetchInto(`/catalog/schemas${profile}`, '#tree', 'innerHTML');
+      return;
+    }
+    tree.querySelectorAll('.sub').forEach((sub) => {
+      if (sub.querySelector(':scope > .relw')) sortChildren(sub, '.relw', S.tsort, S.tdir, relName);
+    });
+  }
+}
+
+/** Expand, collapse or reload the whole tree. */
+function treeAction(/** @type {string} */ action) {
+  if (action === 'reload') {
+    const profile = win.cuadbProfile ? `?profile=${encodeURIComponent(win.cuadbProfile)}` : '';
+    document.getElementById('flatbox')?.remove();
+    fetchInto(`/catalog/schemas${profile}`, '#tree', 'innerHTML');
+    return;
+  }
+  $$('#tree .sch').forEach((sch) => {
+    const open = sch.classList.contains('o');
+    if (action === 'expand' && !open)
+      /** @type {HTMLElement | null} */ (sch.querySelector('[data-s]'))?.click();
+    if (action === 'collapse' && open) openSchema(sch, false);
+  });
+  $$('#tree .grp').forEach((g) => g.classList.toggle('o', action === 'expand'));
+  $$('#tree .relw').forEach((r) => {
+    if (action === 'collapse') r.classList.remove('o');
+  });
+}
+
+/** Show timestamps in the viewer's time zone (display only). */
+function formatDates(/** @type {ParentNode} */ root = document) {
+  root.querySelectorAll('td.ts-value').forEach((node) => {
+    const cell = /** @type {HTMLElement} */ (node);
+    const span = cell.querySelector('.ts');
+    if (!span || cell.querySelector('[data-null]')) return;
+    const raw = cell.dataset.detail ?? '';
+    if (S.dates !== 'local') {
+      if (span.textContent !== raw && cell.dataset.shown) span.textContent = cell.dataset.shown;
+      return;
+    }
+    if (!cell.dataset.shown) cell.dataset.shown = span.textContent ?? '';
+    const when = new Date(raw.replace(' ', 'T').replace(/([+-]\d\d)$/, '$1:00'));
+    if (!Number.isNaN(when.getTime()) && /\d{4}-\d\d-\d\d/.test(raw)) {
+      span.textContent = when.toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+      });
+    }
+  });
+}
+
+/** Remember the last table for 'reopen on load' (names only). */
+function rememberLast(/** @type {string} */ path) {
+  try {
+    const params = new URLSearchParams(path.split('?')[1] ?? '');
+    if (
+      params.get('schema') &&
+      params.get('relation') &&
+      !(params.get('profile') ?? '').includes('~')
+    ) {
+      localStorage.setItem(
+        'cuadb:last',
+        JSON.stringify({
+          s: params.get('schema'),
+          r: params.get('relation'),
+          p: params.get('profile') ?? '',
+        }),
+      );
+    }
+  } catch {
+    /* optional */
+  }
+}
+function restoreLast() {
+  if (!S.restore || document.getElementById('catalog-panel')) return;
+  try {
+    const last = JSON.parse(localStorage.getItem('cuadb:last') || 'null');
+    if (!last?.s || !last?.r) return;
+    const params = new URLSearchParams({ schema: last.s, relation: last.r });
+    if (last.p) params.set('profile', last.p);
+    fetchInto(`/catalog/data?${params.toString()}`, '#mainbody', 'innerHTML');
+  } catch {
+    /* optional */
+  }
+}
+
 /* ------------------------------------------------------------ sidebar tree */
 function openSchema(/** @type {Element} */ holder, /** @type {boolean} */ open) {
   holder.classList.toggle('o', open);
   holder.setAttribute('aria-expanded', String(open));
 }
 function autoOpenSchema() {
+  if (!S.autoOpen) return;
   const schemas = $$('#tree .sch');
   const first =
     schemas.find((el) => el.getAttribute('data-schema-name') === 'public') ?? schemas[0];
@@ -1082,9 +1369,24 @@ function filterTree() {
     schema.toggleAttribute('hidden', needle !== '' && !schemaHit && !any);
     if (needle !== '') openSchema(schema, true);
   });
+  const flat = document.getElementById('flatbox');
+  if (flat) {
+    flat.querySelectorAll('[data-relation-name]').forEach((relation) => {
+      const name = (relation.getAttribute('data-relation-name') ?? '').toLocaleLowerCase();
+      const qual = (relation.getAttribute('data-qual') ?? '').toLocaleLowerCase();
+      relation.toggleAttribute(
+        'hidden',
+        needle !== '' && !name.includes(needle) && !qual.includes(needle),
+      );
+    });
+  }
   const none = document.getElementById('tree-none');
   if (none) {
-    const anyVisible = $$('#tree .sch').some((el) => !el.hasAttribute('hidden'));
+    const anyVisible =
+      $$('#tree .sch').some((el) => !el.hasAttribute('hidden')) ||
+      Array.from(flat?.querySelectorAll('[data-relation-name]') ?? []).some(
+        (el) => !el.hasAttribute('hidden'),
+      );
     none.hidden = needle === '' || anyVisible;
   }
 }
@@ -1165,7 +1467,7 @@ document.addEventListener('click', (event) => {
     return;
   }
   const inPop = target.closest('.pop');
-  if (!inPop && !target.closest('[data-pop],#cbtn,#dbtn,#sbtn')) closePops();
+  if (!inPop && !target.closest('[data-pop],#cbtn,#dbtn,#sbtn,#obtn')) closePops();
 
   if (target.closest('[data-modal-close]') || target.id === 'modal') {
     closeModal();
@@ -1176,6 +1478,21 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (innerWidth < 761 && !target.closest('#side, #menu')) setDrawer(false);
+  if (target.closest('#obtn')) {
+    togglePop('opop');
+    return;
+  }
+  const treeBtn = target.closest('[data-tree]');
+  if (treeBtn instanceof HTMLElement) {
+    treeAction(treeBtn.dataset.tree ?? '');
+    closePops();
+    return;
+  }
+  const dbOption = target.closest('[data-use-db]');
+  if (dbOption instanceof HTMLElement) {
+    void useDatabase(dbOption);
+    return;
+  }
   if (target.closest('#dbtn')) {
     renderDatabasePop();
     togglePop('dpop');
@@ -1186,7 +1503,16 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (target.closest('#sbtn')) {
-    togglePop('spop');
+    openSettings();
+    return;
+  }
+  if (target.closest('[data-sdlg-close]') || target.id === 'spop') {
+    closeSettings();
+    return;
+  }
+  const paneBtn = target.closest('[data-sp]');
+  if (paneBtn instanceof HTMLElement) {
+    showSettingsPane(paneBtn.dataset.sp ?? 'general');
     return;
   }
   const popBtn = target.closest('[data-pop]');
@@ -1243,6 +1569,7 @@ document.addEventListener('click', (event) => {
   const viewBtn = target.closest('[data-view]');
   if (viewBtn instanceof HTMLElement && viewBtn.dataset.view) {
     const view = viewBtn.dataset.view;
+    closeSettings();
     closePops();
     closeInspector();
     markActiveRow(null);
@@ -1280,6 +1607,23 @@ document.addEventListener('click', (event) => {
   if (accent instanceof HTMLElement) {
     S.accent = accent.dataset.ac ?? '';
     applyPrefs();
+    return;
+  }
+  if (target.closest('#rforget')) {
+    Object.keys(TP).forEach((key) => delete TP[key]);
+    prefs.save();
+    toast('Forgot every remembered table');
+    return;
+  }
+  if (target.closest('#sexport')) {
+    const blob = new Blob([JSON.stringify({ settings: S, tables: TP }, null, 2)], {
+      type: 'application/json',
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'cuadb-settings.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 800);
     return;
   }
   if (target.closest('#rall')) {
@@ -1366,7 +1710,33 @@ document.addEventListener('submit', (event) => {
 });
 
 document.addEventListener('change', (event) => {
+  const picked = event.target;
+  if (picked instanceof HTMLSelectElement && picked.dataset.ss) {
+    S[picked.dataset.ss] = picked.value;
+    applyPrefs();
+    return;
+  }
+  if (picked instanceof HTMLInputElement && picked.id === 'simport' && picked.files?.[0]) {
+    void picked.files[0].text().then((text) => {
+      try {
+        const data = JSON.parse(text);
+        const known = Object.keys(prefs.DEF);
+        for (const [key, value] of Object.entries(data.settings ?? {})) {
+          if (known.includes(key) && typeof value === typeof prefs.DEF[key]) S[key] = value;
+        }
+        applyPrefs();
+        toast('Settings imported');
+      } catch {
+        toast('That file is not a CuaDB settings file');
+      }
+    });
+    return;
+  }
   const field = event.target;
+  if (field instanceof HTMLSelectElement && field.matches('[data-size-select]')) {
+    fetchInto(field.value, '#catalog-panel');
+    return;
+  }
   if (field instanceof HTMLSelectElement && field.matches('[data-engine-select]')) {
     field.closest('form')?.setAttribute('data-engine', field.value);
     return;
@@ -1447,6 +1817,27 @@ document.addEventListener('keydown', (event) => {
     input?.select();
     return;
   }
+  if (event.key === 'Tab' && document.getElementById('spop')?.classList.contains('show')) {
+    const nodes = Array.from(
+      document.querySelectorAll(
+        '#spop button, #spop select, #spop input:not([type=hidden]), #spop label.btn',
+      ),
+    ).filter(
+      (el) => el instanceof HTMLElement && el.offsetParent !== null && !el.hasAttribute('disabled'),
+    );
+    const firstEl = /** @type {HTMLElement | undefined} */ (nodes[0]);
+    const lastEl = /** @type {HTMLElement | undefined} */ (nodes[nodes.length - 1]);
+    if (firstEl && lastEl) {
+      if (event.shiftKey && document.activeElement === firstEl) {
+        event.preventDefault();
+        lastEl.focus();
+      } else if (!event.shiftKey && document.activeElement === lastEl) {
+        event.preventDefault();
+        firstEl.focus();
+      }
+    }
+    return;
+  }
   if (event.key === 'Tab' && document.getElementById('modal')?.classList.contains('show')) {
     // Keep keyboard focus inside the open dialog.
     const focusable = Array.from(
@@ -1471,6 +1862,10 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   if (event.key === 'Escape') {
+    if (document.getElementById('spop')?.classList.contains('show')) {
+      closeSettings();
+      return;
+    }
     closeModal();
     closePops();
     setDrawer(false);
@@ -1510,9 +1905,14 @@ document.addEventListener('htmx:afterSwap', (event) => {
           ?.setAttribute('title', ready ? 'Connected' : 'Not connected: open the list to retry');
       }
     }
+    if (event.target.id === 'tree') {
+      applyTreeView();
+      restoreLast();
+    }
     if (event.target.matches('.sub')) {
       filterTree();
       loadObjects();
+      applyTreeView();
     }
     decorateBars(event.target);
     // A new page replaces the sheet's row; swaps inside the sheet itself (the editor form,
@@ -1561,8 +1961,10 @@ document.addEventListener('htmx:afterRequest', (event) => {
   if (path.startsWith('/catalog/data')) {
     const finalPath = String(detail.pathInfo?.finalRequestPath ?? path);
     const status = Number(detail.xhr?.status ?? 0);
-    if (status >= 200 && status < 400) rememberTable(finalPath);
-    else if (status >= 400) {
+    if (status >= 200 && status < 400) {
+      rememberTable(finalPath);
+      rememberLast(finalPath);
+    } else if (status >= 400) {
       // A remembered sort or column list may no longer fit the table: forget it and reopen plainly.
       const params = new URLSearchParams(finalPath.split('?')[1] ?? '');
       const key = tableKey(params);
@@ -1595,6 +1997,7 @@ document.addEventListener('htmx:beforeRequest', (event) => {
   const detailBefore = /** @type {Any} */ (event).detail;
   if (
     win.cuadbEditing &&
+    S.confirmDiscard &&
     detailBefore.requestConfig?.verb === 'get' &&
     String(detailBefore.pathInfo?.requestPath ?? '').startsWith('/catalog/') &&
     !window.confirm('Discard the unsaved row changes?')
@@ -1611,7 +2014,30 @@ document.addEventListener('cuadb:changed', () => {
   // htmx fires response-header events before it swaps the body in; wait for the swap.
   setTimeout(afterChange, 80);
 });
+function refreshConnections() {
+  const list = document.getElementById('cpop');
+  if (!list) return;
+  Promise.resolve(
+    win.htmx?.ajax('GET', '/connection/profiles', { target: '#cpop', swap: 'innerHTML' }),
+  ).then(() => {
+    const base = String(win.cuadbProfile || '').split('~')[0];
+    const stillThere =
+      !base || !!document.querySelector(`#cpop [data-profile="${CSS.escape(base)}"]`);
+    if (!stillThere) {
+      win.cuadbProfile = '';
+      closeInspector();
+      setMainHint('That connection was removed. Choose a table from the sidebar.');
+      fetchInto('/catalog/schemas', '#tree', 'innerHTML');
+    }
+  });
+}
 function afterChange() {
+  const cpopMsg = document.getElementById('cpop-msg')?.textContent?.trim();
+  if (cpopMsg) {
+    toast(cpopMsg);
+    refreshConnections();
+    return;
+  }
   if (win.cuadbEditing && document.getElementById('eerr')) {
     const text = document.getElementById('eerr')?.textContent?.trim();
     win.cuadbEditing = false;
@@ -1624,7 +2050,10 @@ function afterChange() {
   const message = (
     inModal ? document.querySelector('#modal-msg') : document.querySelector('#adm-msg')
   )?.textContent?.trim();
-  if (inModal) closeModal();
+  if (inModal) {
+    closeModal();
+    refreshConnections();
+  }
   if (message) toast(message);
   const src = document.querySelector('#admin-body [data-src]')?.getAttribute('data-src');
   if (src) fetchInto(src, '#admin-body', 'innerHTML');

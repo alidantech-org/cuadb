@@ -156,6 +156,7 @@ pub async fn connection_status(
 }
 
 struct ProfileRow {
+    managed: bool,
     id: String,
     database: String,
     /// `read`, `write` (may edit) or `full` (may also run SQL).
@@ -222,6 +223,7 @@ pub async fn connection_profiles(
                 "read"
             };
         profiles.push(ProfileRow {
+            managed: info.managed,
             access,
             database: info.database,
             id: info.id,
@@ -237,6 +239,115 @@ pub async fn connection_profiles(
         admin: auth.0.is_admin(),
     })?
     .into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+
+struct DatabaseRow {
+    name: String,
+    current: bool,
+}
+
+#[derive(Template)]
+#[template(path = "components/database_list.html")]
+struct DatabaseListTemplate {
+    databases: Vec<DatabaseRow>,
+    base: String,
+}
+
+fn database_switch_allowed(auth: &auth::Auth, base: &str) -> bool {
+    // Relation-scoped grants name tables, not databases, so only whole-connection access
+    // (or the trusted local session) may move to another database of the server.
+    auth.0.is_open() || auth.0.allows_wide(crate::auth::Action::View, base, None)
+}
+
+/// GET /connection/databases: databases of the selected connection's server.
+pub async fn connection_databases(
+    State(state): State<AppState>,
+    auth: auth::Auth,
+    axum::extract::Query(query): axum::extract::Query<StatusQuery>,
+) -> Result<Response, AppError> {
+    let requested = crate::state::checked_profile(query.profile)?;
+    let base = state.effective_profile(requested.as_deref());
+    if !database_switch_allowed(&auth, &base) {
+        return Err(AppError::new(crate::error::ErrorKind::Forbidden));
+    }
+    let current = match requested.as_deref().and_then(crate::state::derived_parts) {
+        Some((_, database)) => database,
+        None => state
+            .profiles()
+            .into_iter()
+            .find(|p| p.id == base)
+            .map(|p| p.database)
+            .unwrap_or_default(),
+    };
+    let names = state
+        .databases_of(&base)
+        .await
+        .map_err(|_| AppError::new(crate::error::ErrorKind::InvalidInput))?;
+    let databases = names
+        .into_iter()
+        .map(|name| DatabaseRow {
+            current: name == current,
+            name,
+        })
+        .collect();
+    let mut response = html(DatabaseListTemplate { databases, base })?.into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UseDatabaseForm {
+    profile: Option<String>,
+    database: String,
+    #[serde(default)]
+    csrf: String,
+}
+
+/// POST /connection/use: switch to another database of the same server.
+pub async fn connection_use(
+    State(state): State<AppState>,
+    auth: auth::Auth,
+    axum::Form(form): axum::Form<UseDatabaseForm>,
+) -> Result<Response, AppError> {
+    let _ = &form.csrf;
+    let requested = crate::state::checked_profile(form.profile)?;
+    let base = state.effective_profile(requested.as_deref());
+    if !database_switch_allowed(&auth, &base) {
+        auth.denied(
+            &state,
+            crate::auth::Action::View,
+            &format!("{base} (database switch)"),
+        )
+        .await;
+        return Err(AppError::new(crate::error::ErrorKind::Forbidden));
+    }
+    if form.database.is_empty()
+        || form.database.len() > 63
+        || form.database.chars().any(char::is_control)
+    {
+        return Err(AppError::new(crate::error::ErrorKind::InvalidInput));
+    }
+    let id = state
+        .use_database(&base, &form.database)
+        .await
+        .map_err(|_| AppError::new(crate::error::ErrorKind::InvalidInput))?;
+    crate::auth::audit_profile_access(&state, &auth.0, &base).await;
+    let body = format!(
+        "<span id=\"use-result\" data-derived=\"{}\" data-db=\"{}\"></span>",
+        id,
+        form.database
+            .replace('&', "&amp;")
+            .replace('"', "&quot;")
+            .replace('<', "&lt;")
+    );
+    let mut response = Html(body).into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

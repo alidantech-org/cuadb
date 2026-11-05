@@ -1,7 +1,7 @@
 <section id="catalog-panel" class="panel" aria-label="Table data" hx-history="false" hx-sync="this:replace" data-table="{{ schema_name }}.{{ relation_name }}" data-schema="{{ schema_name }}" data-relation="{{ relation_name }}" data-prof="{{ profile }}"{% if can_edit %} data-edit="1"{% endif %}>
   <header class="bar">
     <h1><i class="ic-slot" data-ic="relation" data-name="{{ relation_name }}" aria-hidden="true"></i><span>{{ schema_name }}.</span>{{ relation_name }}</h1>
-    <span class="meta">{{ shown_from }}–{{ shown_to }}{% if approximate_total != "unavailable" %} · ~{{ approximate_total }} rows{% endif %}</span>
+    <span class="meta">{{ shown_from }}–{{ shown_to }}{% if approximate_total != "unavailable" %} · ~{{ approximate_total }} rows{% endif %}{% if !size_label.is_empty() %} · {{ size_label }}{% endif %}</span>
     <span class="sp"></span>
     <form class="row-search" action="/catalog/data" method="get" role="search" hx-get="/catalog/data" hx-target="#catalog-panel" hx-swap="outerHTML" hx-trigger="submit, keyup changed delay:350ms from:input[name=filter]">
       <input type="hidden" name="schema" value="{{ schema_name }}">
@@ -68,11 +68,7 @@
     <span class="selinfo" id="selinfo" role="status" aria-live="polite" hidden></span>
     <span class="sp"></span>
     <span>{{ headers.len() }} columns</span>
-    <nav class="seg" aria-label="Rows per page">
-      <a class="{% if page_size == 25 %}on{% endif %}" href="{{ size_25 }}" hx-get="{{ size_25 }}" hx-target="#catalog-panel" hx-swap="outerHTML">25</a>
-      <a class="{% if page_size == 50 %}on{% endif %}" href="{{ size_50 }}" hx-get="{{ size_50 }}" hx-target="#catalog-panel" hx-swap="outerHTML">50</a>
-      <a class="{% if page_size == 100 %}on{% endif %}" href="{{ size_100 }}" hx-get="{{ size_100 }}" hx-target="#catalog-panel" hx-swap="outerHTML">100</a>
-    </nav>
+    <label class="sizesel"><span class="sr-only">Rows per page</span><select class="sel" data-size-select aria-label="Rows per page">{% for size in sizes %}<option value="{{ size.href }}" {% if size.selected %}selected{% endif %}>{{ size.value }}</option>{% endfor %}</select></label>
     <span>rows/page</span>
     {% if can_edit %}<span class="tag m-write">can edit</span>{% else %}<span class="tag ro">read only</span>{% endif %}
   </footer>

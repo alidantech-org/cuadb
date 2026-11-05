@@ -244,6 +244,93 @@ impl PgCatalog {
         ))
     }
 
+    /// Databases the role may connect to (templates and disallowed ones are hidden).
+    pub async fn connectable_databases(&self) -> Result<Vec<String>, DbError> {
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    "SELECT datname::text AS name FROM pg_catalog.pg_database \
+                     WHERE datallowconn AND NOT datistemplate \
+                       AND pg_catalog.has_database_privilege(datname, 'CONNECT') \
+                     ORDER BY datname LIMIT 201",
+                )
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        rows.iter().take(200).map(|r| get(r, "name")).collect()
+    }
+
+    /// Estimated rows (`reltuples`) and total size of each table in a schema.
+    pub async fn table_sizes(
+        &self,
+        namespace: &str,
+    ) -> Result<Vec<crate::db::types::RelationSize>, DbError> {
+        Self::user_schema(namespace)?;
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT c.relname::text AS name,
+                              CASE WHEN c.reltuples < 0 THEN NULL ELSE c.reltuples::bigint END AS rows,
+                              CASE WHEN c.relkind IN ('r','m') THEN pg_catalog.pg_total_relation_size(c.oid) END AS bytes
+                       FROM pg_catalog.pg_class c
+                       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                       WHERE n.nspname = $1 AND c.relkind IN ('r','p','m')
+                         AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+                         AND pg_catalog.has_table_privilege(c.oid, 'SELECT')
+                       ORDER BY c.relname LIMIT 501"#,
+                )
+                .bind(namespace)
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        rows.iter()
+            .take(500)
+            .map(|r| {
+                let rows: Option<i64> = get(r, "rows")?;
+                let bytes: Option<i64> = get(r, "bytes")?;
+                Ok(crate::db::types::RelationSize {
+                    name: get(r, "name")?,
+                    rows,
+                    bytes: bytes.and_then(|b| u64::try_from(b).ok()),
+                })
+            })
+            .collect()
+    }
+
+    /// Visible table count and estimated size per schema.
+    pub async fn schema_totals(&self) -> Result<Vec<crate::db::types::SchemaSummary>, DbError> {
+        let rows = self
+            .bounded(
+                sqlx::query(
+                    r#"SELECT n.nspname::text AS name,
+                              count(*) FILTER (WHERE c.relkind IN ('r','p','m')
+                                  AND pg_catalog.has_table_privilege(c.oid,'SELECT'))::int AS tables,
+                              COALESCE(sum(pg_catalog.pg_total_relation_size(c.oid))
+                                  FILTER (WHERE c.relkind IN ('r','m')
+                                  AND pg_catalog.has_table_privilege(c.oid,'SELECT')), 0)::bigint AS bytes
+                       FROM pg_catalog.pg_namespace n
+                       LEFT JOIN pg_catalog.pg_class c ON c.relnamespace = n.oid
+                       WHERE left(n.nspname, 3) <> 'pg_' AND n.nspname <> 'information_schema'
+                         AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+                       GROUP BY n.nspname ORDER BY n.nspname LIMIT 201"#,
+                )
+                .fetch_all(&self.pool),
+            )
+            .await?;
+        rows.iter()
+            .take(200)
+            .map(|r| {
+                let tables: i32 = get(r, "tables")?;
+                let bytes: i64 = get(r, "bytes")?;
+                Ok(crate::db::types::SchemaSummary {
+                    name: get(r, "name")?,
+                    tables: u32::try_from(tables).unwrap_or(0),
+                    bytes: u64::try_from(bytes).ok(),
+                })
+            })
+            .collect()
+    }
+
     /// Full text of one cell addressed by the whole primary key. Identifiers are checked
     /// against the catalog and quoted; the key values are bound, never interpolated.
     pub async fn cell_text(
@@ -727,6 +814,18 @@ impl DatabaseAdapter for PgCatalog {
         key: &[(String, String)],
     ) -> Result<crate::db::types::CellValue, DbError> {
         self.cell_text(relation, column, key).await
+    }
+    async fn relation_sizes(
+        &self,
+        namespace: &str,
+    ) -> Result<Vec<crate::db::types::RelationSize>, DbError> {
+        self.table_sizes(namespace).await
+    }
+    async fn list_databases(&self) -> Result<Vec<String>, DbError> {
+        self.connectable_databases().await
+    }
+    async fn schema_summaries(&self) -> Result<Vec<crate::db::types::SchemaSummary>, DbError> {
+        self.schema_totals().await
     }
 
     fn sort_supported(&self, native_type: &str) -> bool {

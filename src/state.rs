@@ -81,6 +81,12 @@ impl Runtime {
 
 #[derive(Clone)]
 struct Entry {
+    /// A switch to another database of the same server; hidden from the connection list.
+    derived: bool,
+    /// Whether the SQL workspace may write through this entry.
+    writable: bool,
+    /// The connection URL (secret), kept only to derive same-server database switches.
+    url: Option<crate::config::SecretUrl>,
     /// The database (or SQLite file) name; never a host, user or password.
     database: String,
     /// Saved from the Administration screen (editable); file-defined ones are read-only.
@@ -139,6 +145,9 @@ struct BuildCtx {
 
 /// Most connections that may exist at once (file-defined plus saved).
 pub const MAX_CONNECTIONS: usize = 16;
+
+/// Database switches kept open at once; the oldest is closed beyond this.
+const MAX_DERIVED: usize = 8;
 
 /// Why a runtime connection change was refused. Never carries a URL or driver text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -274,6 +283,9 @@ impl AppState {
                 None
             };
             entries.push(Entry {
+                derived: false,
+                writable: profile.writable,
+                url: Some(profile.url.clone()),
                 database: database_name(profile.url.expose()),
                 managed: false,
                 id: profile.id.clone(),
@@ -326,6 +338,9 @@ impl AppState {
         Self {
             ctx: None,
             entries: Arc::new(RwLock::new(vec![Entry {
+                derived: false,
+                writable: false,
+                url: None,
                 database: String::new(),
                 managed: false,
                 id: crate::profiles::DEFAULT_PROFILE_ID.into(),
@@ -351,6 +366,9 @@ impl AppState {
                 adapters
                     .into_iter()
                     .map(|(id, label, catalog)| Entry {
+                        derived: false,
+                        writable: false,
+                        url: None,
                         database: String::new(),
                         managed: false,
                         id: id.into(),
@@ -518,10 +536,15 @@ impl AppState {
 
     /// The profile id a request refers to (`None` means the default profile).
     pub fn effective_profile(&self, profile: Option<&str>) -> String {
-        profile
+        let id = profile
             .map(str::to_string)
             .or_else(|| self.default_profile_id())
-            .unwrap_or_else(|| crate::profiles::DEFAULT_PROFILE_ID.to_string())
+            .unwrap_or_else(|| crate::profiles::DEFAULT_PROFILE_ID.to_string());
+        // A database switch authorizes as its base connection.
+        match derived_parts(&id) {
+            Some((base, _)) => base.to_string(),
+            None => id,
+        }
     }
 
     fn read(&self) -> std::sync::RwLockReadGuard<'_, Vec<Entry>> {
@@ -590,6 +613,7 @@ impl AppState {
         self.read()
             .iter()
             .enumerate()
+            .filter(|(_, entry)| !entry.derived)
             .map(|(index, entry)| ProfileInfo {
                 database: entry.database.clone(),
                 managed: entry.managed,
@@ -631,6 +655,68 @@ impl AppState {
         self.ctx.as_ref().map(|c| c.sqlite_root.clone())
     }
 
+    /// Databases of the server behind `base` that its role may connect to.
+    pub async fn databases_of(&self, base: &str) -> Result<Vec<String>, ManageError> {
+        let entry = self.entry(Some(base)).ok_or(ManageError::Unknown)?;
+        if entry.derived {
+            return Err(ManageError::Unknown);
+        }
+        entry
+            .catalog
+            .list_databases()
+            .await
+            .map_err(|_| ManageError::Unavailable)
+    }
+
+    /// Register (or reuse) a switch to another database on the same server and return its
+    /// profile id. The name must be one the connection's role may connect to.
+    pub async fn use_database(&self, base: &str, database: &str) -> Result<String, ManageError> {
+        let known = self.databases_of(base).await?;
+        if !known.iter().any(|name| name == database) {
+            return Err(ManageError::Unknown);
+        }
+        let id = derived_id(base, database);
+        if self.entry(Some(&id)).is_some() {
+            return Ok(id);
+        }
+        let base_entry = self.entry(Some(base)).ok_or(ManageError::Unknown)?;
+        let url = base_entry.url.as_ref().ok_or(ManageError::Unavailable)?;
+        let mut parsed = url::Url::parse(url.expose()).map_err(|_| ManageError::Invalid)?;
+        if !matches!(parsed.scheme(), "postgres" | "postgresql") {
+            return Err(ManageError::Unavailable);
+        }
+        parsed.set_path(&format!("/{database}"));
+        let mut entry = self.build_entry(&ManagedInput {
+            id: id.clone(),
+            label: database.to_string(),
+            url: parsed.into(),
+            writable: base_entry.writable,
+        })?;
+        entry.managed = false;
+        entry.derived = true;
+        entry.database = database.to_string();
+        let evicted = {
+            let mut entries = self.write();
+            let mut evicted = None;
+            let derived = entries.iter().filter(|e| e.derived).count();
+            if derived >= MAX_DERIVED
+                && let Some(position) = entries.iter().position(|e| e.derived)
+            {
+                evicted = Some(entries.remove(position));
+            }
+            if !entries.iter().any(|e| e.id == id) {
+                entries.push(entry);
+            }
+            evicted
+        };
+        if let Some(old) = evicted
+            && let Some(runtime) = old.runtime
+        {
+            runtime.close().await;
+        }
+        Ok(id)
+    }
+
     /// Whether this state can build connections at runtime.
     pub fn can_manage(&self) -> bool {
         self.ctx.is_some()
@@ -659,6 +745,9 @@ impl AppState {
             None
         };
         Ok(Entry {
+            derived: false,
+            writable: input.writable,
+            url: Some(crate::config::SecretUrl::new(input.url.clone())),
             database: database_name(&input.url),
             managed: true,
             id: input.id.clone(),
@@ -783,11 +872,29 @@ impl ConnectionSnapshot {
     }
 }
 
+/// `base~hex(database)` is a database switch on connection `base`.
+pub fn derived_parts(id: &str) -> Option<(&str, String)> {
+    let (base, hex) = id.split_once('~')?;
+    if !crate::profiles::valid_id(base) || hex.is_empty() || hex.len() > 126 || hex.len() % 2 != 0 {
+        return None;
+    }
+    let bytes: Option<Vec<u8>> = (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).ok())
+        .collect();
+    String::from_utf8(bytes?).ok().map(|db| (base, db))
+}
+
+pub fn derived_id(base: &str, database: &str) -> String {
+    let hex: String = database.bytes().map(|b| format!("{b:02x}")).collect();
+    format!("{base}~{hex}")
+}
+
 /// Validate the optional `profile` request parameter (syntax only).
 pub fn checked_profile(value: Option<String>) -> Result<Option<String>, crate::error::AppError> {
     match value {
         None => Ok(None),
-        Some(id) if crate::profiles::valid_id(&id) => Ok(Some(id)),
+        Some(id) if crate::profiles::valid_id(&id) || derived_parts(&id).is_some() => Ok(Some(id)),
         Some(_) => Err(crate::error::AppError::new(
             crate::error::ErrorKind::InvalidInput,
         )),

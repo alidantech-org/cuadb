@@ -92,7 +92,7 @@ async fn live_size_and_page_bounds_are_rejected_before_the_database() {
     let (router, manager) = app(&url);
     for bad in [
         "&size=0",
-        "&size=101",
+        "&size=1001",
         "&size=4294967295",
         "&page=101",
         "&page=-1",

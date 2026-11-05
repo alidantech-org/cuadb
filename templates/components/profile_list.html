@@ -2,8 +2,14 @@
 <div class="note" role="status">No connection is configured on the server.</div>
 {% else %}
 {% for profile in profiles %}
+<div class="cirow">
 <button class="ci" type="button" role="option" data-profile="{{ profile.id }}" aria-selected="{% if profile.selected %}true{% else %}false{% endif %}" data-label="{{ profile.label }}" data-ready="{{ profile.ready }}" data-db="{{ profile.database }}" data-access="{{ profile.access }}" data-engine="{{ profile.engine }}" data-state="{{ profile.state }}"
   hx-get="/catalog/schemas?profile={{ profile.id }}" hx-target="#tree" hx-swap="innerHTML" hx-trigger="click"><span><b>{{ profile.label }}</b><small>{{ profile.engine }}{% if !profile.database.is_empty() %} · {{ profile.database }}{% endif %} · {{ profile.state }}</small></span><span class="tag m-{{ profile.access }}">{{ profile.access }}</span>{% if profile.selected %}<span class="chk">✓</span>{% endif %}</button>
+{% if admin && profile.managed %}<button class="cix" type="button" title="Remove {{ profile.label }}" aria-label="Remove connection {{ profile.label }}" hx-post="/admin/connections/delete" hx-vals='{"id": "{{ profile.id }}"}' hx-confirm="Remove {{ profile.label }} and every permission that names it?" hx-target="#cpop-msg" hx-swap="innerHTML">×</button>{% endif %}
+</div>
 {% endfor %}
-{% if admin %}<div class="sep-line"></div><button class="ci" type="button" data-view="admin-connections">Manage connections…</button>{% endif %}
 {% endif %}
+<div id="cpop-msg" class="adm-msg" role="status" aria-live="polite"></div>
+{% if admin %}<div class="sep-line"></div>
+<button class="ci" type="button" hx-get="/admin/connections/form" hx-target="#modal" hx-swap="innerHTML"><span><b>＋ Add connection…</b><small>PostgreSQL or SQLite, saved encrypted on the server</small></span></button>
+<button class="ci" type="button" data-view="admin-connections"><span><b>Manage connections…</b></span></button>{% endif %}

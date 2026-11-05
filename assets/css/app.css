@@ -2241,3 +2241,310 @@ a.row.picked {
 #dbtn {
   flex: 0.8;
 }
+
+/* ---- selects ---- */
+.sel {
+  height: 24px;
+  border: 1px solid var(--bd);
+  border-radius: var(--rad);
+  background: var(--bg);
+  color: var(--tx);
+  padding: 0 22px 0 8px;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--mu) 50%),
+    linear-gradient(135deg, var(--mu) 50%, transparent 50%);
+  background-position:
+    calc(100% - 12px) 10px,
+    calc(100% - 8px) 10px;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
+}
+.sel:hover {
+  border-color: color-mix(in srgb, var(--ac) 50%, var(--bd));
+}
+.sel:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 1px;
+}
+.sizesel {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ---- sidebar counts and sizes ---- */
+.sh.fo .n {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.sh.fo .c {
+  color: var(--mu);
+  font-size: 10.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.hide-counts .row .c[data-count],
+.hide-sums .sh.fo .c {
+  display: none;
+}
+
+/* ---- popovers anchored to the viewport so the sidebar can never crop them ---- */
+#cpop,
+#dpop {
+  position: fixed;
+  left: 8px;
+  bottom: 46px;
+  width: min(340px, calc(100vw - 16px));
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  scrollbar-width: thin;
+  z-index: 60;
+}
+.opop {
+  position: fixed;
+  left: 8px;
+  top: calc(var(--hh) + 2px);
+  width: min(300px, calc(100vw - 16px));
+  padding: 6px 10px 10px;
+  z-index: 60;
+}
+.orow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  padding: 2px 0;
+}
+.orow .btn {
+  flex: 1;
+  justify-content: center;
+}
+#obtn {
+  flex: none;
+  width: 30px;
+}
+.dblist {
+  max-height: 240px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.dbinfo {
+  border-top: 1px solid var(--bd);
+  margin-top: 6px;
+  padding-top: 4px;
+}
+.cirow {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+.cirow .ci {
+  flex: 1;
+  min-width: 0;
+}
+.cix {
+  width: 26px;
+  border-radius: var(--rad);
+  color: var(--mu);
+}
+.cix:hover {
+  background: var(--sf2);
+  color: #d0505f;
+}
+
+/* ---- flat tree and sorting ---- */
+.flat .sch > .sh.fo,
+.flat .sch > .sub .note {
+  display: none;
+}
+.flat .sch {
+  display: none;
+}
+.flatbox {
+  padding: 0 0 8px;
+}
+.sq {
+  color: var(--mu);
+  font-size: 11px;
+  margin-right: 1px;
+}
+.empty-hide {
+  display: none;
+}
+.hide-counts .row .c[data-count] {
+  display: none;
+}
+
+/* ---- settings dialog ---- */
+.dlg-back {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: rgba(10, 14, 13, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.dlg-back.show {
+  display: flex;
+}
+.dlg {
+  width: min(820px, 94vw);
+  height: min(600px, 88vh);
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  grid-template-rows: auto 1fr;
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: calc(var(--rad) + 8px);
+  box-shadow: var(--sh);
+  overflow: hidden;
+}
+.dlg-h {
+  grid-column: 1/3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 46px;
+  padding: 0 14px 0 18px;
+  border-bottom: 1px solid var(--bd);
+}
+.dlg-h h2 {
+  margin: 0;
+  font-size: 14px;
+}
+.dlg-n {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  border-right: 1px solid var(--bd);
+  background: var(--sf2);
+  overflow: auto;
+}
+.snav {
+  text-align: left;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--rad);
+  color: var(--mu);
+}
+.snav:hover {
+  background: var(--bg);
+  color: var(--tx);
+}
+.snav.on {
+  background: var(--acs);
+  color: var(--ac);
+  font-weight: 600;
+}
+.dlg-b {
+  overflow: auto;
+  padding: 14px 20px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--mu) 45%, transparent) transparent;
+}
+.dlg-b::-webkit-scrollbar {
+  width: 6px;
+}
+.dlg-b::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--mu) 45%, transparent);
+  border-radius: 6px;
+}
+.dlg-b::-webkit-scrollbar-track {
+  background: transparent;
+}
+.spane h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+.sgroup {
+  font-weight: 600;
+  color: var(--mu);
+  font-size: 11px;
+  padding: 12px 0 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.srow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--bd) 60%, transparent);
+}
+.slabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.slabel small {
+  max-width: 360px;
+}
+.sctl {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.srow.who .acts {
+  display: flex;
+  gap: 6px;
+}
+.keytab td:first-child {
+  width: 200px;
+}
+kbd {
+  font:
+    11px ui-monospace,
+    monospace;
+  border: 1px solid var(--bd);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  background: var(--bg);
+}
+@media (max-width: 760px) {
+  .dlg {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    height: 92vh;
+  }
+  .dlg-h {
+    grid-column: 1;
+  }
+  .dlg-n {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--bd);
+  }
+  .snav {
+    flex: none;
+  }
+  .srow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .sctl {
+    justify-content: flex-start;
+  }
+}
+.no-motion * {
+  animation: none !important;
+  transition: none !important;
+}

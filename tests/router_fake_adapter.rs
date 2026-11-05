@@ -260,7 +260,7 @@ async fn export_rejects_unknown_formats_scopes_and_browser_supplied_targets() {
         "/catalog/export?schema=main&relation=t&format=xml",
         "/catalog/export?schema=main&relation=t&format=csv&scope=all",
         "/catalog/export?schema=main&relation=t&format=csv&scope=relation&page=1",
-        "/catalog/export?schema=main&relation=t&format=csv&size=101",
+        "/catalog/export?schema=main&relation=t&format=csv&size=1001",
         "/catalog/export?schema=main&relation=t&format=csv&sql=select+1",
         "/catalog/export?schema=main&relation=t&format=csv&url=postgres://x",
     ] {

@@ -72,6 +72,8 @@ fn limits(state: &AppState) -> ExecLimits {
 
 struct Target {
     pid: String,
+    /// The exact connection id (a database switch keeps its own transactions apart).
+    tx_key: String,
     profile_arg: Option<String>,
     workspace: std::sync::Arc<dyn Workspace>,
     user: i64,
@@ -107,13 +109,15 @@ async fn target(
             return Err(AppError::new(ErrorKind::Forbidden));
         }
     }
+    let tx_key = profile_arg.clone().unwrap_or_else(|| pid.clone());
     if let Some(open) = state.txs().open_profile(user).await
-        && open != pid
+        && open != tx_key
     {
         return Err(AppError::new(ErrorKind::Conflict));
     }
     Ok(Target {
         pid,
+        tx_key,
         profile_arg,
         workspace,
         user,
@@ -730,7 +734,7 @@ pub async fn tx_begin(
         .begin(
             target.user,
             &session,
-            &target.pid,
+            &target.tx_key,
             state.sql_settings().tx_ttl,
             tx,
         )
@@ -766,7 +770,12 @@ pub async fn tx_status(
         .pending(&query.tx, user)
         .await
         .map_err(tx_error)?;
-    auth.authorize_wide(&state, Action::Edit, &profile).await?;
+    auth.authorize_wide(
+        &state,
+        Action::Edit,
+        &state.effective_profile(Some(&profile)),
+    )
+    .await?;
     render_tx(&query.tx, profile, remaining, changes)
 }
 
@@ -786,7 +795,12 @@ pub async fn tx_commit(
         .parse()
         .map_err(|_| AppError::new(ErrorKind::InvalidInput))?;
     let (profile, changes, _) = state.txs().pending(id, user).await.map_err(tx_error)?;
-    auth.authorize_wide(&state, Action::Edit, &profile).await?;
+    auth.authorize_wide(
+        &state,
+        Action::Edit,
+        &state.effective_profile(Some(&profile)),
+    )
+    .await?;
     // The user must have reviewed exactly what is pending right now.
     if reviewed != changes.len() {
         return notice_status(

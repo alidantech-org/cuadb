@@ -4,6 +4,7 @@
   <aside id="side" aria-label="Database explorer">
     <div class="sf">
       <input class="inp" id="f" placeholder="Search tables…" autocomplete="off" aria-label="Search tables" aria-keyshortcuts="Control+K Meta+K">
+      <button class="btn ico" id="obtn" type="button" title="Sidebar options" aria-label="Sidebar options" aria-haspopup="menu" aria-expanded="false" aria-controls="opop"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
       {% if shell.sql %}<button class="btn ico" id="sqlb" type="button" title="SQL workspace" aria-label="SQL workspace" data-view="sql">&gt;_</button>{% endif %}
       <button class="btn ico" id="selb" type="button" title="Select tables to export" aria-label="Select tables to export" aria-pressed="false" hidden>☑</button>
     </div>
@@ -12,6 +13,7 @@
     </div>
     <div class="note" id="tree-none" hidden>Nothing matches.</div>
     <div id="selbar"></div>
+    {% include "components/tree_options.html" %}
     <div class="sfoot">
       <button class="cbtn" id="cbtn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="cpop"
         hx-get="/connection/profiles" hx-target="#cpop" hx-swap="innerHTML" hx-trigger="click">
@@ -23,9 +25,6 @@
       </button>
       <div class="pop" id="cpop" role="listbox" aria-label="Connections" hx-get="/connection/profiles" hx-trigger="load" hx-swap="innerHTML"></div>
       <div class="pop" id="dpop" role="dialog" aria-label="Database"></div>
-      <div class="pop" id="spop" role="dialog" aria-label="Settings">
-        {% include "components/settings.html" %}
-      </div>
     </div>
   </aside>
   <div id="rs" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="180" aria-valuemax="520" aria-valuenow="264" title="Drag to resize · double-click to reset"></div>
@@ -38,5 +37,6 @@
     </div>
   </main>
 </div>
+{% include "components/settings.html" %}
 <button class="btn ico hm" id="menu" type="button" data-toggle-sidebar aria-controls="side" aria-expanded="false" aria-label="Toggle sidebar">☰</button>
 {% endblock %}
