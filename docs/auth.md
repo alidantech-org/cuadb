@@ -28,3 +28,10 @@ Append-only `audit_events` (a trigger blocks UPDATE and deleting rows younger th
 
 ## Limitations
 No UI beyond minimal unstyled forms (a UI needs an approved demo first); no password rules beyond those above; lockout is per login name, not per client address; sessions and the audit log are not replicated or exported; grants are re-read on every request, so changes apply immediately, but a session keeps working until it expires, is revoked or its user is disabled.
+
+
+## Administration screen (Phase 2)
+
+`/admin` is the browser front end for the routes above. Members: add, enable/disable, reset password, **change role** (`POST /admin/users/role`) and **delete** (`POST /admin/users/delete`). Nobody changes or deletes their own account, and the last active administrator can be neither demoted, disabled nor deleted; deleting a member removes their sessions and grants and ends their open transactions, while the audit history stays. Policy refusals (for example "password is too simple") are shown to the administrator as their static reason.
+
+The audit log (`GET /admin/audit`) filters by `actor`, `kind`, `outcome`, `since` and `until` (`YYYY-MM-DD`, UTC). Unknown kinds or malformed dates are ignored, never echoed. Saved connections are described in `docs/connections.md`. The Security tab is read-only operator configuration.

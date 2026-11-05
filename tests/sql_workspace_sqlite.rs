@@ -1524,3 +1524,33 @@ async fn the_grid_offers_editing_only_where_the_user_may_edit_and_a_key_exists()
     .await;
     assert!(!readonly_profile.contains(r#"data-edit="1""#));
 }
+
+#[tokio::test]
+async fn advanced_object_routes_are_empty_on_engines_without_them_and_validate_input() {
+    let w = world("objects", "read-only", false).await;
+    let (status, body) = get(&w.router, &w.admin, "/catalog/objects?schema=main").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(!body.contains("grp") && !body.contains(" style="), "{body}");
+    for bad in [
+        "/catalog/object?schema=main&kind=table&name=items",
+        "/catalog/object?schema=main&kind=function&name=%00",
+        "/catalog/object?schema=main&kind=function",
+        "/catalog/objects?schema=",
+    ] {
+        let (status, _) = get(&w.router, &w.admin, bad).await;
+        assert!(status.is_client_error(), "{bad} -> {status}");
+    }
+    // A reader without access to the schema is refused like every other catalog route.
+    let nobody = user(&w, "nolan", Role::Viewer, &[]).await;
+    assert_eq!(
+        get(&w.router, &nobody, "/catalog/objects?schema=main")
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    // The tree links to the overview and reserves a place for objects, without inline code.
+    let (_, tree) = get(&w.router, &w.admin, "/catalog/schemas").await;
+    assert!(tree.contains("ov-row") && tree.contains("/catalog/overview"));
+    let (_, rel) = get(&w.router, &w.admin, "/catalog/relations?schema=main").await;
+    assert!(rel.contains(r#"data-objs="/catalog/objects?schema=main""#));
+}

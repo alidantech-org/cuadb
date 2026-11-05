@@ -102,6 +102,7 @@ struct StatisticView {
 struct SchemaTreeTemplate {
     schemas: Vec<SchemaItem>,
     note: String,
+    overview_href: String,
 }
 #[derive(Clone)]
 struct SchemaItem {
@@ -112,6 +113,7 @@ struct SchemaItem {
 #[template(path = "components/relation_tree.html")]
 struct RelationTreeTemplate {
     schema: String,
+    objects_href: String,
     relations: Vec<RelationItem>,
     note: String,
     /// The bounded catalog list was cut off; tell the user even when rows exist.
@@ -427,6 +429,7 @@ pub async fn schemas(
         Lookup::Unknown => return Err(AppError::new(ErrorKind::UnknownProfile)),
         Lookup::NotConfigured => {
             return tree_response(SchemaTreeTemplate {
+                overview_href: String::new(),
                 schemas: vec![],
                 note: "Not configured. Set CUADB_DATABASE_URL or CUADB_PROFILES_FILE on the server to browse the catalog."
                     .into(),
@@ -437,6 +440,7 @@ pub async fn schemas(
         Ok(entries) => entries,
         Err(db) => {
             return tree_response(SchemaTreeTemplate {
+                overview_href: String::new(),
                 schemas: vec![],
                 note: match db.kind {
                     DbErrorKind::PermissionDenied => {
@@ -463,6 +467,10 @@ pub async fn schemas(
         })
         .collect();
     tree_response(SchemaTreeTemplate {
+        overview_href: format!(
+            "/catalog/overview?{}",
+            profile_arg(profile).trim_start_matches('&')
+        ),
         schemas,
         note: if truncated {
             "Only schemas with USAGE are listed; the bounded list is incomplete.".into()
@@ -519,6 +527,11 @@ pub async fn relations(
         })
         .collect();
     tree_response(RelationTreeTemplate {
+        objects_href: format!(
+            "/catalog/objects?schema={}{}",
+            url_arg(&schema),
+            profile_arg(profile)
+        ),
         schema,
         relations,
         truncated,
@@ -680,6 +693,66 @@ pub async fn advanced(
         "Functions, procedures, sequences, types and triggers are metadata only; never executed.",
     )
 }
+fn human_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+    let mut value = bytes as f64;
+    let mut unit = 0;
+    while value >= 1024.0 && unit < UNITS.len() - 1 {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 || value >= 100.0 {
+        format!("{} {}", value.round() as u64, UNITS[unit])
+    } else {
+        format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
+struct Bar {
+    label: String,
+    href: String,
+    pct: u32,
+    size: String,
+}
+
+fn bars(items: Vec<(String, String, Availability<u64>)>) -> Vec<Bar> {
+    let known = |a: &Availability<u64>| match a {
+        Availability::Available(n) => *n,
+        Availability::Unavailable => 0,
+    };
+    let max = items
+        .iter()
+        .map(|(_, _, a)| known(a))
+        .max()
+        .unwrap_or(0)
+        .max(1);
+    items
+        .into_iter()
+        .map(|(label, href, size)| Bar {
+            pct: ((known(&size) as f64 / max as f64) * 100.0)
+                .round()
+                .clamp(1.0, 100.0) as u32,
+            size: match &size {
+                Availability::Available(n) => human_bytes(*n),
+                Availability::Unavailable => "unavailable".into(),
+            },
+            label,
+            href,
+        })
+        .collect()
+}
+
+#[derive(Template)]
+#[template(path = "components/overview.html")]
+struct OverviewTemplate {
+    schemas: usize,
+    relations: usize,
+    extensions: Vec<String>,
+    schema_bars: Vec<Bar>,
+    largest: Vec<Bar>,
+    truncated: bool,
+}
+
 pub async fn overview(
     State(state): State<AppState>,
     auth: Auth,
@@ -697,39 +770,184 @@ pub async fn overview(
         .advanced_overview()
         .await
         .map_err(err)?;
-    let mut rows = vec![
-        row("Visible schemas", o.visible_schema_count.to_string(), ""),
-        row(
-            "Visible relations",
-            o.visible_relation_count.to_string(),
-            "",
+    tree_response(OverviewTemplate {
+        schemas: o.visible_schema_count,
+        relations: o.visible_relation_count,
+        extensions: o.extensions,
+        schema_bars: bars(
+            o.schema_sizes
+                .items
+                .into_iter()
+                .map(|s| (s.namespace, String::new(), s.estimated_bytes))
+                .collect(),
         ),
-    ];
-    rows.extend(
-        o.extensions
-            .into_iter()
-            .map(|e| row(format!("Extension · {e}"), "Installed", "")),
-    );
-    rows.extend(o.schema_sizes.items.into_iter().map(|s| {
-        row(
-            format!("Schema · {}", s.namespace),
-            format!("Estimated bytes: {}", availability(&s.estimated_bytes)),
-            "",
-        )
-    }));
-    rows.extend(o.largest_relations.items.into_iter().map(|(r, size)| {
-        row(
-            format!("{}.{}", r.namespace, r.name),
-            format!("Estimated bytes: {}", availability(&size)),
-            relation_url("structure", &r, profile),
-        )
-    }));
-    fragment(
-        "Advanced overview".into(),
-        rows,
-        o.truncated,
-        "Overview size estimates use catalog relpages. Counts and charts can be truncated.",
-    )
+        largest: bars(
+            o.largest_relations
+                .items
+                .into_iter()
+                .take(8)
+                .map(|(r, size)| {
+                    (
+                        format!("{}.{}", r.namespace, r.name),
+                        relation_url("data", &r, profile),
+                        size,
+                    )
+                })
+                .collect(),
+        ),
+        truncated: o.truncated,
+    })
+}
+
+fn kind_code(kind: crate::db::types::CatalogObjectKind) -> &'static str {
+    use crate::db::types::CatalogObjectKind as K;
+    match kind {
+        K::Function => "function",
+        K::Procedure => "procedure",
+        K::Sequence => "sequence",
+        K::UserType => "type",
+        K::Trigger => "trigger",
+    }
+}
+
+fn kind_group(code: &str) -> &'static str {
+    match code {
+        "function" => "Functions",
+        "procedure" => "Procedures",
+        "sequence" => "Sequences",
+        "type" => "Types",
+        _ => "Triggers",
+    }
+}
+
+struct ObjItem {
+    name: String,
+    kind: &'static str,
+    href: String,
+}
+struct ObjGroup {
+    label: &'static str,
+    items: Vec<ObjItem>,
+}
+
+#[derive(Template)]
+#[template(path = "components/object_tree.html")]
+struct ObjectTreeTemplate {
+    groups: Vec<ObjGroup>,
+    truncated: bool,
+}
+
+/// Advanced explorer: metadata objects of a schema, grouped by kind, for the sidebar.
+/// Engines without these objects return an empty fragment rather than an error.
+pub async fn objects(
+    State(state): State<AppState>,
+    auth: Auth,
+    Query(query): Query<SchemaQuery>,
+) -> Result<Response, AppError> {
+    let schema = checked_query_name(query.schema)?;
+    let profile = checked_profile(query.profile)?;
+    let pid = state.effective_profile(profile.as_deref());
+    if !auth.0.allows_wide(Action::View, &pid, Some(&schema)) {
+        auth.denied(&state, Action::View, &format!("{pid}/{schema} (objects)"))
+            .await;
+        return Err(AppError::new(ErrorKind::Forbidden));
+    }
+    let entries = match catalog(&state, profile.as_deref())?
+        .list_advanced(&schema)
+        .await
+    {
+        Ok(entries) => entries,
+        Err(db) if db.kind == DbErrorKind::Unsupported => {
+            return tree_response(ObjectTreeTemplate {
+                groups: Vec::new(),
+                truncated: false,
+            });
+        }
+        Err(db) => return Err(err(db)),
+    };
+    let truncated = entries.truncated;
+    let mut groups: Vec<ObjGroup> = ["function", "procedure", "sequence", "type", "trigger"]
+        .into_iter()
+        .map(|code| ObjGroup {
+            label: kind_group(code),
+            items: Vec::new(),
+        })
+        .collect();
+    for object in entries.items {
+        let code = kind_code(object.kind);
+        let Some(group) = groups.iter_mut().find(|g| g.label == kind_group(code)) else {
+            continue;
+        };
+        group.items.push(ObjItem {
+            href: format!(
+                "/catalog/object?schema={}&kind={code}&name={}{}",
+                url_arg(&schema),
+                url_arg(&object.name),
+                profile_arg(profile.as_deref())
+            ),
+            kind: code,
+            name: object.name,
+        });
+    }
+    groups.retain(|g| !g.items.is_empty());
+    tree_response(ObjectTreeTemplate { groups, truncated })
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectQuery {
+    schema: String,
+    kind: String,
+    name: String,
+    profile: Option<String>,
+}
+
+#[derive(Template)]
+#[template(path = "components/object_page.html")]
+struct ObjectPageTemplate {
+    schema: String,
+    name: String,
+    kind: &'static str,
+    definition: String,
+}
+
+/// One metadata object: its definition text, shown as inert text and never executable.
+pub async fn object(
+    State(state): State<AppState>,
+    auth: Auth,
+    Query(query): Query<ObjectQuery>,
+) -> Result<Response, AppError> {
+    let schema = checked_query_name(query.schema)?;
+    let name = checked_query_name(query.name)?;
+    let kind = ["function", "procedure", "sequence", "type", "trigger"]
+        .into_iter()
+        .find(|code| *code == query.kind)
+        .ok_or(AppError::new(ErrorKind::InvalidInput))?;
+    let profile = checked_profile(query.profile)?;
+    let pid = state.effective_profile(profile.as_deref());
+    if !auth.0.allows_wide(Action::View, &pid, Some(&schema)) {
+        auth.denied(&state, Action::View, &format!("{pid}/{schema} (object)"))
+            .await;
+        return Err(AppError::new(ErrorKind::Forbidden));
+    }
+    let entries = catalog(&state, profile.as_deref())?
+        .list_advanced(&schema)
+        .await
+        .map_err(err)?;
+    let found = entries
+        .items
+        .into_iter()
+        .find(|o| kind_code(o.kind) == kind && o.name == name)
+        .ok_or(AppError::new(ErrorKind::InvalidInput))?;
+    tree_response(ObjectPageTemplate {
+        schema,
+        name: found.name,
+        kind,
+        definition: match found.definition {
+            Availability::Available(text) => text,
+            Availability::Unavailable => "Definition unavailable.".into(),
+        },
+    })
 }
 
 #[cfg(test)]

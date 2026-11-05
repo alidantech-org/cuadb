@@ -1,0 +1,20 @@
+<section id="catalog-panel" class="panel" aria-label="Database overview" hx-history="false" hx-sync="this:replace">
+  <header class="bar"><h1><i class="ic-slot" data-ic="overview" aria-hidden="true"></i>Overview</h1><span class="meta">catalog estimates, not exact measurements</span></header>
+  <div class="wrap"><div class="gw st">
+    <div class="cards">
+      <div class="card"><small>Schemas</small><b>{{ schemas }}</b></div>
+      <div class="card"><small>Relations</small><b>{{ relations }}</b></div>
+      <div class="card"><small>Extensions</small><b>{{ extensions.len() }}</b></div>
+    </div>
+    {% if truncated %}<p class="note" role="status">Some lists were capped, so counts and bars can be incomplete.</p>{% endif %}
+    <h4>Size by schema</h4>
+    {% for bar in schema_bars %}<div class="br"><span>{{ bar.label }}</span><i><u class="bar-fill" data-pct="{{ bar.pct }}"></u></i><b>{{ bar.size }}</b></div>{% endfor %}
+    {% if schema_bars.is_empty() %}<p class="note">No size information is available.</p>{% endif %}
+    <h4>Largest tables</h4>
+    {% for bar in largest %}<a class="br" href="{{ bar.href }}" hx-get="{{ bar.href }}" hx-target="#mainbody" hx-swap="innerHTML"><span>{{ bar.label }}</span><i><u class="bar-fill" data-pct="{{ bar.pct }}"></u></i><b>{{ bar.size }}</b></a>{% endfor %}
+    {% if largest.is_empty() %}<p class="note">No tables are visible.</p>{% endif %}
+    <h4>Extensions</h4>
+    {% if extensions.is_empty() %}<p class="note">No extensions are installed or visible.</p>{% else %}
+    <table><tbody>{% for e in extensions %}<tr><td><b>{{ e }}</b></td></tr>{% endfor %}</tbody></table>{% endif %}
+  </div></div>
+</section>

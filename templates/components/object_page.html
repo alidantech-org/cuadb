@@ -1,0 +1,8 @@
+<section id="catalog-panel" class="panel" aria-label="{{ kind }} {{ name }}" hx-history="false" hx-sync="this:replace">
+  <header class="bar"><h1><i class="ic-slot" data-ic="object" data-kind="{{ kind }}" aria-hidden="true"></i><span>{{ schema }}.</span>{{ name }}</h1><span class="tag">{{ kind }}</span><span class="meta">metadata only, never executed</span></header>
+  <div class="wrap"><div class="gw st">
+    <table><tbody><tr><td class="mu">Kind</td><td>{{ kind }}</td></tr><tr><td class="mu">Schema</td><td>{{ schema }}</td></tr><tr><td class="mu">Name</td><td>{{ name }}</td></tr></tbody></table>
+    <h4>Definition</h4>
+    <pre class="src">{{ definition }}</pre>
+  </div></div>
+</section>

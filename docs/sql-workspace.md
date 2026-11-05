@@ -31,3 +31,8 @@ A real SQL parser (`sqlparser`), run before the database is contacted. Exactly o
 
 ## Limitations
 No UI; MySQL/MariaDB execution not implemented; SQLite statements cannot be interrupted; PostgreSQL results are rendered via `to_json`, so column types appear as JSON (bytea as hex text, timestamps as ISO text); only whole-row-key edits (no bulk edits); the function denylist is not exhaustive (read-only transactions and database privileges are the real boundaries).
+
+
+## Browser screens
+
+`GET /sql` renders the editor (Ctrl/Cmd+Enter runs, Cancel stops a running read) for users who hold a profile-wide `sql` grant while `CUADB_SQL_WORKSPACE=enabled`; the sidebar entry appears only for them. The pending-change bar mirrors `/tx/status` and commits with the reviewed `expected_changes`. In the data grid, **Edit / Delete / + Add row** appear only when the profile is writable, the user holds `edit` on that relation and the relation has a primary key visible in the grid; edits are single statements (not part of a transaction). The browser never builds SQL: it posts typed values to `/data/*`, with `old.*` values so a concurrent change is reported as a conflict.

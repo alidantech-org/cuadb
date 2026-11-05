@@ -110,6 +110,8 @@ fn api_routes() -> Router<crate::state::AppState> {
         .route("/catalog/stats", get(web::catalog::stats))
         .route("/catalog/advanced", get(web::catalog::advanced))
         .route("/catalog/overview", get(web::catalog::overview))
+        .route("/catalog/objects", get(web::catalog::objects))
+        .route("/catalog/object", get(web::catalog::object))
         .route("/catalog/data", get(web::rows::data))
         .route("/catalog/export", get(web::export::export))
         .nest_service("/static", ServeDir::new("public"))

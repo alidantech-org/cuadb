@@ -1,0 +1,9 @@
+{% for group in groups %}
+<div class="grp" data-group="{{ group.label }}">
+  <button class="sh g" type="button" data-g aria-expanded="false"><span class="ch" aria-hidden="true"></span>{{ group.label }}<span class="tag">{{ group.items.len() }}</span></button>
+  <div class="sub">
+    {% for item in group.items %}<a href="{{ item.href }}" class="row" data-object-name="{{ item.name }}" hx-get="{{ item.href }}" hx-target="#mainbody" hx-swap="innerHTML" hx-sync="#mainbody:replace" title="{{ item.kind }}"><i class="ic-slot" data-ic="object" data-kind="{{ item.kind }}" aria-hidden="true"></i><span class="n">{{ item.name }}</span></a>{% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% if truncated %}<div class="note" role="status">Only the first objects are listed.</div>{% endif %}

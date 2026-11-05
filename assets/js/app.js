@@ -115,6 +115,13 @@ const IC = {
     '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
   ],
   folder: [45, '<path d="M3 6h7l2 2h9v11H3z"/>'],
+  fn: [285, '<path d="M15 4c-3 0-3 2-4 6l-2 10c-.5 2-1.5 3-3 3M7 10h8"/>'],
+  proc: [
+    95,
+    '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+  ],
+  seq: [20, '<path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/>'],
+  enum: [330, '<path d="M4 6h16M4 12h10M4 18h14"/>'],
   folderopen: [45, '<path d="M3 19V5h7l2 2h8v3"/><path d="M3 19l3-9h17l-3 9z"/>'],
 };
 /** @type {Array<[RegExp, string]>} */
@@ -138,6 +145,13 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 function iconName(/** @type {HTMLElement} */ slot) {
   const kind = slot.dataset.ic;
   if (kind === 'folder' || kind === 'overview') return kind;
+  if (kind === 'object') {
+    return (
+      { function: 'fn', procedure: 'proc', sequence: 'seq', type: 'enum', trigger: 'bolt' }[
+        slot.dataset.kind ?? ''
+      ] ?? 'fn'
+    );
+  }
   if (slot.dataset.kind && /view/i.test(slot.dataset.kind)) return 'view';
   const name = (slot.dataset.name ?? '').toLowerCase();
   return NAME_ICONS.find((pair) => pair[0].test(name))?.[1] ?? 'table';
@@ -188,6 +202,24 @@ function closeModal() {
   modal.replaceChildren();
 }
 
+/** Bar widths come from data attributes so no inline style is needed. */
+function decorateBars(/** @type {ParentNode} */ root = document) {
+  root.querySelectorAll('.bar-fill[data-pct]').forEach((node) => {
+    const el = /** @type {HTMLElement} */ (node);
+    el.style.setProperty('--p', el.dataset.pct ?? '0');
+  });
+}
+
+/** Advanced mode: load each expanded schema's functions, sequences, types and triggers. */
+function loadObjects() {
+  if (S.mode !== 'advanced') return;
+  document.querySelectorAll('#tree .objs[data-objs]:not([data-loaded])').forEach((node) => {
+    const el = /** @type {HTMLElement} */ (node);
+    el.dataset.loaded = '1';
+    win.htmx?.ajax('GET', el.dataset.objs ?? '', { target: el, swap: 'innerHTML' });
+  });
+}
+
 /* ------------------------------------------------------------ popovers */
 const POPS = ['cpop', 'spop', 'colpop', 'exppop'];
 function closePops(/** @type {string} */ except = '') {
@@ -236,8 +268,13 @@ function syncSettings() {
 function currentTable() {
   return document.getElementById('catalog-panel')?.dataset.table ?? '';
 }
+let lastMode = S.mode;
 function applyPrefs() {
   prefs.apply();
+  if (S.mode !== lastMode) {
+    lastMode = S.mode;
+    if (S.mode === 'advanced') loadObjects();
+  }
   prefs.save();
   syncSettings();
   const selb = document.getElementById('selb');
@@ -683,6 +720,13 @@ document.addEventListener('click', (event) => {
     return;
   }
 
+  const groupBtn = target.closest('#tree [data-g]');
+  if (groupBtn) {
+    const holder = groupBtn.closest('.grp');
+    const open = holder?.classList.toggle('o') ?? false;
+    groupBtn.setAttribute('aria-expanded', String(open));
+    return;
+  }
   const schemaBtn = target.closest('#tree [data-s]');
   if (schemaBtn) {
     const holder = schemaBtn.closest('.sch');
@@ -899,7 +943,11 @@ document.addEventListener('htmx:afterSwap', (event) => {
       if (selected instanceof HTMLElement && name)
         name.textContent = selected.dataset.label ?? 'Connection';
     }
-    if (event.target.matches('.sub')) filterTree();
+    if (event.target.matches('.sub')) {
+      filterTree();
+      loadObjects();
+    }
+    decorateBars(event.target);
   }
   closeInspector();
 });
