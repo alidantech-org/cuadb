@@ -1,5 +1,5 @@
 ---
-{id: TSK-DC88ADC32B93,name: Implement typed read-only Axum route contracts for browsing,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.669Z,updated_at: 2026-11-04T11:23:01.716Z,tags: [cuadb,http],depends_on: [TSK-A3CFF0B5E267,TSK-23F3D2D0DDE1],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:23:01.716Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-DC88ADC32B93/1793791381726-start,started_at: 2026-11-04T11:23:01.750Z}]}}}
+{id: TSK-DC88ADC32B93,name: Implement typed read-only Axum route contracts for browsing,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.669Z,updated_at: 2026-11-05T00:19:12.449Z,tags: [cuadb,http],depends_on: [TSK-A3CFF0B5E267,TSK-23F3D2D0DDE1],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:23:01.716Z},{from: in-progress,to: completed,at: 2026-11-05T00:19:12.449Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-DC88ADC32B93/1793791381726-start,started_at: 2026-11-04T11:23:01.750Z,end_ref: refs/tracking/TSK-DC88ADC32B93/1793837952452-end,ended_at: 2026-11-05T00:19:12.449Z,summary: {files: 143,insertions: 26821,deletions: 932}}]}}}
 ---
 
 # Implement typed read-only Axum route contracts for browsing
@@ -29,7 +29,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 ### Reference-specific acceptance
 - [x] Expose typed read-only routes for the demo's sidebar tree, selected-object toolbar, Data/Structure/Indexes segment, Overview and advanced metadata screens, with all relation identifiers and options checked server-side.
 - [x] Specify secure, cancellable, resource-bounded backend routes for the demo's CSV/JSON exports and linked-table ZIP; do not implement its unbounded JavaScript whole-table export against real data.
-- [ ] Preserve the selected connection, relation, row filter, column visibility, sort and page state across the same on-screen controls shown in the reference.
+- [x] Preserve the selected connection, relation, row filter, column visibility, sort and page state across the same on-screen controls shown in the reference.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
@@ -51,3 +51,7 @@ Item 7 PARTIAL: bounded CSV/JSON export route /catalog/export implemented (row 1
 ### 2026-11-04T13:50:13.490Z · PETER IRUNGU
 
 Item 7 VERIFIED: /catalog/export serves CSV, JSON and related-table ZIP (zip =2.6.1, stored, no default features). Caps: 10k rows/relation, 16 MiB, 8 relations, depth<=2; independent validation; formula-safe CSV; cancellable via request timeout. Evidence: tests/router_fake_adapter.rs (14 pass) and tests/export_live.rs (3 pass against live PostgreSQL 18 cuadb_fixture_catalog, reader role). LIMITATIONS: output buffered in memory within the cap (not streamed); ZIP follows outgoing FKs only; export walk NOT verified live on MySQL/MariaDB/SQLite. Item 8 (state across on-screen controls) is UI - BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING.
+
+### 2026-11-05T00:19:10.937Z · PETER IRUNGU
+
+Phase 2 evidence (2026-11-05), built-in browser against the dedicated cuadb_fixture_catalog PostgreSQL fixture (read-only reader) and disposable SQLite data, light and dark at 1440x900, 1280x800 and 390x844 (paired with the updated demo), plus Rust tests (tests/sql_workspace_sqlite.rs, auth_http.rs, catalog_live_http.rs). Selected connection, relation, row filter, chosen columns, sort and page size travel in every navigation link and hidden form field; verified through search, sort, paging and the connection picker.

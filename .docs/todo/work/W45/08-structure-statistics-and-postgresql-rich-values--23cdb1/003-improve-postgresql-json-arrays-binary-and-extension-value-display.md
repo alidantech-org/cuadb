@@ -1,5 +1,5 @@
 ---
-{id: TSK-11615BE5E97B,name: "Improve PostgreSQL JSON, arrays, binary and extension value display",type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.257Z,updated_at: 2026-11-04T23:18:20.217Z,tags: [cuadb,inspectors],depends_on: [TSK-8DB2E738839F,TSK-ABE2D51C83F3],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.837Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.301Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.217Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-11615BE5E97B/1793791788839-start,started_at: 2026-11-04T11:29:48.856Z,end_ref: refs/tracking/TSK-11615BE5E97B/1793808860303-end,ended_at: 2026-11-04T16:14:20.301Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-58382C325F5F}]}
+{id: TSK-11615BE5E97B,name: "Improve PostgreSQL JSON, arrays, binary and extension value display",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.257Z,updated_at: 2026-11-05T00:19:29.891Z,tags: [cuadb,inspectors],depends_on: [TSK-8DB2E738839F,TSK-ABE2D51C83F3],order: 3072,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.837Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:20.301Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.217Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.891Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-11615BE5E97B/1793791788839-start,started_at: 2026-11-04T11:29:48.856Z,end_ref: refs/tracking/TSK-11615BE5E97B/1793808860303-end,ended_at: 2026-11-04T16:14:20.301Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-11615BE5E97B/1793837969894-start,started_at: 2026-11-05T00:19:29.920Z}]}},links: [{type: blocks,task: TSK-58382C325F5F}]}
 ---
 
 # Improve PostgreSQL JSON, arrays, binary and extension value display
@@ -27,8 +27,8 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/frontend-interactions.md`. Match its actual visible control labels, compact placement and selected-object behavior. In particular, the source uses **Data / Structure / Indexes** in its table toolbar and a separate Advanced **Overview**, so the older plan's independent `Info` tab terminology is superseded. The production UI uses safe real metadata rather than hard-coded statistics. User approval is required for material visual changes.
 
 ### Reference-specific acceptance
-- [ ] Use the same compact typed grid cells and selected-row inspector as the demo for JSONB, arrays, timestamps, UUID, inet, enums, binary and custom values; preserve multiline detail formatting.
-- [ ] Integrate the demo's data-cell monospace setting, NULL display setting, ellipsis and wrapping without creating a new inspection layout.
+- [x] Use the same compact typed grid cells and selected-row inspector as the demo for JSONB, arrays, timestamps, UUID, inet, enums, binary and custom values; preserve multiline detail formatting.
+- [x] Integrate the demo's data-cell monospace setting, NULL display setting, ellipsis and wrapping without creating a new inspection layout.
 - [x] Escape all values and apply strict payload/cell limits so visual fidelity remains safe with large JSON and unusual extension types.
 
 ## Verification and handoff
@@ -53,3 +53,7 @@ CORRECTION/UPDATE: this is the rich-value task. Evidence (tests/rich_live_http.r
 ### 2026-11-04T16:14:20.462Z · PETER IRUNGU
 
 Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.
+
+### 2026-11-05T00:19:39.373Z · PETER IRUNGU
+
+Phase 2 (2026-11-05): JSON, arrays, uuid, inet, timestamps, bytea and numeric render in the demo's compact monospace and pill styles and the inspector keeps multiline structure; the monospace, NULL and wrap settings apply. Item 4 (deeply nested JSON test) and item 9 (user-defined enums get no special pill, and the editor is not driven by these rules) stay open.

@@ -1,5 +1,5 @@
 ---
-{id: TSK-FFD6A5B94574,name: Build Askama view models and reusable fragment templates,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.740Z,updated_at: 2026-11-04T16:14:59.295Z,tags: [cuadb,http],depends_on: [TSK-DC88ADC32B93],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:25:00.389Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-FFD6A5B94574/1793791500391-start,started_at: 2026-11-04T11:25:00.407Z}]}},links: [{type: blocks,task: TSK-0AA246B508ED}]}
+{id: TSK-FFD6A5B94574,name: Build Askama view models and reusable fragment templates,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.740Z,updated_at: 2026-11-05T00:19:28.360Z,tags: [cuadb,http],depends_on: [TSK-DC88ADC32B93],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:25:00.389Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-FFD6A5B94574/1793791500391-start,started_at: 2026-11-04T11:25:00.407Z}]}},links: [{type: blocks,task: TSK-0AA246B508ED}]}
 ---
 
 # Build Askama view models and reusable fragment templates
@@ -28,7 +28,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ### Reference-specific acceptance
 - [x] Map Askama pages/fragments directly to demo regions: #side/#tree, bottom #cbtn/#spop, #rs splitter, #mainbody, .bar toolbar, .gw grid, #insp detail panel and .foot footer.
-- [ ] Render both Simple and Advanced explorer layouts and the database Overview, table Data/Structure/Indexes and read-only metadata object detail screens with the demo's compact component hierarchy.
+- [x] Render both Simple and Advanced explorer layouts and the database Overview, table Data/Structure/Indexes and read-only metadata object detail screens with the demo's compact component hierarchy.
 - [x] Retain the demo's visual layout instead of introducing an unrelated global header, generic dashboard or alternate navigation model.
 
 ## Verification and handoff
@@ -55,3 +55,7 @@ Item 2 PARTIAL: Data/Structure/Indexes tab nav extracted to templates/components
 ### 2026-11-04T23:31:43.029Z · PETER IRUNGU
 
 Phase 2 progress (2026-11-05): explorer.html, schema_tree, relation_tree, data_page, structure_page, indexes_page, catalog, profile_list, settings and login now emit the demo regions (#side/#tree, #cbtn/#spop, #rs, #mainbody, .bar, .gw, #insp, .foot) with no global header, and tests assert no inline style or script. Still open: item 2 (some components still duplicated), item 7 (Advanced Overview and metadata object pages need the new backend metadata in Group 15), item 9 (principal view model reaches only the explorer and login pages) and item 11 (new-surface partials).
+
+### 2026-11-05T00:19:38.233Z · PETER IRUNGU
+
+Phase 2 (2026-11-05): item 7 verified (Simple and Advanced trees, Overview, Data/Structure/Indexes, metadata object pages). Still open: item 2 (the Data page still carries its own copy of the Data/Structure/Indexes switcher), item 9 (only the explorer and login pages receive the principal view model; plain catalog fragments do not need it) and item 11 (the row editor is built in the browser from the grid's typed column metadata, not as an Askama partial). Owner decision needed: accept these as deviations (then the items are reworded) or have them rebuilt.

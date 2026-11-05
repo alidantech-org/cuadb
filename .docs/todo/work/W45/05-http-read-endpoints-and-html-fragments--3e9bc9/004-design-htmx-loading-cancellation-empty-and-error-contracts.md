@@ -1,5 +1,5 @@
 ---
-{id: TSK-9890D0090922,name: "Design HTMX loading, cancellation, empty and error contracts",type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:05.887Z,updated_at: 2026-11-04T16:15:20.401Z,tags: [cuadb,http],depends_on: [TSK-E09AA19D0352],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:07.621Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-9890D0090922/1793791747624-start,started_at: 2026-11-04T11:29:07.636Z}]}},links: [{type: blocks,task: TSK-A513FD340BD5}]}
+{id: TSK-9890D0090922,name: "Design HTMX loading, cancellation, empty and error contracts",type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:05.887Z,updated_at: 2026-11-05T00:19:12.719Z,tags: [cuadb,http],depends_on: [TSK-E09AA19D0352],order: 4096,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:07.621Z},{from: in-progress,to: completed,at: 2026-11-05T00:19:12.719Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-9890D0090922/1793791747624-start,started_at: 2026-11-04T11:29:07.636Z,end_ref: refs/tracking/TSK-9890D0090922/1793837952722-end,ended_at: 2026-11-05T00:19:12.719Z,summary: {files: 142,insertions: 26503,deletions: 985}}]}},links: [{type: blocks,task: TSK-A513FD340BD5}]}
 ---
 
 # Design HTMX loading, cancellation, empty and error contracts
@@ -18,7 +18,7 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 ## Acceptance checklist
 - [x] Define swap targets, request synchronization and stable loading indicators per fragment.
 - [x] Provide safe fragments for timeout, validation, permission and disconnected states.
-- [ ] Ensure stale responses cannot replace a newer selected relation or sort.
+- [x] Ensure stale responses cannot replace a newer selected relation or sort.
 - [x] Test full-page and HTMX failure behavior with simulated slow fake adapters.
 - [x] Document retry and refresh actions without automatic unbounded polling.
 
@@ -27,9 +27,9 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 **Mandatory reference:** `assets/cuadb-ui-demo.html`, with the complete interaction and visual contract in `.docs/docs/frontend-interactions.md`. Reproduce the exact applicable layout and behaviors rather than designing a new interface. The HTML file uses fake records; the actual implementation must render verified database-backed content with safe Rust endpoints and HTMX swaps. This requirement is part of task completion, not a future polish option.
 
 ### Reference-specific acceptance
-- [ ] Keep loading, empty, offline, invalid-object and access-denied fragments inside the demo's sidebar, toolbar, grid and inspector regions instead of showing a visually different full-screen error UI.
-- [ ] Synchronize HTMX requests so rapid relation selection, search, pagination, sorting and profile changes never display stale data in the reference grid.
-- [ ] Match the demo's dismissible popovers, transient toast feedback, selected-row close control and disabled control treatment while adding focus/accessible state announcements.
+- [x] Keep loading, empty, offline, invalid-object and access-denied fragments inside the demo's sidebar, toolbar, grid and inspector regions instead of showing a visually different full-screen error UI.
+- [x] Synchronize HTMX requests so rapid relation selection, search, pagination, sorting and profile changes never display stale data in the reference grid.
+- [x] Match the demo's dismissible popovers, transient toast feedback, selected-row close control and disabled control treatment while adding focus/accessible state announcements.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
@@ -38,8 +38,8 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
 
 ### Amendment acceptance
-- [ ] HTMX requests send the `x-csrf-token` header (from a layout meta tag) and a session-expired `hx-redirect` lands on the login page without leaving a half-rendered shell.
-- [ ] Permission-denied (403), session-expired and read-only-profile responses render in the same shell region as the demo's inline messages, and stale responses never overwrite a newer selection.
+- [x] HTMX requests send the `x-csrf-token` header (from a layout meta tag) and a session-expired `hx-redirect` lands on the login page without leaving a half-rendered shell.
+- [x] Permission-denied (403), session-expired and read-only-profile responses render in the same shell region as the demo's inline messages, and stale responses never overwrite a newer selection.
 
 ## Comments
 
@@ -54,3 +54,7 @@ Backend partial: slow fake adapter is cancelled by the request timeout (router_f
 ### 2026-11-04T13:50:13.779Z · PETER IRUNGU
 
 Items 4,5 verified (router_fake_adapter: identical in-region error fragment for full-page and HX-Request, slow adapter timeout; README retry section). Items 3,7: hx-sync=this:replace added on all catalog panel roots and asserted in a test; real abort behavior is browser-only and UNVERIFIED - left open for Phase B. Items 6,8 UI.
+
+### 2026-11-05T00:19:11.105Z · PETER IRUNGU
+
+Phase 2 evidence (2026-11-05), built-in browser against the dedicated cuadb_fixture_catalog PostgreSQL fixture (read-only reader) and disposable SQLite data, light and dark at 1440x900, 1280x800 and 390x844 (paired with the updated demo), plus Rust tests (tests/sql_workspace_sqlite.rs, auth_http.rs, catalog_live_http.rs). Rapid relation clicks end on the last one; two quick Next clicks land on page 3; hx-sync replaces stale requests. A rejected request keeps the panel and shows a toast. Session expiry returns hx-redirect to /login (tests/auth_http.rs); the CSRF header comes from the layout meta tag. Loading uses a thin progress bar; the connection picker shows a connected or not-connected dot.

@@ -1,5 +1,5 @@
 ---
-{id: TSK-8EC2E48964BC,name: Implement table Structure tab from real metadata,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:07.044Z,updated_at: 2026-11-04T23:18:20.141Z,tags: [cuadb,inspectors],depends_on: [TSK-047C7016EEAA,TSK-FFD6A5B94574],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.511Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.668Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.141Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-8EC2E48964BC/1793791788513-start,started_at: 2026-11-04T11:29:48.525Z,end_ref: refs/tracking/TSK-8EC2E48964BC/1793808859670-end,ended_at: 2026-11-04T16:14:19.668Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}}}
+{id: TSK-8EC2E48964BC,name: Implement table Structure tab from real metadata,type: task,status: in-progress,priority: medium,created_at: 2026-11-04T07:32:07.044Z,updated_at: 2026-11-05T00:19:29.320Z,tags: [cuadb,inspectors],depends_on: [TSK-047C7016EEAA,TSK-FFD6A5B94574],order: 1024,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:48.511Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:19.668Z},{from: blocked,to: planned,at: 2026-11-04T23:18:20.141Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:29.320Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-8EC2E48964BC/1793791788513-start,started_at: 2026-11-04T11:29:48.525Z,end_ref: refs/tracking/TSK-8EC2E48964BC/1793808859670-end,ended_at: 2026-11-04T16:14:19.668Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-8EC2E48964BC/1793837969322-start,started_at: 2026-11-05T00:19:29.350Z}]}}}
 ---
 
 # Implement table Structure tab from real metadata
@@ -17,19 +17,19 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 
 ## Acceptance checklist
 - [x] Render ordered columns and native data type names with correct key indicators.
-- [ ] Expose indexes, constraints and foreign-key targets with safe relation links.
+- [x] Expose indexes, constraints and foreign-key targets with safe relation links.
 - [x] Handle views, partition parents and inaccessible related objects gracefully.
 - [x] Test Structure tab with a complex fixture containing composite keys and defaults.
-- [ ] Keep the tab responsive through HTMX fragment updates without page reloads.
+- [x] Keep the tab responsive through HTMX fragment updates without page reloads.
 
 ## Canonical UI fidelity
 
 The canonical frontend is `assets/cuadb-ui-demo.html`, described in `.docs/docs/frontend-interactions.md`. Match its actual visible control labels, compact placement and selected-object behavior. In particular, the source uses **Data / Structure / Indexes** in its table toolbar and a separate Advanced **Overview**, so the older plan's independent `Info` tab terminology is superseded. The production UI uses safe real metadata rather than hard-coded statistics. User approval is required for material visual changes.
 
 ### Reference-specific acceptance
-- [ ] Match the demo's inline Data / Structure / Indexes segmented toolbar, where 'Structure' is a mode within the existing main panel rather than a separate page or redesigned tab.
-- [ ] Render Structure fields in the reference order and styling: #, Column, Type, Nullable, Key, References, with accurate schema metadata.
-- [ ] Keep the schema-qualified header and compact table styling identical while distinguishing views and unavailable attributes honestly.
+- [x] Match the demo's inline Data / Structure / Indexes segmented toolbar, where 'Structure' is a mode within the existing main panel rather than a separate page or redesigned tab.
+- [x] Render Structure fields in the reference order and styling: #, Column, Type, Nullable, Key, References, with accurate schema metadata.
+- [x] Keep the schema-qualified header and compact table styling identical while distinguishing views and unavailable attributes honestly.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
@@ -53,3 +53,7 @@ BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Live PG18 (tests/rich_live_http.
 ### 2026-11-04T16:14:19.834Z · PETER IRUNGU
 
 Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.
+
+### 2026-11-05T00:19:38.991Z · PETER IRUNGU
+
+Phase 2 (2026-11-05): Structure shows #, Column, Type, Nullable, Key, References (links), Default and generation, constraints and partitions inside the Data/Structure/Indexes switcher. Item 9 stays open because column comments are not exposed by the adapters yet.

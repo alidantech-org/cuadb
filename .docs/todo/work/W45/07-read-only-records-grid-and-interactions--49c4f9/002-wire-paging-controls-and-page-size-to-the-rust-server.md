@@ -1,5 +1,5 @@
 ---
-{id: TSK-16AEEF4061F8,name: Wire paging controls and page size to the Rust server,type: task,status: planned,priority: medium,created_at: 2026-11-04T07:32:06.572Z,updated_at: 2026-11-04T23:18:19.988Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8B8935A1684A],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.555Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:18.312Z},{from: blocked,to: planned,at: 2026-11-04T23:18:19.988Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-16AEEF4061F8/1793791781557-start,started_at: 2026-11-04T11:29:41.570Z,end_ref: refs/tracking/TSK-16AEEF4061F8/1793808858314-end,ended_at: 2026-11-04T16:14:18.312Z,summary: {files: 91,insertions: 10231,deletions: 706}}]}},links: [{type: blocks,task: TSK-812F816785FD}]}
+{id: TSK-16AEEF4061F8,name: Wire paging controls and page size to the Rust server,type: task,status: completed,priority: medium,created_at: 2026-11-04T07:32:06.572Z,updated_at: 2026-11-05T00:19:13.538Z,tags: [cuadb,data-grid-ui],depends_on: [TSK-BE512E99EA68,TSK-8B8935A1684A],order: 2048,extra: {status_history: [{from: planned,to: in-progress,at: 2026-11-04T11:29:41.555Z},{from: in-progress,to: blocked,at: 2026-11-04T16:14:18.312Z},{from: blocked,to: planned,at: 2026-11-04T23:18:19.988Z},{from: planned,to: in-progress,at: 2026-11-05T00:19:00.152Z},{from: in-progress,to: completed,at: 2026-11-05T00:19:13.538Z}],tracking: {segments: [{base_ref: refs/tracking/TSK-16AEEF4061F8/1793791781557-start,started_at: 2026-11-04T11:29:41.570Z,end_ref: refs/tracking/TSK-16AEEF4061F8/1793808858314-end,ended_at: 2026-11-04T16:14:18.312Z,summary: {files: 91,insertions: 10231,deletions: 706}},{base_ref: refs/tracking/TSK-16AEEF4061F8/1793837940154-start,started_at: 2026-11-05T00:19:00.183Z,end_ref: refs/tracking/TSK-16AEEF4061F8/1793837953540-end,ended_at: 2026-11-05T00:19:13.538Z,summary: {files: 0,insertions: 0,deletions: 0}}]}},links: [{type: blocks,task: TSK-812F816785FD}]}
 ---
 
 # Wire paging controls and page size to the Rust server
@@ -20,16 +20,16 @@ CuaDB is a local-first, read-only database viewer served by one Rust/Axum proces
 - [x] Offer bounded page-size choices without allowing arbitrary large values.
 - [x] Preserve relation, sorting and pagination cursor during HTMX navigation.
 - [x] Handle first, last and empty pages with accurate disabled states.
-- [ ] Test rapid paging and stale request behavior against a fake adapter.
+- [x] Test rapid paging and stale request behavior against a fake adapter.
 
 ## Canonical UI fidelity
 
 The **required frontend specification** is `assets/cuadb-ui-demo.html` and the comparison contract in `.docs/docs/frontend-interactions.md`. Match the demo's visible interface, controls and applicable interactions accurately, using real database data and safe read-only backend pagination/export behavior instead of the prototype's synthetic arrays. No generic table-grid replacement or materially different layout is acceptable without user-approved documentation.
 
 ### Reference-specific acceptance
-- [ ] Match the demo's bottom footer: narrow ‹/› buttons, displayed row range, visible-column count, 25/50/100 rows-per-page select (default 25) and green 'SELECT only' tag.
-- [ ] Render actual limited server-side page state instead of inferring exact totals from catalog estimates or fetching all rows; preserve demo positioning and styling.
-- [ ] Keep sidebar, toolbar, hidden-column choices and selected relation stable during HTMX pagination, without changing unrelated regions.
+- [x] Match the demo's bottom footer: narrow ‹/› buttons, displayed row range, visible-column count, 25/50/100 rows-per-page select (default 25) and green 'SELECT only' tag.
+- [x] Render actual limited server-side page state instead of inferring exact totals from catalog estimates or fetching all rows; preserve demo positioning and styling.
+- [x] Keep sidebar, toolbar, hidden-column choices and selected relation stable during HTMX pagination, without changing unrelated regions.
 
 ## Verification and handoff
 Verify both the expected result and realistic failure cases. Run `bun run format:check`, `bun run check` and `bun run test`, plus targeted integration checks when this task touches live database behavior. Tests using real databases must run against disposable fixtures, not a personal or production database. If there are unsupported data types, catalog permissions, engine versions or pagination limits, document them instead of masking the limitation. Add a Task comment summarizing implementation evidence, test commands and unresolved risks; tick accepted checklist items with `task check` and only then mark the task completed.
@@ -38,7 +38,7 @@ Verify both the expected result and realistic failure cases. Run `bun run format
 The owner updated `assets/cuadb-ui-demo.html` (login and roles, database switcher, connection create/edit/test modal, Administration view, typed row editor and SQL workspace) and decided that Phase 2 is open (`.docs/docs/backend-gate-decision.md`). The demo remains the binding look, feel and density baseline, but it may be **improved** where that makes the product better; every departure is recorded in a Task comment. Production rules that override the demo: the Content-Security-Policy allows no inline `<script>`, `style=` or `on*=` handlers (use classes, `data-*` attributes and CSS custom properties), every state-changing request carries the CSRF token, and every screen is built from real, permission-scoped backend data. Acceptance is checked manually in the built-in browser at 1440x900, 1280x800 and 390x844, light and dark, side by side with the demo, and boxes stay unticked until that comparison passes.
 
 ### Amendment acceptance
-- [ ] Page size and previous/next remain bounded server fetches, and paging cancels any open row editor after confirming unsaved changes.
+- [x] Page size and previous/next remain bounded server fetches, and paging cancels any open row editor after confirming unsaved changes.
 
 ## Comments
 
@@ -49,3 +49,7 @@ BACKEND VERIFIED - FRONTEND ACCEPTANCE PENDING. Items 1-4 verified live: Previou
 ### 2026-11-04T16:14:18.517Z · PETER IRUNGU
 
 Paused by the CuaDB phase gate: complete PostgreSQL + SQLite backend work and typed HTTP/fragment contracts before continuing visual frontend implementation. Preserve this task work and resume after the backend gate is accepted.
+
+### 2026-11-05T00:19:11.835Z · PETER IRUNGU
+
+Phase 2 evidence (2026-11-05), built-in browser against the dedicated cuadb_fixture_catalog PostgreSQL fixture (read-only reader) and disposable SQLite data, light and dark at 1440x900, 1280x800 and 390x844 (paired with the updated demo), plus Rust tests (tests/sql_workspace_sqlite.rs, auth_http.rs, catalog_live_http.rs). Footer matches the demo (previous and next, range, column count, 25/50/100 segment, access tag). Page state is server-side and bounded; paging while the row editor is open asks before discarding.
