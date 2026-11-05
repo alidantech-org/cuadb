@@ -2,9 +2,26 @@
 {% if relations.is_empty() %}
   <div class="note" role="status">{{ note }}</div>
 {% else %}
+  {% if grouped %}
+  <div class="grp o" data-group="Tables">
+    <button class="sh g" type="button" data-g aria-expanded="true"><span class="ch" aria-hidden="true"></span>Tables<span class="tag">{{ table_count }}</span></button>
+    <div class="sub">
+      {% for relation in relations %}{% if !relation.is_view %}<a href="{{ relation.href }}" class="row" data-relation-name="{{ relation.name }}" data-kind="{{ relation.kind }}" hx-get="{{ relation.href }}" hx-target="#mainbody" hx-swap="innerHTML" hx-sync="#mainbody:replace" title="{{ relation.kind }}" aria-label="Open {{ relation.kind }} {{ relation.name }}"><i class="ic-slot" data-ic="relation" data-name="{{ relation.name }}" data-kind="{{ relation.kind }}" aria-hidden="true"></i><span class="n">{{ relation.name }}</span>{% if relation.kind != "Table" %}<span class="c">{{ relation.kind }}</span>{% endif %}</a>{% endif %}{% endfor %}
+    </div>
+  </div>
+  {% if view_count > 0 %}
+  <div class="grp o" data-group="Views">
+    <button class="sh g" type="button" data-g aria-expanded="true"><span class="ch" aria-hidden="true"></span>Views<span class="tag">{{ view_count }}</span></button>
+    <div class="sub">
+      {% for relation in relations %}{% if relation.is_view %}<a href="{{ relation.href }}" class="row" data-relation-name="{{ relation.name }}" data-kind="{{ relation.kind }}" hx-get="{{ relation.href }}" hx-target="#mainbody" hx-swap="innerHTML" hx-sync="#mainbody:replace" title="{{ relation.kind }}" aria-label="Open {{ relation.kind }} {{ relation.name }}"><i class="ic-slot" data-ic="relation" data-name="{{ relation.name }}" data-kind="{{ relation.kind }}" aria-hidden="true"></i><span class="n">{{ relation.name }}</span>{% if relation.kind != "Table" %}<span class="c">{{ relation.kind }}</span>{% endif %}</a>{% endif %}{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
   {% for relation in relations %}
   <a href="{{ relation.href }}" class="row" data-relation-name="{{ relation.name }}" data-kind="{{ relation.kind }}" hx-get="{{ relation.href }}" hx-target="#mainbody" hx-swap="innerHTML" hx-sync="#mainbody:replace" title="{{ relation.kind }}" aria-label="Open {{ relation.kind }} {{ relation.name }}"><i class="ic-slot" data-ic="relation" data-name="{{ relation.name }}" data-kind="{{ relation.kind }}" aria-hidden="true"></i><span class="n">{{ relation.name }}</span>{% if relation.kind != "Table" %}<span class="c">{{ relation.kind }}</span>{% endif %}</a>
   {% endfor %}
+  {% endif %}
   {% if truncated %}<div class="note" role="status">{{ note }}</div>{% endif %}
 {% endif %}
 <div class="objs" data-objs="{{ objects_href }}"></div>

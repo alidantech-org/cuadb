@@ -36,6 +36,8 @@ struct Value {
     truncated: bool,
     detail: String,
     class: &'static str,
+    /// Set for single-column foreign keys: opens the referenced relation filtered by this value.
+    fk_href: String,
 }
 #[derive(Clone)]
 struct DisplayRow {
@@ -72,6 +74,8 @@ struct PageTemplate {
     export_view_csv: String,
     export_all_csv: String,
     export_all_json: String,
+    export_zip_1: String,
+    export_zip_2: String,
     stable: bool,
     /// The caller may insert, update and delete rows here (grant, writable profile, key).
     can_edit: bool,
@@ -418,6 +422,19 @@ fn export_link(nav: &Navigation, format: &str, scope: &str, page: u32) -> String
     }
     format!("/catalog/export?{}", q.finish())
 }
+/// Related-table ZIP: this relation plus the relations its foreign keys reach.
+fn zip_link(nav: &Navigation, depth: u8) -> String {
+    let mut q = url::form_urlencoded::Serializer::new(String::new());
+    q.append_pair("schema", &nav.id.namespace);
+    q.append_pair("relation", &nav.id.name);
+    q.append_pair("format", "zip");
+    q.append_pair("scope", "related");
+    q.append_pair("depth", &depth.to_string());
+    if let Some(profile) = nav.profile.as_deref() {
+        q.append_pair("profile", profile);
+    }
+    format!("/catalog/export?{}", q.finish())
+}
 pub async fn data(
     State(state): State<AppState>,
     auth: crate::web::auth::Auth,
@@ -508,6 +525,26 @@ pub async fn data(
                 }),
             })
             .collect::<Vec<_>>();
+    // Single-column foreign keys turn their cells into links (best effort, bounded).
+    let fk_targets: std::collections::HashMap<String, RelationId> = catalog
+        .list_constraints(&nav.id)
+        .await
+        .map(|list| {
+            list.items
+                .into_iter()
+                .filter(|k| {
+                    k.kind == crate::db::types::ConstraintKind::ForeignKey && k.columns.len() == 1
+                })
+                .filter_map(|k| Some((k.columns.into_iter().next()?, k.references?)))
+                .filter(|(_, target)| {
+                    auth.0.allows(
+                        crate::auth::Action::View,
+                        &crate::auth::Resource::relation(&pid, &target.namespace, &target.name),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     let has_spatial = page.columns.iter().any(|column| {
         let native = column.native_type.to_ascii_lowercase();
         native.starts_with("geometry") || native.starts_with("geography")
@@ -553,13 +590,30 @@ pub async fn data(
         let values = cells
             .iter()
             .zip(previews)
-            .map(|(cell, preview)| {
+            .zip(page.columns.iter())
+            .map(|((cell, preview), column)| {
                 let mut detail = detail_value(cell, &preview.type_name);
                 if let Some(spatial) = preview.detail.as_deref() {
                     detail.push_str("\n\nGeoJSON detail:\n");
                     detail.push_str(spatial);
                 }
+                let fk_href = match (fk_targets.get(&column.name), cell) {
+                    (Some(target), c)
+                        if !matches!(c, crate::db::types::Cell::Null) && !preview.truncated =>
+                    {
+                        let mut q = url::form_urlencoded::Serializer::new(String::new());
+                        q.append_pair("schema", &target.namespace);
+                        q.append_pair("relation", &target.name);
+                        q.append_pair("filter", &preview.text);
+                        if let Some(profile) = nav.profile.as_deref() {
+                            q.append_pair("profile", profile);
+                        }
+                        format!("/catalog/data?{}", q.finish())
+                    }
+                    _ => String::new(),
+                };
                 Value {
+                    fk_href,
                     text: visible_text(&preview.text),
                     class: value_class(&preview.type_name),
                     native_type: preview.type_name,
@@ -584,6 +638,8 @@ pub async fn data(
     let export_view_csv = export_link(&nav, "csv", "page", page.page);
     let export_all_csv = export_link(&nav, "csv", "relation", 0);
     let export_all_json = export_link(&nav, "json", "relation", 0);
+    let export_zip_1 = zip_link(&nav, 1);
+    let export_zip_2 = zip_link(&nav, 2);
     let mut geojson_nav = nav.clone();
     geojson_nav.options.spatial_geojson = !nav.options.spatial_geojson;
     let geojson_url = link(&geojson_nav, 0, None, geojson_nav.options.sort.clone());
@@ -636,6 +692,8 @@ pub async fn data(
         export_view_csv,
         export_all_csv,
         export_all_json,
+        export_zip_1,
+        export_zip_2,
         headers,
         rows: rendered,
         previous_url,

@@ -54,6 +54,17 @@ document.addEventListener('htmx:configRequest', (event) => {
   const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
   if (token && detail.verb !== 'get') detail.headers['x-csrf-token'] = token;
   const path = String(detail.path ?? '');
+  if (
+    detail.verb === 'get' &&
+    path.startsWith('/catalog/data') &&
+    detail.elt instanceof Element &&
+    detail.elt.matches('#tree a.row')
+  ) {
+    detail.path = recallTable(path);
+  }
+  if (path.startsWith('/catalog/relations') && S.mode === 'advanced') {
+    setParam(detail.parameters, 'group', '1');
+  }
   if (/^\/(sql\/(execute|cancel)|tx\/begin)/.test(path) && win.cuadbProfile) {
     setParam(detail.parameters, 'profile', win.cuadbProfile);
   }
@@ -70,6 +81,23 @@ document.addEventListener('htmx:configRequest', (event) => {
 document.addEventListener('htmx:beforeSwap', (event) => {
   const detail = /** @type {CustomEvent} */ (event).detail;
   const text = detail.xhr.responseText;
+  if (detail.target?.id === 'catalog-panel' && detail.xhr.status >= 400) {
+    const message = new DOMParser()
+      .parseFromString(detail.xhr.responseText, 'text/html')
+      .querySelector('.cuadb-error p')?.textContent;
+    toast(message || 'That request failed. The table was left as it was.');
+    detail.shouldSwap = false;
+    detail.isError = false;
+    return;
+  }
+  if (detail.target?.id === 'tree' && detail.xhr.status === 403) {
+    // A member with no grants at all: say so in the sidebar instead of an error card.
+    detail.serverResponse =
+      '<div class="note" role="status">No databases assigned yet. Ask an administrator for access.</div>';
+    detail.shouldSwap = true;
+    detail.isError = false;
+    return;
+  }
   if (
     detail.xhr.status >= 400 &&
     (text.includes('class="cuadb-error"') || text.includes('class="notice'))
@@ -276,9 +304,14 @@ function currentTable() {
 let lastMode = S.mode;
 function applyPrefs() {
   prefs.apply();
+  formatNumbers(document);
   if (S.mode !== lastMode) {
     lastMode = S.mode;
-    if (S.mode === 'advanced') loadObjects();
+    // Grouping and metadata objects depend on the mode: rebuild the tree.
+    if (document.getElementById('tree')?.querySelector('.sch')) {
+      const profile = win.cuadbProfile ? `?profile=${encodeURIComponent(win.cuadbProfile)}` : '';
+      fetchInto(`/catalog/schemas${profile}`, '#tree', 'innerHTML');
+    }
   }
   prefs.save();
   syncSettings();
@@ -614,6 +647,144 @@ function deleteRow() {
   win.htmx?.ajax('POST', '/data/delete', { target: '#eerr', swap: 'innerHTML', values });
 }
 
+/* ------------------------------------------------------------ grid niceties */
+/** Thousands separators on numeric cells (never on key columns), restored when turned off. */
+function formatNumbers(/** @type {ParentNode} */ root = document) {
+  root.querySelectorAll('table.grid').forEach((table) => {
+    const heads = Array.from(table.querySelectorAll('thead th'));
+    table.querySelectorAll('tbody tr[data-row]').forEach((tr) => {
+      Array.from(tr.children).forEach((node, index) => {
+        const cell = /** @type {HTMLElement} */ (node);
+        if (!cell.classList.contains('numeric') && !cell.classList.contains('num')) return;
+        if (heads[index]?.hasAttribute('data-pk') || cell.querySelector('a,[data-null]')) return;
+        const raw = cell.dataset.detail ?? '';
+        const value = Number(raw);
+        if (!raw || !Number.isFinite(value) || /e/i.test(raw)) return;
+        const text = S.sep ? value.toLocaleString() : raw;
+        if (cell.firstChild?.nodeType === Node.TEXT_NODE && cell.childNodes.length === 1) {
+          cell.firstChild.textContent = text;
+        }
+      });
+    });
+  });
+}
+
+/** Drag the right edge of a header to resize that column. */
+function addResizers(/** @type {ParentNode} */ root = document) {
+  root.querySelectorAll('table.grid thead th[data-col]:not([data-rz])').forEach((node) => {
+    const th = /** @type {HTMLElement} */ (node);
+    th.dataset.rz = '1';
+    const handle = document.createElement('span');
+    handle.className = 'rzh';
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-label', `Resize column ${th.dataset.col ?? ''}`);
+    th.append(handle);
+    let startX = 0;
+    let startW = 0;
+    const apply = (/** @type {number} */ width) => {
+      const table = th.closest('table');
+      const index = Array.from(th.parentElement?.children ?? []).indexOf(th);
+      const set = (/** @type {HTMLElement} */ el) => {
+        el.style.width = `${width}px`;
+        el.style.minWidth = `${width}px`;
+        el.style.maxWidth = `${width}px`;
+      };
+      set(th);
+      table?.querySelectorAll('tbody tr').forEach((tr) => {
+        const cell = /** @type {HTMLElement | undefined} */ (tr.children[index]);
+        if (cell) set(cell);
+      });
+    };
+    let dragging = false;
+    handle.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      startX = event.clientX;
+      startW = th.getBoundingClientRect().width;
+      dragging = true;
+      try {
+        handle.setPointerCapture(event.pointerId);
+      } catch {
+        /* the drag still works while the pointer stays over the handle */
+      }
+    });
+    handle.addEventListener('pointermove', (event) => {
+      if (dragging) apply(Math.max(56, Math.min(720, startW + event.clientX - startX)));
+    });
+    const stop = () => {
+      dragging = false;
+    };
+    handle.addEventListener('pointerup', stop);
+    handle.addEventListener('pointercancel', stop);
+    handle.addEventListener('click', (event) => event.stopPropagation());
+    handle.addEventListener('dblclick', (event) => {
+      event.stopPropagation();
+      apply(Math.max(56, Math.min(720, th.scrollWidth)));
+    });
+  });
+}
+
+/** Remember sort and chosen columns per table (only while the preference is on). */
+function tableKey(/** @type {URLSearchParams} */ params) {
+  const schema = params.get('schema');
+  const relation = params.get('relation');
+  return schema && relation ? `${schema}.${relation}` : '';
+}
+function rememberTable(/** @type {string} */ path) {
+  if (!S.remember) return;
+  const query = path.split('?')[1] ?? '';
+  const params = new URLSearchParams(query);
+  const key = tableKey(params);
+  if (!key) return;
+  const sort = params.get('sort');
+  const cols = params.has('pick') ? params.getAll('column') : null;
+  if (!sort && !cols) delete TP[key];
+  else
+    TP[key] = {
+      s: sort ? { c: sort, d: params.get('direction') === 'desc' ? -1 : 1 } : null,
+      h: cols,
+    };
+  prefs.save();
+}
+function recallTable(/** @type {string} */ path) {
+  if (!S.remember) return path;
+  const [base, query = ''] = path.split('?');
+  const params = new URLSearchParams(query);
+  const key = tableKey(params);
+  const saved = key ? TP[key] : null;
+  if (!saved || params.has('sort') || params.has('pick') || params.has('filter')) return path;
+  if (saved.s) {
+    params.set('sort', saved.s.c);
+    params.set('direction', saved.s.d < 0 ? 'desc' : 'asc');
+  }
+  if (Array.isArray(saved.h)) {
+    params.set('pick', '1');
+    saved.h.forEach((/** @type {string} */ name) => params.append('column', name));
+  }
+  return `${base}?${params.toString()}`;
+}
+
+/** Keyboard use of the grid: arrows move between rows, Ctrl/Cmd+C copies the focused row. */
+document.addEventListener('keydown', (event) => {
+  const row = event.target;
+  if (!(row instanceof HTMLTableRowElement) || !row.dataset.row) return;
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    const sibling = event.key === 'ArrowDown' ? row.nextElementSibling : row.previousElementSibling;
+    if (sibling instanceof HTMLElement) sibling.focus();
+    return;
+  }
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    event.key.toLowerCase() === 'c' &&
+    !window.getSelection()?.toString()
+  ) {
+    event.preventDefault();
+    const values = Object.values(rowValues(row)).map((v) => (v.value === null ? '' : v.value));
+    void copyText(values.join('\t'), 'Row copied');
+  }
+});
+
 /* ------------------------------------------------------------ sidebar tree */
 function openSchema(/** @type {Element} */ holder, /** @type {boolean} */ open) {
   holder.classList.toggle('o', open);
@@ -644,6 +815,11 @@ function filterTree() {
     schema.toggleAttribute('hidden', needle !== '' && !schemaHit && !any);
     if (needle !== '') openSchema(schema, true);
   });
+  const none = document.getElementById('tree-none');
+  if (none) {
+    const anyVisible = $$('#tree .sch').some((el) => !el.hasAttribute('hidden'));
+    none.hidden = needle === '' || anyVisible;
+  }
 }
 function markActiveRow(/** @type {Element | null} */ link) {
   $$('#tree .row.act').forEach((el) => {
@@ -709,6 +885,7 @@ document.addEventListener('click', (event) => {
     if (name) name.textContent = label;
     win.cuadbProfile = profile.dataset.profile ?? '';
     closePops();
+    document.getElementById('f')?.focus();
     closeInspector();
     const main = document.getElementById('mainbody');
     if (main) {
@@ -897,6 +1074,38 @@ document.addEventListener('input', (event) => {
   if (el instanceof HTMLInputElement && el.id === 'f') filterTree();
 });
 
+/** Visible, focusable rows of the sidebar tree, in order. */
+function treeItems() {
+  return /** @type {HTMLElement[]} */ (
+    Array.from(document.querySelectorAll('#tree .sh, #tree a.row')).filter(
+      (el) => el instanceof HTMLElement && el.offsetParent !== null,
+    )
+  );
+}
+document.addEventListener('keydown', (event) => {
+  const here = event.target;
+  if (
+    (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+    here instanceof HTMLElement &&
+    (here.id === 'f' || here.closest('#tree'))
+  ) {
+    const items = treeItems();
+    if (here.id === 'f') {
+      if (event.key === 'ArrowDown' && items[0]) {
+        event.preventDefault();
+        items[0].focus();
+      }
+      return;
+    }
+    const current = here.closest('#tree .sh, #tree a.row');
+    const index = items.findIndex((el) => el === current);
+    const item = items[event.key === 'ArrowDown' ? index + 1 : index - 1];
+    event.preventDefault();
+    if (item) item.focus();
+    else document.getElementById('f')?.focus();
+    return;
+  }
+});
 document.addEventListener('keydown', (event) => {
   if (
     (event.metaKey || event.ctrlKey) &&
@@ -970,6 +1179,14 @@ document.addEventListener('htmx:afterSwap', (event) => {
       const name = document.getElementById('cname');
       if (selected instanceof HTMLElement && name)
         name.textContent = selected.dataset.label ?? 'Connection';
+      const dot = document.getElementById('cdot');
+      if (selected instanceof HTMLElement && dot) {
+        const ready = selected.dataset.ready === 'true';
+        dot.classList.toggle('off', !ready);
+        document
+          .getElementById('cbtn')
+          ?.setAttribute('title', ready ? 'Connected' : 'Not connected: open the list to retry');
+      }
     }
     if (event.target.matches('.sub')) {
       filterTree();
@@ -1005,6 +1222,8 @@ document.addEventListener('htmx:afterSwap', (event) => {
     syncAdminTabs();
   }
   if (target.id === 'modal') openModal();
+  addResizers(document);
+  formatNumbers(document);
   if (target.id === 'sql-tx') {
     const open = target.querySelector('[data-tx]');
     win.cuadbTx = open instanceof HTMLElement ? (open.dataset.tx ?? '') : '';
@@ -1014,6 +1233,8 @@ document.addEventListener('htmx:afterRequest', (event) => {
   const detail = /** @type {Any} */ (event).detail;
   const path = String(detail.pathInfo?.requestPath ?? '');
   const cancel = document.getElementById('sql-cancel');
+  if (path.startsWith('/catalog/data') && detail.successful)
+    rememberTable(String(detail.pathInfo?.finalRequestPath ?? path));
   if (path.startsWith('/catalog/data'))
     win.cuadbDataUrl = String(detail.pathInfo?.finalRequestPath ?? path);
   if (path.startsWith('/sql/execute')) {
@@ -1026,6 +1247,16 @@ document.addEventListener('htmx:afterRequest', (event) => {
   }
 });
 document.addEventListener('htmx:beforeRequest', (event) => {
+  const detailBefore = /** @type {Any} */ (event).detail;
+  if (
+    win.cuadbEditing &&
+    detailBefore.requestConfig?.verb === 'get' &&
+    String(detailBefore.pathInfo?.requestPath ?? '').startsWith('/catalog/') &&
+    !window.confirm('Discard the unsaved row changes?')
+  ) {
+    event.preventDefault();
+    return;
+  }
   const path = String(/** @type {Any} */ (event).detail.pathInfo?.requestPath ?? '');
   if (path.startsWith('/sql/execute'))
     document.getElementById('sql-cancel')?.removeAttribute('hidden');

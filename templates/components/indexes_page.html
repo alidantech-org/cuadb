@@ -4,10 +4,10 @@
     <h4>Indexes</h4>
     {% if indexes.is_empty() %}<p class="note">No visible indexes.</p>{% else %}
     <table><thead><tr><th>Name</th><th>Kind</th><th>Columns / expressions</th><th>Valid</th><th>Predicate</th><th>Definition</th></tr></thead><tbody>
-      {% for index in indexes %}<tr><td><b>{{ index.name }}</b></td><td>{{ index.kind }}</td><td>{{ index.columns }}</td><td>{% if index.valid %}yes{% else %}no{% endif %}</td><td>{{ index.predicate }}</td><td><code>{{ index.definition }}</code></td></tr>{% endfor %}
+      {% for index in indexes %}<tr><td><b>{{ index.name }}</b> {% if index.unique %}<span class="tag">unique</span>{% endif %}</td><td>{{ index.kind }}</td><td>{{ index.columns }}</td><td>{% if index.valid %}yes{% else %}no{% endif %}</td><td>{{ index.predicate }}</td><td><code>{{ index.definition }}</code></td></tr>{% endfor %}
     </tbody></table>{% endif %}
     {% if truncated %}<p class="note" role="status">The index list is capped and may be incomplete.</p>{% endif %}
-    <h4>Storage</h4><table><thead><tr><th>Measurement</th><th>Value</th><th>Meaning</th></tr></thead><tbody>
+    <div class="adm-head"><h4>Storage</h4><button class="btn" type="button" hx-get="{{ links.indexes }}" hx-target="#catalog-panel" hx-swap="outerHTML" title="Ask the database for fresh estimates (never COUNT(*))">Refresh estimates</button></div><table><thead><tr><th>Measurement</th><th>Value</th><th>Meaning</th></tr></thead><tbody>
       {% for stat in statistics %}<tr><td>{{ stat.name }}</td><td>{{ stat.value }}</td><td class="mu">{{ stat.meaning }}</td></tr>{% endfor %}
     </tbody></table>
     <p class="note">Row counts and storage values are engine-reported estimates and may be stale, unavailable or permission-limited.</p>

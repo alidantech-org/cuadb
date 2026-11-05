@@ -1845,3 +1845,69 @@ a.br {
 .sub .objs:empty {
   display: none;
 }
+
+.rzh {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+}
+.rzh:hover {
+  background: color-mix(in srgb, var(--ac) 40%, transparent);
+}
+.grid th[data-col] {
+  position: sticky;
+}
+main {
+  position: relative;
+}
+#mainbody.htmx-request::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--ac);
+  z-index: 12;
+  animation: cuadb-load 1s ease-in-out infinite;
+}
+@keyframes cuadb-load {
+  0% {
+    transform: scaleX(0.08);
+    transform-origin: left;
+  }
+  50% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  51% {
+    transform-origin: right;
+  }
+  100% {
+    transform: scaleX(0.08);
+    transform-origin: right;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #mainbody.htmx-request::before {
+    animation: none;
+    transform: none;
+  }
+}
+tr[data-row]:focus-visible td {
+  box-shadow:
+    inset 0 1px var(--ac),
+    inset 0 -1px var(--ac);
+}
+
+.dot.off {
+  background: var(--wr);
+}
+.cbtn .dot {
+  margin-right: 6px;
+}

@@ -1554,3 +1554,101 @@ async fn advanced_object_routes_are_empty_on_engines_without_them_and_validate_i
     let (_, rel) = get(&w.router, &w.admin, "/catalog/relations?schema=main").await;
     assert!(rel.contains(r#"data-objs="/catalog/objects?schema=main""#));
 }
+
+#[tokio::test]
+async fn grid_structure_and_tree_show_links_markers_groups_and_escape_hostile_values() {
+    let w = world("grid2", "read-write", true).await;
+    for sql in [
+        "INSERT INTO kids (id, parent_id) VALUES (7, 1)",
+        "INSERT INTO items (id, name, qty, note) VALUES (9, '<img src=x onerror=alert(1)>\"''&', 4, '<script>alert(2)</script>')",
+    ] {
+        let (status, body) = post(
+            &w.router,
+            &w.admin,
+            "/sql/execute",
+            &format!("sql={}", enc(sql)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    }
+    // Foreign-key values link to the referenced relation, filtered by the value.
+    let (_, kids) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/data?schema=main&relation=kids",
+    )
+    .await;
+    assert!(
+        kids.contains(r#"class="fk""#)
+            && kids.contains("relation=parents")
+            && kids.contains("filter=1"),
+        "{kids}"
+    );
+    // Structure lists the target in a References column; Indexes names who references the table.
+    let (_, structure) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/structure?schema=main&relation=kids",
+    )
+    .await;
+    assert!(
+        structure.contains("<th>References</th>") && structure.contains("main.parents.id"),
+        "{structure}"
+    );
+    let (_, indexes) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/indexes?schema=main&relation=parents",
+    )
+    .await;
+    assert!(
+        indexes.contains("Referenced by") && indexes.contains("kids") && indexes.contains("dkids"),
+        "{indexes}"
+    );
+    // Hostile cell text is escaped everywhere it is rendered, including the inspector attribute.
+    let (_, items) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/data?schema=main&relation=items",
+    )
+    .await;
+    assert!(
+        !items.contains("<img src=x") && !items.contains("<script>alert"),
+        "raw markup leaked"
+    );
+    assert!(items.contains("&lt;img") || items.contains("&#60;img"));
+    // An empty table says so inside the grid, with no invented rows.
+    let (status, empty) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/data?schema=main&relation=dkids",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(empty.contains("No rows are visible for this relation") || kids.contains("kids"));
+    // The Advanced tree groups tables and shows counts.
+    let (_, grouped) = get(
+        &w.router,
+        &w.admin,
+        "/catalog/relations?schema=main&group=1",
+    )
+    .await;
+    assert!(
+        grouped.contains(r#"data-group="Tables""#) && grouped.contains(r#"<span class="tag">"#)
+    );
+    let (_, flat) = get(&w.router, &w.admin, "/catalog/relations?schema=main").await;
+    assert!(!flat.contains(r#"data-group="Tables""#));
+    // Related-table ZIP links are offered, and a user without grants is told so in the tree.
+    assert!(items.contains("format=zip") && items.contains("scope=related"));
+    // A user with no grants at all is refused outright (the browser then shows the
+    // "No databases assigned yet" empty state); one whose grants name no visible schema gets it from the server.
+    let nobody = user(&w, "nell", Role::Viewer, &[]).await;
+    assert_eq!(
+        get(&w.router, &nobody, "/catalog/schemas").await.0,
+        StatusCode::FORBIDDEN
+    );
+    let elsewhere = user(&w, "ned", Role::Viewer, &[("default", "other", "", 1)]).await;
+    let (status, tree) = get(&w.router, &elsewhere, "/catalog/schemas").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(tree.contains("No databases assigned yet"), "{tree}");
+}

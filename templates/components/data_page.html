@@ -26,6 +26,8 @@
       <a class="ci" href="{{ export_view_csv }}" download><span><b>Download CSV</b><small>This page, visible columns</small></span></a>
       <a class="ci" href="{{ export_all_csv }}" download><span><b>Download CSV: whole table</b><small>Bounded server stream</small></span></a>
       <a class="ci" href="{{ export_all_json }}" download><span><b>Download JSON: whole table</b><small>Bounded server stream</small></span></a>
+      <a class="ci" href="{{ export_zip_1 }}" download><span><b>Download ZIP with linked tables</b><small>This table and what its foreign keys reach (1 hop, up to 8 tables)</small></span></a>
+      <a class="ci" href="{{ export_zip_2 }}" download><span><b>Download ZIP, 2 hops</b><small>Also the tables those reach; relationships in meta.json</small></span></a>
       <button class="ci" type="button" data-copy-csv><span><b>Copy as CSV</b><small>This page, to clipboard</small></span></button>
     </div>
     <div class="pop" id="colpop">
@@ -52,7 +54,7 @@
           <tr tabindex="0" data-row="{{ row.number }}">
             <td class="rn">{{ row.number }}</td>
             {% for cell in row.values %}
-            <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if cell.class == "bool-value" %}<span class="pill {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
+            <td class="{{ cell.class }}" data-detail="{{ cell.detail }}" title="{{ cell.native_type }}">{% if cell.is_null %}<i class="nul" data-null></i>{% else %}{% if !cell.fk_href.is_empty() %}<a class="fk" href="{{ cell.fk_href }}" hx-get="{{ cell.fk_href }}" hx-target="#mainbody" hx-swap="innerHTML" title="Open the referenced row">{{ cell.text }}</a>{% else if cell.class == "bool-value" %}<span class="pill {% if cell.text == "true" || cell.text == "t" %}y{% else %}n{% endif %}">{{ cell.text }}</span>{% else if cell.class == "mono-value" || cell.class == "json-value" || cell.class == "array-value" %}<code>{{ cell.text }}</code>{% else if cell.class == "ts-value" %}<span class="ts">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}{% if cell.truncated %}<span class="truncation" aria-label="truncated">…</span>{% endif %}{% endif %}</td>
             {% endfor %}
           </tr>
           {% endfor %}

@@ -60,6 +60,9 @@ struct StructureColumn {
     nullable: bool,
     key: String,
     generation: String,
+    /// `schema.table.column` of a single-column foreign key, shown as a link.
+    references: String,
+    ref_href: String,
 }
 struct StructureConstraint {
     name: String,
@@ -90,6 +93,7 @@ struct IndexView {
     valid: bool,
     predicate: String,
     definition: String,
+    unique: bool,
 }
 struct StatisticView {
     name: String,
@@ -112,6 +116,9 @@ struct SchemaItem {
 #[derive(Template)]
 #[template(path = "components/relation_tree.html")]
 struct RelationTreeTemplate {
+    grouped: bool,
+    table_count: usize,
+    view_count: usize,
     schema: String,
     objects_href: String,
     relations: Vec<RelationItem>,
@@ -123,6 +130,7 @@ struct RelationItem {
     name: String,
     kind: String,
     href: String,
+    is_view: bool,
 }
 
 fn err(db: DbError) -> AppError {
@@ -290,6 +298,8 @@ fn structure_column(detail: ColumnDetail) -> StructureColumn {
         } else {
             generation.join(" · ")
         },
+        references: String::new(),
+        ref_href: String::new(),
     }
 }
 fn structure_constraint(constraint: Constraint) -> StructureConstraint {
@@ -333,6 +343,7 @@ fn index_view(index: Index) -> IndexView {
         valid: index.valid,
         predicate: index.predicate.unwrap_or_else(|| "—".into()),
         definition: index.definition,
+        unique: index.unique || index.primary,
     }
 }
 fn validate_name(name: &str) -> Result<(), AppError> {
@@ -383,6 +394,8 @@ pub struct SchemaQuery {
     q: Option<String>,
     /// Trusted connection profile id; absent means the default profile.
     profile: Option<String>,
+    /// Advanced explorer: group tables and views under headings.
+    group: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -453,7 +466,7 @@ pub async fn schemas(
         }
     };
     let truncated = entries.truncated;
-    let schemas = entries
+    let schemas: Vec<SchemaItem> = entries
         .items
         .into_iter()
         .filter(|schema| auth.0.can_see_schema(&pid, &schema.name))
@@ -466,6 +479,7 @@ pub async fn schemas(
             name: schema.name,
         })
         .collect();
+    let schemas_empty = schemas.is_empty();
     tree_response(SchemaTreeTemplate {
         overview_href: format!(
             "/catalog/overview?{}",
@@ -474,6 +488,8 @@ pub async fn schemas(
         schemas,
         note: if truncated {
             "Only schemas with USAGE are listed; the bounded list is incomplete.".into()
+        } else if !auth.0.is_open() && schemas_empty {
+            "No databases assigned yet. Ask an administrator for access.".into()
         } else {
             "Only schemas with USAGE privileges are listed; empty schemas remain visible.".into()
         },
@@ -520,13 +536,21 @@ pub async fn relations(
                 .as_ref()
                 .is_none_or(|n| relation.id.name.to_lowercase().contains(n))
         })
-        .map(|relation| RelationItem {
-            name: relation.id.name.clone(),
-            kind: format!("{:?}", relation.kind),
-            href: relation_url("data", &relation.id, profile),
+        .map(|relation| {
+            let kind = format!("{:?}", relation.kind);
+            RelationItem {
+                name: relation.id.name.clone(),
+                is_view: kind.contains("View"),
+                kind,
+                href: relation_url("data", &relation.id, profile),
+            }
         })
-        .collect();
+        .collect::<Vec<_>>();
+    let view_count = relations.iter().filter(|r| r.is_view).count();
     tree_response(RelationTreeTemplate {
+        grouped: query.group.as_deref() == Some("1"),
+        table_count: relations.len() - view_count,
+        view_count,
         objects_href: format!(
             "/catalog/objects?schema={}{}",
             url_arg(&schema),
@@ -576,6 +600,30 @@ pub async fn structure(
         .map(structure_column)
         .collect::<Vec<_>>();
     columns.sort_by_key(|column| column.position);
+    // Single-column foreign keys become the column's "References" link.
+    for constraint in &constraints.items {
+        if constraint.kind != crate::db::types::ConstraintKind::ForeignKey
+            || constraint.columns.len() != 1
+        {
+            continue;
+        }
+        let (Some(target), Some(column)) = (
+            constraint.references.as_ref(),
+            columns.iter_mut().find(|c| c.name == constraint.columns[0]),
+        ) else {
+            continue;
+        };
+        column.references = format!(
+            "{}.{}{}",
+            target.namespace,
+            target.name,
+            constraint
+                .referenced_columns
+                .first()
+                .map_or(String::new(), |c| format!(".{c}"))
+        );
+        column.ref_href = relation_url("data", target, profile);
+    }
     let constraints = constraints
         .items
         .into_iter()
@@ -595,6 +643,54 @@ pub async fn structure(
         partitions,
         truncated,
     })
+}
+/// Relations in the same schema whose foreign keys point here. Bounded to the first 50
+/// visible relations, so it is a hint, not a complete dependency graph.
+async fn referenced_by(
+    c: &std::sync::Arc<dyn crate::db::adapter::DatabaseAdapter>,
+    id: &RelationId,
+    auth: &Auth,
+    pid: &str,
+) -> StatisticView {
+    let meaning =
+        "Same-schema foreign keys that point at this relation (first 50 visible relations)"
+            .to_string();
+    let Ok(list) = c.list_relations(&id.namespace).await else {
+        return StatisticView {
+            name: "Referenced by".into(),
+            value: "Unavailable".into(),
+            meaning,
+        };
+    };
+    let mut found = Vec::new();
+    for relation in list.items.into_iter().take(50) {
+        if relation.id == *id
+            || !auth.0.allows(
+                Action::View,
+                &Resource::relation(pid, &relation.id.namespace, &relation.id.name),
+            )
+        {
+            continue;
+        }
+        let Ok(constraints) = c.list_constraints(&relation.id).await else {
+            continue;
+        };
+        if constraints.items.iter().any(|k| {
+            k.kind == crate::db::types::ConstraintKind::ForeignKey
+                && k.references.as_ref() == Some(id)
+        }) {
+            found.push(relation.id.name);
+        }
+    }
+    StatisticView {
+        name: "Referenced by".into(),
+        value: if found.is_empty() {
+            "—".into()
+        } else {
+            found.join(", ")
+        },
+        meaning,
+    }
 }
 pub async fn indexes(
     State(state): State<AppState>,
@@ -619,12 +715,14 @@ pub async fn indexes(
         tokio::try_join!(c.list_indexes(&id), c.relation_statistics(&id)).map_err(err)?;
     let truncated = entries.truncated;
     let indexes = entries.items.into_iter().map(index_view).collect();
+    let mut statistics = statistic_views(&statistics);
+    statistics.push(referenced_by(&c, &id, &auth, &pid).await);
     metadata_response(IndexesTemplate {
         active: "indexes",
         title: format!("Indexes · {}.{}", id.namespace, id.name),
         links: relation_links(&id, profile),
         indexes,
-        statistics: statistic_views(&statistics),
+        statistics,
         truncated,
     })
 }

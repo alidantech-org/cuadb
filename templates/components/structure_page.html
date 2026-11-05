@@ -3,8 +3,8 @@
   <div class="wrap"><div class="gw st">
     <h4>Columns</h4>
     {% if columns.is_empty() %}<p class="note">No visible column metadata.</p>{% else %}
-    <table><thead><tr><th>#</th><th>Column</th><th>Type</th><th>Nullable</th><th>Key</th><th>Default / generation</th></tr></thead><tbody>
-      {% for column in columns %}<tr><td>{{ column.position }}</td><td><b>{{ column.name }}</b></td><td><code>{{ column.native_type }}</code></td><td>{% if column.nullable %}yes{% else %}no{% endif %}</td><td>{{ column.key }}</td><td>{{ column.generation }}</td></tr>{% endfor %}
+    <table><thead><tr><th>#</th><th>Column</th><th>Type</th><th>Nullable</th><th>Key</th><th>References</th><th>Default / generation</th></tr></thead><tbody>
+      {% for column in columns %}<tr><td>{{ column.position }}</td><td><b>{{ column.name }}</b></td><td><code>{{ column.native_type }}</code></td><td>{% if column.nullable %}yes{% else %}no{% endif %}</td><td>{{ column.key }}</td><td>{% if column.ref_href.is_empty() %}<span class="mu">—</span>{% else %}<a class="fk" href="{{ column.ref_href }}" hx-get="{{ column.ref_href }}" hx-target="#mainbody" hx-swap="innerHTML">{{ column.references }}</a>{% endif %}</td><td>{{ column.generation }}</td></tr>{% endfor %}
     </tbody></table>{% endif %}
     <h4>Constraints</h4>
     {% if constraints.is_empty() %}<p class="note">No visible constraints, or this relation does not expose constraint metadata.</p>{% else %}
